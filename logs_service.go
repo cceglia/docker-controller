@@ -115,23 +115,49 @@ func (s *ProjectsService) StartLogs(id, project, service string) error {
 		if errors.Is(err, errLogStopped) {
 			return nil // stopped before it started: nothing to run
 		}
-		return err
+		return userError(err)
 	}
 	go func() {
 		defer s.logs.release(id)
-		var stderr []string // only touched by the callback, in this goroutine
-		err := s.manager.Logs(ctx, compose.LogRequest{Project: project, Service: service}, func(l compose.LogLine) {
-			s.emit(logEvent, LogEvent{ID: id, Type: LogLineEvent, Line: l})
-		})
-		if ctx.Err() == nil { // not stopped: tell the frontend why it ended
-			e := LogEvent{ID: id, Type: LogEndedEvent}
-			if err != nil {
-				e.Error = logEndedMessage(err, stderr)
-			}
-			s.emit(logEvent, e)
-		}
+		streamLogs(ctx, id, compose.LogRequest{Project: project, Service: service}, s.manager.Logs, s.emit)
 	}()
 	return nil
+}
+
+// maxEndedStderrLines bounds the stderr lines kept to explain how a stream ended.
+const maxEndedStderrLines = 20
+
+// logSource runs a log stream (compose.Manager.Logs) until it ends.
+type logSource func(ctx context.Context, req compose.LogRequest, onLine func(compose.LogLine)) error
+
+// appendLastLines appends line to lines, keeping only the last n.
+func appendLastLines(lines []string, line string, n int) []string {
+	lines = append(lines, line)
+	if len(lines) > n {
+		lines = slices.Delete(lines, 0, len(lines)-n)
+	}
+	return lines
+}
+
+// streamLogs runs the stream, emitting each line, and when it ends on its own
+// (ctx not cancelled) a LogEndedEvent that explains why, with the last stderr
+// lines of compose as detail.
+func streamLogs(ctx context.Context, id string, req compose.LogRequest, logs logSource, emit func(string, any)) {
+	var stderr []string // only touched by the callback, which is never concurrent
+	err := logs(ctx, req, func(l compose.LogLine) {
+		if l.Stderr {
+			stderr = appendLastLines(stderr, l.Text, maxEndedStderrLines)
+		}
+		emit(logEvent, LogEvent{ID: id, Type: LogLineEvent, Line: l})
+	})
+	if ctx.Err() != nil {
+		return // stopped: nothing more is sent
+	}
+	e := LogEvent{ID: id, Type: LogEndedEvent}
+	if err != nil {
+		e.Error = logEndedMessage(err, stderr)
+	}
+	emit(logEvent, e)
 }
 
 // StopLogs stops the log stream id and terminates its `compose logs` process.

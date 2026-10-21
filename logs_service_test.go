@@ -3,7 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
+
+	"dockercontroller/internal/compose"
 )
 
 func TestLogStreams_StopCancelsARegisteredStream(t *testing.T) {
@@ -52,5 +56,62 @@ func TestLogStreams_StoppedIDsAreBounded(t *testing.T) {
 	}
 	if n := len(l.stopped); n > maxStoppedLogIDs {
 		t.Errorf("%d remembered ids, want at most %d", n, maxStoppedLogIDs)
+	}
+}
+
+func TestAppendLastLines_KeepsOnlyTheLastN(t *testing.T) {
+	var lines []string
+	for i := 0; i < 100; i++ {
+		lines = appendLastLines(lines, fmt.Sprint("l", i), maxEndedStderrLines)
+	}
+	if len(lines) != maxEndedStderrLines {
+		t.Fatalf("kept %d lines, want %d", len(lines), maxEndedStderrLines)
+	}
+	if lines[0] != "l80" || lines[len(lines)-1] != "l99" {
+		t.Errorf("kept %v, want l80..l99", lines)
+	}
+}
+
+func TestStreamLogs_EndedEventCarriesTheStderrDetailOfCompose(t *testing.T) {
+	source := func(_ context.Context, _ compose.LogRequest, onLine func(compose.LogLine)) error {
+		onLine(compose.LogLine{Text: "web  | hello"})
+		onLine(compose.LogLine{Text: "no configuration file provided: not found", Stderr: true})
+		return errors.New("exit status 1")
+	}
+	var events []LogEvent
+	emit := func(_ string, data any) { events = append(events, data.(LogEvent)) }
+
+	streamLogs(context.Background(), "s1", compose.LogRequest{Project: "p"}, source, emit)
+
+	if len(events) != 3 {
+		t.Fatalf("%d events, want 3: %v", len(events), events)
+	}
+	last := events[2]
+	if last.Type != LogEndedEvent || !strings.Contains(last.Error, "no configuration file provided") {
+		t.Errorf("ended event = %+v, want the stderr detail", last)
+	}
+}
+
+func TestStreamLogs_StoppedStreamSendsNoEndedEvent(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	source := func(context.Context, compose.LogRequest, func(compose.LogLine)) error {
+		cancel()
+		return nil
+	}
+	n := 0
+	streamLogs(ctx, "s1", compose.LogRequest{}, source, func(string, any) { n++ })
+	if n != 0 {
+		t.Errorf("%d events after a stop, want none", n)
+	}
+}
+
+func TestStartLogs_DuplicateIDReturnsAnItalianMessage(t *testing.T) {
+	s := &ProjectsService{ctx: context.Background()}
+	if err := s.logs.add("dup", func() {}); err != nil {
+		t.Fatal(err)
+	}
+	err := s.StartLogs("dup", "p", "")
+	if err == nil || err.Error() != "Flusso dei log già aperto." {
+		t.Errorf("err = %v, want the Italian message", err)
 	}
 }
