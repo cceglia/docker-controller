@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="224" fill="#1769e0"/>
+  <!-- containers stacked on the whale's back -->
+  <g fill="#bfe0ff">
+    <rect x="250" y="400" width="110" height="90" rx="12"/>
+    <rect x="370" y="400" width="110" height="90" rx="12"/>
+    <rect x="490" y="400" width="110" height="90" rx="12"/>
+    <rect x="610" y="400" width="110" height="90" rx="12"/>
+    <rect x="310" y="300" width="110" height="90" rx="12"/>
+    <rect x="430" y="300" width="110" height="90" rx="12"/>
+    <rect x="550" y="300" width="110" height="90" rx="12"/>
+    <rect x="430" y="200" width="110" height="90" rx="12"/>
+  </g>
+  <!-- whale -->
+  <path fill="#fff" d="M120 520 H820 C880 520 930 500 960 460 C985 520 960 640 880 720 C790 810 640 850 500 850 C320 850 180 760 120 520 Z"/>
+  <path fill="#fff" d="M130 560 C90 520 50 470 40 410 C100 410 150 450 180 510 Z"/>
+  <circle cx="855" cy="590" r="24" fill="#0a4bb5"/>
+  <!-- running status dot -->
+  <circle cx="800" cy="260" r="76" fill="#fff"/>
+  <circle cx="800" cy="260" r="60" fill="#2ecc71"/>
+</svg>

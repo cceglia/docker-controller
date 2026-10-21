@@ -19,6 +19,11 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// appIcon is the icon of the window (title bar, taskbar, about box).
+//
+//go:embed build/appicon.png
+var appIcon []byte
+
 // snapshotEvent carries a compose.Snapshot to the frontend.
 const snapshotEvent = "snapshot"
 
@@ -76,6 +81,7 @@ func run() error {
 	closer := &windowCloser{settings: settingsStore}
 	app = application.New(application.Options{
 		Name:        "Docker Controller",
+		Icon:        appIcon,
 		Description: "Gestione dei Progetti docker-compose",
 		Services: []application.Service{
 			application.NewService(&ProjectsService{manager: manager, settings: settingsStore, ctx: ctx, emit: func(name string, data any) { app.Event.Emit(name, data) }}),
