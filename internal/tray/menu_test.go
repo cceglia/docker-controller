@@ -107,7 +107,7 @@ func TestBuildMenu_ProjectActionsAndServices(t *testing.T) {
 	if p == nil {
 		t.Fatalf("no project: %v", labels(m))
 	}
-	want := map[string]compose.ActionKind{"Up": compose.ActionUp, "Stop": compose.ActionStop, "Restart": compose.ActionRestart}
+	want := map[string]compose.ActionKind{"Up": compose.ActionUp, "Stop": compose.ActionStop, "Restart": compose.ActionRestart, "Down": compose.ActionDown}
 	for label, kind := range want {
 		it := find(p.Children, label)
 		if it == nil || !it.Enabled || it.Action == nil || *it.Action != (compose.Action{Project: "vpn", Kind: kind}) {
@@ -122,7 +122,7 @@ func TestBuildMenu_ProjectActionsAndServices(t *testing.T) {
 	if web == nil {
 		t.Fatalf("services = %v", labels(services.Children))
 	}
-	wantSvc := map[string]compose.ActionKind{"Start": compose.ActionStart, "Stop": compose.ActionStop, "Restart": compose.ActionRestart}
+	wantSvc := map[string]compose.ActionKind{"Start": compose.ActionStart, "Stop": compose.ActionStop, "Restart": compose.ActionRestart, "Down": compose.ActionDownService}
 	if len(web.Children) != len(wantSvc) {
 		t.Errorf("service entries = %v", labels(web.Children))
 	}
@@ -165,8 +165,8 @@ func TestBuildMenu_ActivityDisablesOnlyThatProject(t *testing.T) {
 			enabled++
 		}
 	})
-	if enabled != 6 {
-		t.Errorf("idle: %d enabled actions, want 6", enabled)
+	if enabled != 8 {
+		t.Errorf("idle: %d enabled actions, want 8", enabled)
 	}
 }
 
@@ -189,21 +189,44 @@ func TestBuildMenu_DockerUnreachableDisablesEveryAction(t *testing.T) {
 	}
 }
 
-func TestBuildMenu_NeverOffersDestructiveOrHeavyActions(t *testing.T) {
+func TestBuildMenu_NeverOffersDownWithVolumesPullOrBuild(t *testing.T) {
 	p := project("p", "", "G", compose.StatusActive, "web")
 	m := BuildMenu(snapshot(true, p, project("q", "", "", compose.StatusStopped, "db")))
-	banned := map[compose.ActionKind]bool{compose.ActionDown: true, compose.ActionDownVolumes: true, compose.ActionDownService: true, compose.ActionPull: true, compose.ActionBuild: true}
+	banned := map[compose.ActionKind]bool{compose.ActionDownVolumes: true, compose.ActionPull: true, compose.ActionBuild: true}
 	walk(m, func(it Item) {
 		if it.Action != nil && banned[it.Action.Kind] {
 			t.Errorf("%q offers %s", it.Label, it.Action.Kind)
 		}
 		l := strings.ToLower(it.Label)
-		for _, w := range []string{"down", "pull", "build", "volum"} {
+		for _, w := range []string{"pull", "build", "volum"} {
 			if strings.Contains(l, w) {
 				t.Errorf("label %q mentions %s", it.Label, w)
 			}
 		}
 	})
+}
+
+func TestBuildMenu_DownOfAProjectAndOfAServiceAsksForConfirmation(t *testing.T) {
+	m := BuildMenu(snapshot(true, project("p", "", "", compose.StatusActive, "web")))
+	downs := map[compose.ActionKind]Item{}
+	walk(m, func(it Item) {
+		if it.Action != nil && (it.Action.Kind == compose.ActionDown || it.Action.Kind == compose.ActionDownService) {
+			downs[it.Action.Kind] = it
+		}
+	})
+	for _, kind := range []compose.ActionKind{compose.ActionDown, compose.ActionDownService} {
+		it, ok := downs[kind]
+		if !ok {
+			t.Errorf("no %s entry in the menu", kind)
+			continue
+		}
+		if it.Label != "Down" || it.Confirm == "" {
+			t.Errorf("%s entry = %+v, want label Down and a confirmation", kind, it)
+		}
+	}
+	if downs[compose.ActionDownService].Action.Service != "web" || downs[compose.ActionDown].Action.Service != "" {
+		t.Errorf("Down targets wrong: %+v", downs)
+	}
 }
 
 func TestIconFor(t *testing.T) {

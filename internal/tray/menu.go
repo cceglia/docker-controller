@@ -21,7 +21,9 @@ type Item struct {
 	Enabled   bool
 	Separator bool
 	// Action is the compose Action the entry launches, nil for other entries.
-	Action   *compose.Action
+	Action *compose.Action
+	// Confirm, when not empty, is the question to ask before launching Action.
+	Confirm  string
 	Command  Command
 	Children []Item
 }
@@ -45,8 +47,10 @@ func IconFor(s compose.Snapshot) Icon {
 
 // BuildMenu describes the whole tray menu for a snapshot: Groups as submenus
 // of Projects, ungrouped Projects at the top level, then "Mostra finestra" and
-// "Esci". Only non-destructive Actions are ever offered: Up, Stop and Restart
-// on a Project, Start, Stop and Restart on a Service. Every Action is disabled
+// "Esci". Up, Stop, Restart and Down are offered on a Project; Start, Stop,
+// Restart and Down on a Service. Down asks for confirmation (Item.Confirm) and
+// never removes volumes: Down con volumi, Pull and Build are not in the tray.
+// Every Action is disabled
 // while Docker is unreachable and, for a Project, while it has an Activity.
 func BuildMenu(s compose.Snapshot) []Item {
 	var menu []Item
@@ -85,11 +89,17 @@ func projectItem(p compose.Project, dockerReachable bool) Item {
 	act := func(label string, service string, kind compose.ActionKind) Item {
 		return Item{Label: label, Enabled: usable, Action: &compose.Action{Project: p.Name, Service: service, Kind: kind}}
 	}
+	down := func(label, service string, kind compose.ActionKind, confirm string) Item {
+		it := act(label, service, kind)
+		it.Confirm = confirm
+		return it
+	}
 
 	children := []Item{
 		act("Up", "", compose.ActionUp),
 		act("Stop", "", compose.ActionStop),
 		act("Restart", "", compose.ActionRestart),
+		down("Down", "", compose.ActionDown, "Fermare e rimuovere i Container di "+displayName(p)+"? I volumi restano."),
 	}
 	if len(p.Services) > 0 {
 		services := make([]Item, 0, len(p.Services))
@@ -98,6 +108,7 @@ func projectItem(p compose.Project, dockerReachable bool) Item {
 				act("Start", svc.Name, compose.ActionStart),
 				act("Stop", svc.Name, compose.ActionStop),
 				act("Restart", svc.Name, compose.ActionRestart),
+				down("Down", svc.Name, compose.ActionDownService, "Fermare e rimuovere i Container del Servizio "+svc.Name+" di "+displayName(p)+"? I volumi restano."),
 			}})
 		}
 		children = append(children, Item{Separator: true}, Item{Label: "Servizi", Enabled: usable, Children: services})

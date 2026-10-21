@@ -72,7 +72,7 @@ Un'app desktop per KDE/Linux che mostra in un'unica finestra tutti i Progetti sa
 45. Come utente, voglio vedere nel menu tray lo stato di ogni Progetto (● Attivo, ◐ Parziale, ○ Fermo/Rimosso).
 46. Come utente, voglio eseguire Up, Stop e Restart su un Progetto dal tray.
 47. Come utente, voglio un sottomenu Servizi ▸ Servizio ▸ Start/Stop/Restart nel tray.
-48. Come utente, voglio che Down, Down con volumi, Pull e Build non siano disponibili nel tray, così che non compaiano mai modal da lì.
+48. Come utente, voglio che Down con volumi, Pull e Build non siano disponibili nel tray; Down (di un Progetto o di un Servizio) c\'è, con una conferma, così da non rimuovere Container per errore.
 49. Come utente, voglio che nel tray le voci di un Progetto con un'Attività in corso siano disabilitate.
 50. Come utente, voglio una notifica desktop quando finisce un'Attività lanciata dal tray, o quando un'Attività fallisce, così da conoscere l'esito anche a finestra nascosta.
 51. Come utente, voglio le voci "Mostra finestra" ed "Esci" nel tray.

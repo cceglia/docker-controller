@@ -109,7 +109,26 @@ func (t *trayAdapter) run(it tray.Item) {
 	if it.Action == nil {
 		return
 	}
-	a := *it.Action
+	if it.Confirm != "" {
+		t.confirm(it)
+		return
+	}
+	t.launch(*it.Action)
+}
+
+// confirm asks the question of a destructive entry and launches its Action
+// only when the user accepts.
+func (t *trayAdapter) confirm(it tray.Item) {
+	d := t.app.Dialog.Question().SetTitle("Docker Controller").SetMessage(it.Confirm)
+	ok := d.AddButton(it.Label)
+	ok.OnClick(func() { t.launch(*it.Action) })
+	cancel := d.AddButton("Annulla")
+	d.SetDefaultButton(cancel).SetCancelButton(cancel)
+	d.Show()
+}
+
+// launch starts an Action from the tray.
+func (t *trayAdapter) launch(a compose.Action) {
 	t.notifier.Launching(a)
 	if _, err := t.manager.Do(t.ctx, a); err != nil {
 		t.notifier.Aborted(a)
