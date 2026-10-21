@@ -1,0 +1,26 @@
+{
+  "exclude": [
+    "/docs/",
+    "/.codegraph/",
+    "/.claude/",
+    "/.scratch/",
+    "/bin/",
+    "/build/",
+    "/frontend/dist/",
+    "/frontend/bindings/",
+    "**/.git/",
+    "**/node_modules/",
+    "**/dist/",
+    "**/coverage/",
+    "**/testdata/",
+    "**/*.tsbuildinfo",
+    "**/*.log",
+    "**/*.db",
+    "**/.env",
+    "**/.env.*",
+    "**/.vscode/",
+    "**/.idea/",
+    "**/*.swp",
+    "**/*~"
+  ]
+}

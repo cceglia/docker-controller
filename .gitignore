@@ -1,0 +1,12 @@
+# build output
+/bin/
+/build/bin/
+/frontend/dist/
+node_modules/
+# local state
+*.db
+*.log
+.agents/tmp/
+.scratch/
+.env
+.env.*
