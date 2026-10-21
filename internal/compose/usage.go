@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Measures is the Utilizzo risorse of a set of Containers: the sum of their
@@ -34,6 +35,49 @@ func (m *Measures) add(o Measures) {
 	m.BlockWriteBytes += o.BlockWriteBytes
 }
 
+// Rates is the instantaneous network and disk traffic of the running
+// Containers, in bytes per second, measured between two consecutive frames.
+type Rates struct {
+	NetInBytesPerSec      float64 `json:"netInBytesPerSec"`
+	NetOutBytesPerSec     float64 `json:"netOutBytesPerSec"`
+	BlockReadBytesPerSec  float64 `json:"blockReadBytesPerSec"`
+	BlockWriteBytesPerSec float64 `json:"blockWriteBytesPerSec"`
+}
+
+// rateTracker turns the cumulative counters of docker stats into Rates. It
+// works per Container, so a Container that starts, stops or restarts (its
+// counters drop) never makes the rate negative or spikes it.
+type rateTracker struct {
+	at   time.Time
+	prev map[string]Measures // by Container id
+}
+
+// observe returns the Rates of the frame taken at now; zero for the first frame.
+func (r *rateTracker) observe(now time.Time, rows []statsRow) Rates {
+	var d Rates
+	if dt := now.Sub(r.at).Seconds(); r.prev != nil && dt > 0 {
+		delta := func(cur, old uint64) float64 {
+			if cur < old {
+				return 0
+			}
+			return float64(cur-old) / dt
+		}
+		for _, row := range rows {
+			if old, ok := r.prev[row.id]; ok {
+				d.NetInBytesPerSec += delta(row.measures.NetInBytes, old.NetInBytes)
+				d.NetOutBytesPerSec += delta(row.measures.NetOutBytes, old.NetOutBytes)
+				d.BlockReadBytesPerSec += delta(row.measures.BlockReadBytes, old.BlockReadBytes)
+				d.BlockWriteBytesPerSec += delta(row.measures.BlockWriteBytes, old.BlockWriteBytes)
+			}
+		}
+	}
+	r.at, r.prev = now, make(map[string]Measures, len(rows))
+	for _, row := range rows {
+		r.prev[row.id] = row.measures
+	}
+	return d
+}
+
 // ServiceUsage is the Utilizzo risorse of one Service: the sum over its
 // running Containers.
 type ServiceUsage struct {
@@ -54,6 +98,8 @@ type UsageSample struct {
 	Containers int `json:"containers"`
 	// Total is the global usage: the sum over every running Container.
 	Total Measures `json:"total"`
+	// Rate is the instantaneous network and disk traffic of Total.
+	Rate Rates `json:"rate"`
 	// CPUs and MemoryTotalBytes are the size of the machine (docker info).
 	CPUs             int    `json:"cpus"`
 	MemoryTotalBytes uint64 `json:"memoryTotalBytes"`
@@ -105,7 +151,12 @@ func (m *Manager) streamUsage(ctx context.Context, onSample func(UsageSample)) e
 		return err
 	}
 
-	frames := statsFrames{emit: func(rows []statsRow) { onSample(m.sampleOf(rows, size)) }}
+	var rates rateTracker // per stream: a new stream has no previous frame
+	frames := statsFrames{emit: func(rows []statsRow) {
+		s := m.sampleOf(rows, size)
+		s.Rate = rates.observe(time.Now(), rows)
+		onSample(s)
+	}}
 	var lastStderr string
 	err = m.docker.Stream(ctx, statsArgs, func(line string, stderr bool) {
 		if stderr {
