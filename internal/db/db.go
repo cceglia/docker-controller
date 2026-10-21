@@ -3,17 +3,23 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
-	"strings"
+	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	migsqlite "github.com/golang-migrate/migrate/v4/database/sqlite" // modernc.org/sqlite based, no cgo
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "modernc.org/sqlite" // database/sql driver "sqlite"
 )
+
+// migrationTimeout bounds the schema checks done while opening.
+const migrationTimeout = 30 * time.Second
 
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
@@ -42,74 +48,64 @@ func Open(path string) (*sql.DB, error) {
 	// One connection: the app is a single local process and this avoids
 	// SQLITE_BUSY between concurrent goroutines.
 	conn.SetMaxOpenConns(1)
-	if err := migrate(conn); err != nil {
+	if err := migrateUp(conn); err != nil {
 		_ = conn.Close()
 		return nil, err
 	}
 	return conn, nil
 }
 
-type migration struct {
-	version int
-	sql     string
-}
-
-func loadMigrations() ([]migration, error) {
-	entries, err := migrationFiles.ReadDir("migrations")
+// legacyVersion is the schema version of a database created by the former
+// hand-rolled runner (PRAGMA user_version) that has no schema_migrations table
+// yet; 0 when the database is new or already managed by golang-migrate.
+func legacyVersion(ctx context.Context, conn *sql.DB) (int, error) {
+	var managed int
+	err := conn.QueryRowContext(ctx,
+		"SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?", migsqlite.DefaultMigrationsTable).Scan(&managed)
 	if err != nil {
-		return nil, fmt.Errorf("db: read migrations: %w", err)
+		return 0, fmt.Errorf("db: look for %s: %w", migsqlite.DefaultMigrationsTable, err)
 	}
-	var out []migration
-	for _, e := range entries {
-		prefix, _, ok := strings.Cut(e.Name(), "_")
-		if !ok {
-			return nil, fmt.Errorf("db: migration %q has no version prefix", e.Name())
-		}
-		v, err := strconv.Atoi(prefix)
-		if err != nil {
-			return nil, fmt.Errorf("db: migration %q: bad version: %w", e.Name(), err)
-		}
-		body, err := migrationFiles.ReadFile("migrations/" + e.Name())
-		if err != nil {
-			return nil, fmt.Errorf("db: read migration %q: %w", e.Name(), err)
-		}
-		out = append(out, migration{version: v, sql: string(body)})
+	if managed > 0 {
+		return 0, nil
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].version < out[j].version })
-	return out, nil
+	var current int
+	if err := conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&current); err != nil {
+		return 0, fmt.Errorf("db: read legacy schema version: %w", err)
+	}
+	return current, nil
 }
 
-// migrate applies, in order and each in its own transaction, the migrations
-// newer than PRAGMA user_version.
-func migrate(conn *sql.DB) error {
-	migrations, err := loadMigrations()
+// migrateUp applies the embedded migrations with golang-migrate. A database
+// left by the former runner (user_version >= 1, no schema_migrations) is
+// adopted at its version first, so its tables and rows are kept untouched.
+func migrateUp(conn *sql.DB) error {
+	ctx, cancel := context.WithTimeout(context.Background(), migrationTimeout)
+	defer cancel()
+
+	legacy, err := legacyVersion(ctx, conn)
 	if err != nil {
 		return err
 	}
-	var current int
-	if err := conn.QueryRow("PRAGMA user_version").Scan(&current); err != nil {
-		return fmt.Errorf("db: read schema version: %w", err)
+	src, err := iofs.New(migrationFiles, "migrations")
+	if err != nil {
+		return fmt.Errorf("db: migration source: %w", err)
 	}
-	for _, m := range migrations {
-		if m.version <= current {
-			continue
+	driver, err := migsqlite.WithInstance(conn, &migsqlite.Config{DatabaseName: "docker-controller"})
+	if err != nil {
+		return fmt.Errorf("db: migration driver: %w", err)
+	}
+	// m.Close is never called: it would close conn, which the caller owns.
+	m, err := migrate.NewWithInstance("iofs", src, "sqlite", driver)
+	if err != nil {
+		return fmt.Errorf("db: migrator: %w", err)
+	}
+	if legacy >= 1 {
+		if err := m.Force(legacy); err != nil {
+			return fmt.Errorf("db: adopt legacy schema version %d: %w", legacy, err)
 		}
-		tx, err := conn.Begin()
-		if err != nil {
-			return fmt.Errorf("db: begin migration %d: %w", m.version, err)
-		}
-		if _, err := tx.Exec(m.sql); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("db: apply migration %d: %w", m.version, err)
-		}
-		// PRAGMA does not accept bound parameters.
-		if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", m.version)); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("db: record migration %d: %w", m.version, err)
-		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("db: commit migration %d: %w", m.version, err)
-		}
+	}
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return fmt.Errorf("db: apply migrations: %w", err)
 	}
 	return nil
 }

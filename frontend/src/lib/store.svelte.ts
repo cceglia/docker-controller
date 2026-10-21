@@ -88,7 +88,7 @@ export interface Toast {
   activityId: string | null
 }
 
-const empty: Snapshot = { dockerReachable: true, projects: [], groups: [] }
+const empty: Snapshot = { loading: true, dockerReachable: true, projects: [], groups: [] }
 
 let snapshot = $state<Snapshot>(empty)
 let loaded = $state(false)
@@ -110,6 +110,15 @@ const serviceUsage = $derived(
   new Map((usage?.dockerReachable ? (usage.services ?? []) : []).map((u) => [`${u.project}/${u.service}`, u.measures])),
 )
 
+/** The longest error excerpt shown in a toast. */
+const EXCERPT_MAX = 140
+
+/** The first non-empty line of an error text, truncated for a toast ('' when there is none). */
+export function errorExcerpt(text: string, max = EXCERPT_MAX): string {
+  const line = text.split('\n').map((l) => l.trim()).find((l) => l !== '') ?? ''
+  return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line
+}
+
 function applyActivity(e: ActivityEvent) {
   if (e.type === ActivityEventType.ActivityStarted) {
     activities.unshift({ id: e.id, project: e.project, service: e.service, kind: e.kind, state: 'running', error: '', lines: [] })
@@ -125,10 +134,9 @@ function applyActivity(e: ActivityEvent) {
   record.state = e.error ? 'error' : 'ok'
   record.error = e.error
   if (e.error) {
-    toast = {
-      message: `${actionLabels[e.kind] ?? e.kind} su ${e.service ? `${e.project}/${e.service}` : e.project} non riuscito`,
-      activityId: e.id,
-    }
+    const what = `${actionLabels[e.kind] ?? e.kind} su ${e.service ? `${e.project}/${e.service}` : e.project} non riuscito`
+    const why = errorExcerpt(e.error)
+    toast = { message: why ? `${what}: ${why}` : what, activityId: e.id }
   }
 }
 
@@ -169,7 +177,9 @@ function applyLog(e: LogEvent) {
 
 function apply(next: Snapshot) {
   snapshot = { ...next, projects: next.projects ?? [] }
-  loaded = true
+  // The first snapshot of the backend is flagged loading: Docker has not been
+  // asked yet, so nothing (not even "Docker non raggiungibile") is shown.
+  loaded = !next.loading
 }
 
 /** Subscribes to snapshot events and loads the initial one. Idempotent. */
@@ -376,9 +386,11 @@ export function dismissToast() {
 /**
  * The Utilizzo risorse of the Services of a Project: Service name -> measures.
  * A Service without running Containers is absent (the UI shows "—"), which is
- * not the same as zero.
+ * not the same as zero. null while no sample has arrived yet: the UI shows a
+ * loading placeholder, not "—".
  */
-export function usageOfProject(project: string): Record<string, Measures> {
+export function usageOfProject(project: string): Record<string, Measures> | null {
+  if (usage === null) return null
   const out: Record<string, Measures> = {}
   for (const [key, measures] of serviceUsage) {
     if (key.startsWith(`${project}/`)) out[key.slice(project.length + 1)] = measures

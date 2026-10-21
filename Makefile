@@ -37,18 +37,19 @@ dev:
 PREFIX ?= $(HOME)/.local
 DESTDIR ?=
 APP_BIN := docker-controller
-ICON_DIR := $(PREFIX)/share/icons/hicolor/1024x1024/apps
+ICON_SIZES := 256x256 512x512
+ICON_ROOT := $(PREFIX)/share/icons/hicolor
 DESKTOP_DIR := $(PREFIX)/share/applications
 BIN_INSTALL := $(DESTDIR)$(PREFIX)/bin/$(APP_BIN)
 DESKTOP_INSTALL := $(DESTDIR)$(DESKTOP_DIR)/docker-controller.desktop
-ICON_INSTALL := $(DESTDIR)$(ICON_DIR)/docker-controller.png
+ICON_INSTALL := $(foreach s,$(ICON_SIZES),$(DESTDIR)$(ICON_ROOT)/$(s)/apps/docker-controller.png)
 
 install: build
 	install -Dm755 bin/dockercontroller $(BIN_INSTALL)
 	install -d $(DESTDIR)$(DESKTOP_DIR)
 	sed 's|@BINDIR@|$(PREFIX)/bin|' build/linux/docker-controller.desktop.in > $(DESKTOP_INSTALL)
 	chmod 644 $(DESKTOP_INSTALL)
-	install -Dm644 build/appicon.png $(ICON_INSTALL)
+	$(foreach s,$(ICON_SIZES),install -Dm644 build/linux/icons/$(s)/docker-controller.png $(DESTDIR)$(ICON_ROOT)/$(s)/apps/docker-controller.png;)
 	-command -v update-desktop-database >/dev/null && update-desktop-database -q $(DESTDIR)$(DESKTOP_DIR)
 	-command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -t -f $(DESTDIR)$(PREFIX)/share/icons/hicolor
 	@echo "Installato in $(DESTDIR)$(PREFIX). Il database non viene toccato."

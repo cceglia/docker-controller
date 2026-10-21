@@ -402,3 +402,39 @@ func TestRefresh_FlagsAProjectWhoseComposeFilesAreGone(t *testing.T) {
 		t.Errorf("got missing=%v status=%s, want missing Rimosso", p.ComposeMissing, p.Status)
 	}
 }
+
+func TestWatch_FirstSnapshotIsLoadingUntilTheFirstRefresh(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		docker    func() *composefake.Fake
+		reachable bool
+	}{
+		{"docker reachable", func() *composefake.Fake { return realDocker(t) }, true},
+		{"docker unreachable", func() *composefake.Fake {
+			f := composefake.New()
+			f.RespondErr(nil, errors.New("Cannot connect to the Docker daemon"), lsArgs...)
+			return f
+		}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newManager(t, tc.docker(), tempDB(t))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			ch := m.Watch(ctx)
+
+			if first := <-ch; !first.Loading {
+				t.Errorf("first snapshot must be Loading (nothing was checked yet): %+v", first)
+			}
+			if !m.Snapshot().Loading {
+				t.Error("Snapshot() before the first Refresh must be Loading")
+			}
+			if err := m.Refresh(ctx); err != nil {
+				t.Fatal(err)
+			}
+			s := <-ch
+			if s.Loading || s.DockerReachable != tc.reachable {
+				t.Errorf("after the first Refresh: Loading=%v DockerReachable=%v, want false %v", s.Loading, s.DockerReachable, tc.reachable)
+			}
+		})
+	}
+}

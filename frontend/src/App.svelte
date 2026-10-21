@@ -33,6 +33,12 @@
   } from './lib/store.svelte'
 
   onMount(start)
+
+  // Whatever hides the log panel (Impostazioni, the Project gone from the
+  // list, the back button) must also stop the stream.
+  $effect(() => {
+    if (store.logs !== null && (store.showingSettings || store.selectedProject === null)) closeLogs()
+  })
 </script>
 
 <main>
@@ -44,7 +50,7 @@
       <button onclick={() => setAdding(true)}>Aggiungi Progetto</button>
     </div>
   </header>
-  {#if !store.dockerReachable}
+  {#if store.loaded && !store.dockerReachable}
     <p class="banner">Docker non raggiungibile</p>
   {/if}
   {#if store.loaded}

@@ -46,6 +46,7 @@ type Manager struct {
 	base     Snapshot   // what Docker and the store say
 	snap     Snapshot   // base plus the running Activities
 	running  map[string]ActivityRef
+	removing map[string]bool // Projects being removed from the list: no Activity may start on them
 	nextID   uint64
 	watchers []chan Snapshot
 }
@@ -58,9 +59,10 @@ func New(cfg Config) (*Manager, error) {
 	return &Manager{
 		docker:     cfg.Docker,
 		store:      store{db: cfg.DB},
-		base:       Snapshot{Projects: []Project{}, Groups: []string{}},
-		snap:       Snapshot{Projects: []Project{}, Groups: []string{}},
+		base:       Snapshot{Loading: true, Projects: []Project{}, Groups: []string{}},
+		snap:       Snapshot{Loading: true, Projects: []Project{}, Groups: []string{}},
 		running:    map[string]ActivityRef{},
+		removing:   map[string]bool{},
 		profiles:   map[string]profileCache{},
 		onActivity: cfg.OnActivity,
 
@@ -214,7 +216,7 @@ func (m *Manager) publish(next Snapshot) {
 // recompose rebuilds snap from base and the running Activities and notifies
 // watchers if it changed. m.mu must be held.
 func (m *Manager) recompose() {
-	next := Snapshot{DockerReachable: m.base.DockerReachable, Projects: make([]Project, len(m.base.Projects))}
+	next := Snapshot{Loading: m.base.Loading, DockerReachable: m.base.DockerReachable, Projects: make([]Project, len(m.base.Projects))}
 	copy(next.Projects, m.base.Projects)
 	next.Groups = groupsOf(next.Projects)
 	for i := range next.Projects {

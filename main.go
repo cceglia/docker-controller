@@ -95,7 +95,9 @@ func run() error {
 	})
 
 	// The usage stream runs while the window is visible: it starts with the
-	// application (the window is created shown) and follows Show and Hide.
+	// application (the window is always created shown; IsVisible() can still
+	// answer false at that point, while GTK is creating it) and follows Show and
+	// Hide.
 	usage := &usageStreamer{
 		manager: manager,
 		ctx:     ctx,
@@ -104,9 +106,7 @@ func run() error {
 	}
 	shown := visibleWindow{Window: window, usage: usage}
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
-		if window.IsVisible() {
-			usage.Start()
-		}
+		usage.Start()
 	})
 
 	closer.app, closer.window = app, shown

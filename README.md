@@ -32,7 +32,7 @@ Compila l'app in modalità produzione e installa in `~/.local`:
 
 - `~/.local/bin/docker-controller`
 - `~/.local/share/applications/docker-controller.desktop`
-- `~/.local/share/icons/hicolor/1024x1024/apps/docker-controller.png`
+- `~/.local/share/icons/hicolor/{256x256,512x512}/apps/docker-controller.png`
 
 Dopo l'installazione l'app compare nel menu di KDE. Per un altro percorso: `make install PREFIX=/usr/local` (con `DESTDIR=` per i pacchetti).
 

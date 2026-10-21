@@ -214,3 +214,16 @@ func TestIconFor(t *testing.T) {
 		t.Error("unreachable Docker should use the offline icon")
 	}
 }
+
+func TestIconFor_NoOfflineIconBeforeTheFirstRefresh(t *testing.T) {
+	loading := compose.Snapshot{Loading: true}
+	if IconFor(loading) != IconNormal {
+		t.Error("a Loading snapshot must not show the offline icon")
+	}
+	if IconFor(compose.Snapshot{}) != IconOffline {
+		t.Error("an unreachable Docker must show the offline icon")
+	}
+	if find(BuildMenu(loading), "Docker non raggiungibile") != nil {
+		t.Error("a Loading snapshot must not say Docker is unreachable")
+	}
+}

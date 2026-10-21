@@ -55,8 +55,8 @@ func (f *Fake) RespondStream(stdout, stderr []byte, err error, args ...string) {
 	f.responses[key(args)] = response{out: stdout, stderr: stderr, err: err}
 }
 
-// Hold makes the streamed command with exactly these arguments block, once it
-// has started, until the returned release function is called or its context is
+// Hold makes the command (streamed or not) with exactly these arguments block,
+// once it has started, until the returned release function is called or its context is
 // cancelled. It lets a test observe an Activity while it is running.
 func (f *Fake) Hold(args ...string) (release func()) {
 	ch := make(chan struct{})
@@ -99,8 +99,18 @@ func (f *Fake) lookup(args []string) (response, error) {
 }
 
 // Run implements "run and return the output".
-func (f *Fake) Run(_ context.Context, args ...string) ([]byte, error) {
+func (f *Fake) Run(ctx context.Context, args ...string) ([]byte, error) {
 	r, err := f.lookup(args)
+	f.mu.Lock()
+	hold := f.holds[key(args)]
+	f.mu.Unlock()
+	if hold != nil {
+		select {
+		case <-hold:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 	return r.out, err
 }
 

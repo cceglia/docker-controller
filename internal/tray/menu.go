@@ -34,9 +34,10 @@ const (
 	IconOffline
 )
 
-// IconFor returns the icon that reflects whether Docker is reachable.
+// IconFor returns the icon that reflects whether Docker is reachable. Before
+// the first refresh nothing is known, so it is not the offline one.
 func IconFor(s compose.Snapshot) Icon {
-	if s.DockerReachable {
+	if s.Loading || s.DockerReachable {
 		return IconNormal
 	}
 	return IconOffline
@@ -49,7 +50,7 @@ func IconFor(s compose.Snapshot) Icon {
 // while Docker is unreachable and, for a Project, while it has an Activity.
 func BuildMenu(s compose.Snapshot) []Item {
 	var menu []Item
-	if !s.DockerReachable {
+	if !s.Loading && !s.DockerReachable {
 		menu = append(menu, Item{Label: "Docker non raggiungibile"}, Item{Separator: true})
 	}
 

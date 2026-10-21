@@ -3,6 +3,7 @@ package compose_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -20,6 +21,9 @@ func removedProjects(t *testing.T, dbPath string) (*compose.Manager, *composefak
 	}
 	f := composefake.New()
 	f.Respond([]byte("[]"), lsArgs...)
+	for _, p := range []string{"sunlinkdocker", "stellantisvpn", "personalvpn", "sunlinkvpn", "travelgrouplaravel"} {
+		f.Respond([]byte("[]"), psArgs(p)...) // the fresh check made before deleting
+	}
 	m := newManager(t, f, dbPath)
 	if err := m.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
@@ -51,7 +55,7 @@ func TestRemoveFromList_DropsARemovedProjectForGoodWithoutTouchingDocker(t *test
 		t.Errorf("%d Projects left, want 4", n)
 	}
 	for _, call := range f.Calls()[calls:] {
-		if len(call) < 2 || call[1] != "ls" {
+		if len(call) < 2 || (call[1] != "ls" && !slices.Contains(call, "ps")) {
 			t.Errorf("RemoveFromList may only re-read Docker, ran %v", call)
 		}
 	}
@@ -128,5 +132,59 @@ func TestRemoveFromList_RefusesWhenDockerIsUnreachable(t *testing.T) {
 	}
 	if !listed(m.Snapshot(), "stellantisvpn") {
 		t.Error("a refused removal must keep the Project")
+	}
+}
+
+func TestRemoveFromList_ChecksFreshDockerStateNotTheCachedSnapshot(t *testing.T) {
+	// The snapshot says Rimosso, but Containers appeared since the last refresh.
+	m, f := removedProjects(t, tempDB(t))
+	f.Respond(fixture(t, "ps-stellantisvpn.json"), psArgs("stellantisvpn")...)
+
+	err := m.RemoveFromList(context.Background(), "stellantisvpn")
+	if !errors.Is(err, compose.ErrProjectNotRemoved) {
+		t.Errorf("err = %v, want ErrProjectNotRemoved", err)
+	}
+	if !listed(m.Snapshot(), "stellantisvpn") {
+		t.Error("a refused removal must keep the Project")
+	}
+}
+
+func TestRemoveFromList_BlocksActivitiesWhileItRuns(t *testing.T) {
+	m, f := removedProjects(t, tempDB(t))
+	ps := psArgs("stellantisvpn")
+	release := f.Hold(ps...)
+	defer release()
+	calls := len(f.Calls())
+
+	done := make(chan error, 1)
+	go func() { done <- m.RemoveFromList(context.Background(), "stellantisvpn") }()
+	eventually(t, func() bool {
+		return slices.ContainsFunc(f.Calls()[calls:], func(c []string) bool { return slices.Equal(c, ps) })
+	})
+
+	_, err := m.Do(context.Background(), compose.Action{Project: "stellantisvpn", Kind: compose.ActionUp})
+	if !errors.Is(err, compose.ErrActivityRunning) {
+		t.Errorf("Do during the removal: err = %v, want ErrActivityRunning", err)
+	}
+	release()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if listed(m.Snapshot(), "stellantisvpn") {
+		t.Error("the Project is still in the snapshot")
+	}
+	_, err = m.Do(context.Background(), compose.Action{Project: "stellantisvpn", Kind: compose.ActionUp})
+	if !errors.Is(err, compose.ErrUnknownProject) {
+		t.Errorf("Do after the removal: err = %v, want ErrUnknownProject", err)
+	}
+}
+
+func eventually(t *testing.T, cond func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(2 * time.Second); !cond(); {
+		if time.Now().After(deadline) {
+			t.Fatal("condition not reached")
+		}
+		time.Sleep(2 * time.Millisecond)
 	}
 }

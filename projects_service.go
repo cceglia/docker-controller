@@ -35,20 +35,21 @@ func (s *ProjectsService) Snapshot() compose.Snapshot {
 // Do starts an Action on a Project and returns the id of its Activity. Output
 // and outcome arrive through the "activity" event.
 func (s *ProjectsService) Do(action compose.Action) (compose.ActivityID, error) {
-	return s.manager.Do(s.ctx, action)
+	id, err := s.manager.Do(s.ctx, action)
+	return id, userError(err)
 }
 
 // RemoveFromList removes a Rimosso Project from the saved list. It never
 // touches Docker; a Project with Containers is refused.
 func (s *ProjectsService) RemoveFromList(project string) error {
-	return s.manager.RemoveFromList(s.ctx, project)
+	return userError(s.manager.RemoveFromList(s.ctx, project))
 }
 
 // UpdateSettings changes the Display name, Group and/or active Profiles of a
 // Project: a null field is left as it is, an empty one is cleared. It never
 // launches an Action.
 func (s *ProjectsService) UpdateSettings(project string, settings compose.Settings) error {
-	return s.manager.UpdateSettings(s.ctx, project, settings)
+	return userError(s.manager.UpdateSettings(s.ctx, project, settings))
 }
 
 // PickComposeFile shows the native file picker and returns the chosen compose
@@ -63,13 +64,14 @@ func (s *ProjectsService) PickComposeFile() (string, error) {
 // ProposeName returns the compose name compose would give to a Project whose
 // main File compose is mainFile.
 func (s *ProjectsService) ProposeName(mainFile string) (string, error) {
-	return compose.ProposeName(mainFile)
+	name, err := compose.ProposeName(mainFile)
+	return name, userError(err)
 }
 
 // AddProject saves a Project added by hand: its compose name and its File
 // compose in -f order (the main one first). A name already saved is refused.
 func (s *ProjectsService) AddProject(name string, files []string) error {
-	return s.manager.AddProject(s.ctx, name, files)
+	return userError(s.manager.AddProject(s.ctx, name, files))
 }
 
 // OpenPort opens http://localhost:<port> in the default browser. The URL is
@@ -100,7 +102,7 @@ func (s *ProjectsService) OpenTerminal(project string) error {
 	}
 	cfg, err := s.settings.Get(s.ctx)
 	if err != nil {
-		return err
+		return userError(err)
 	}
 	argv, err := settings.TerminalArgv(cfg.TerminalCommand, folder)
 	if err != nil {

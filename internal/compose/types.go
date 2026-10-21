@@ -77,6 +77,10 @@ type Port struct {
 
 // Snapshot is the complete, resolved view of every saved Project.
 type Snapshot struct {
+	// Loading is true until the first Refresh completes: nothing has been asked
+	// to Docker yet, so DockerReachable and Projects mean nothing and must not
+	// be shown as "Docker offline".
+	Loading bool `json:"loading"`
 	// DockerReachable is false when the Docker daemon does not answer.
 	DockerReachable bool      `json:"dockerReachable"`
 	Projects        []Project `json:"projects"`

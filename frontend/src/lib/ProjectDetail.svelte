@@ -47,8 +47,8 @@
     oncloselogs: () => void
     /** Docker does not answer: Actions are disabled. */
     unavailable?: boolean
-    /** Utilizzo risorse by Service name; a Service without running Containers is absent. */
-    usage: Record<string, Measures>
+    /** Utilizzo risorse by Service name; a Service without running Containers is absent. null until the first sample. */
+    usage: Record<string, Measures> | null
   } = $props()
 
   const kinds = [ActionKind.ActionStart, ActionKind.ActionStop, ActionKind.ActionRestart]
@@ -201,7 +201,7 @@
           {/each}
         </div>
       </div>
-      {#if usage[service.name]}
+      {#if usage?.[service.name]}
         {@const u = usage[service.name]}
         <p class="usage" aria-label="Utilizzo risorse di {service.name}">
           <span><b>CPU</b> {formatPercent(u.cpuPercent)} <small>({formatCores(u.cpuPercent)})</small></span>
@@ -209,6 +209,8 @@
           <span><b>Rete</b> in {formatBytes(u.netInBytes, 'decimal')} · out {formatBytes(u.netOutBytes, 'decimal')}</span>
           <span><b>Disco</b> lettura {formatBytes(u.blockReadBytes, 'decimal')} · scrittura {formatBytes(u.blockWriteBytes, 'decimal')}</span>
         </p>
+      {:else if usage === null && (service.containers ?? []).some((c) => c.state === 'running')}
+        <p class="usage none" aria-label="Utilizzo risorse di {service.name}" title="In attesa della prima misura">Utilizzo risorse: caricamento…</p>
       {:else}
         <p class="usage none" aria-label="Utilizzo risorse di {service.name}" title="Nessun Container in esecuzione">Utilizzo risorse: —</p>
       {/if}

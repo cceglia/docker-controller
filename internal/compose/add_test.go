@@ -58,8 +58,8 @@ func TestProposeName(t *testing.T) {
 }
 
 func TestProposeName_FailsForAFileThatCannotBeRead(t *testing.T) {
-	if _, err := compose.ProposeName(filepath.Join(t.TempDir(), "missing.yaml")); !errors.Is(err, compose.ErrInvalidProject) {
-		t.Errorf("err = %v, want ErrInvalidProject", err)
+	if _, err := compose.ProposeName(filepath.Join(t.TempDir(), "missing.yaml")); !errors.Is(err, compose.ErrInvalidProject) || !errors.Is(err, compose.ErrComposeFileUnusable) {
+		t.Errorf("err = %v, want ErrInvalidProject and ErrComposeFileUnusable", err)
 	}
 }
 
@@ -162,14 +162,15 @@ func TestAddProject_RefusesWhatComposeCouldNotUse(t *testing.T) {
 		name  string
 		pname string
 		files []string
+		is    error // the specific reason, besides ErrInvalidProject
 	}{
-		{"no files", "app", nil},
-		{"empty name", "", []string{main}},
-		{"invalid name", "My App", []string{main}},
-		{"relative path", "app", []string{"compose.yaml"}},
-		{"missing file", "app", []string{filepath.Join(dir, "missing.yaml")}},
-		{"a folder instead of a file", "app", []string{dir}},
-		{"missing extra file", "app", []string{main, filepath.Join(dir, "missing.yaml")}},
+		{"no files", "app", nil, compose.ErrNoComposeFile},
+		{"empty name", "", []string{main}, compose.ErrInvalidName},
+		{"invalid name", "My App", []string{main}, compose.ErrInvalidName},
+		{"relative path", "app", []string{"compose.yaml"}, compose.ErrComposeFileUnusable},
+		{"missing file", "app", []string{filepath.Join(dir, "missing.yaml")}, compose.ErrComposeFileUnusable},
+		{"a folder instead of a file", "app", []string{dir}, compose.ErrComposeFileUnusable},
+		{"missing extra file", "app", []string{main, filepath.Join(dir, "missing.yaml")}, compose.ErrComposeFileUnusable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -177,6 +178,8 @@ func TestAddProject_RefusesWhatComposeCouldNotUse(t *testing.T) {
 			n := len(m.Snapshot().Projects)
 			if err := m.AddProject(context.Background(), tt.pname, tt.files); !errors.Is(err, compose.ErrInvalidProject) {
 				t.Errorf("err = %v, want ErrInvalidProject", err)
+			} else if !errors.Is(err, tt.is) {
+				t.Errorf("err = %v, want %v", err, tt.is)
 			}
 			if got := len(m.Snapshot().Projects); got != n {
 				t.Errorf("%d Projects, want %d: nothing must be saved", got, n)

@@ -175,7 +175,7 @@ func (m *Manager) Do(ctx context.Context, a Action) (ActivityID, error) {
 		m.mu.Unlock()
 		return "", err
 	}
-	if _, busy := m.running[a.Project]; busy {
+	if _, busy := m.running[a.Project]; busy || m.removing[a.Project] {
 		m.mu.Unlock()
 		return "", fmt.Errorf("%w: %s", ErrActivityRunning, a.Project)
 	}

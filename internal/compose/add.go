@@ -18,6 +18,10 @@ var (
 	// ErrInvalidProject is returned for a Project that compose could not use: a
 	// name it would reject, no compose file, or a file that cannot be read.
 	ErrInvalidProject = errors.New("compose: invalid Project")
+	// The specific reasons of an ErrInvalidProject; each error wraps both.
+	ErrInvalidName         = errors.New("name is not a valid compose name")
+	ErrNoComposeFile       = errors.New("no compose file")
+	ErrComposeFileUnusable = errors.New("compose file is not an absolute path to a readable file")
 )
 
 // validName is what compose accepts as a project name.
@@ -39,7 +43,7 @@ func normalizeName(s string) string {
 func ProposeName(mainFile string) (string, error) {
 	f, err := os.Open(mainFile)
 	if err != nil {
-		return "", fmt.Errorf("%w: %w", ErrInvalidProject, err)
+		return "", fmt.Errorf("%w: %w: %w", ErrInvalidProject, ErrComposeFileUnusable, err)
 	}
 	defer f.Close()
 
@@ -83,17 +87,17 @@ func ProposeName(mainFile string) (string, error) {
 // readable regular file) or ErrDuplicateProject.
 func (m *Manager) AddProject(ctx context.Context, name string, files []string) error {
 	if !validName.MatchString(name) {
-		return fmt.Errorf("%w: %q is not a valid compose name (lower case letters, digits, - and _)", ErrInvalidProject, name)
+		return fmt.Errorf("%w: %w: %q (lower case letters, digits, - and _)", ErrInvalidProject, ErrInvalidName, name)
 	}
 	if len(files) == 0 {
-		return fmt.Errorf("%w: no compose file", ErrInvalidProject)
+		return fmt.Errorf("%w: %w", ErrInvalidProject, ErrNoComposeFile)
 	}
 	for _, f := range files {
 		if !filepath.IsAbs(f) {
-			return fmt.Errorf("%w: %q is not an absolute path", ErrInvalidProject, f)
+			return fmt.Errorf("%w: %w: %q is not an absolute path", ErrInvalidProject, ErrComposeFileUnusable, f)
 		}
 		if info, err := os.Stat(f); err != nil || !info.Mode().IsRegular() {
-			return fmt.Errorf("%w: %q is not a readable file", ErrInvalidProject, f)
+			return fmt.Errorf("%w: %w: %q is not a readable file", ErrInvalidProject, ErrComposeFileUnusable, f)
 		}
 	}
 
