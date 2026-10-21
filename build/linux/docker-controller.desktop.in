@@ -8,3 +8,4 @@ Exec=@BINDIR@/docker-controller
 Icon=docker-controller
 Terminal=false
 Categories=Development;
+StartupWMClass=docker-controller

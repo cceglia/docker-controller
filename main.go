@@ -80,8 +80,13 @@ func run() error {
 	settingsStore := settings.New(conn)
 	closer := &windowCloser{settings: settingsStore}
 	app = application.New(application.Options{
-		Name:        "Docker Controller",
-		Icon:        appIcon,
+		Name: "Docker Controller",
+		Icon: appIcon,
+		Linux: application.LinuxOptions{
+			// The window's app id: it must match docker-controller.desktop so the
+			// taskbar and title bar use its icon, whatever the executable is called.
+			ProgramName: "docker-controller",
+		},
 		Description: "Gestione dei Progetti docker-compose",
 		Services: []application.Service{
 			application.NewService(&ProjectsService{manager: manager, settings: settingsStore, ctx: ctx, emit: func(name string, data any) { app.Event.Emit(name, data) }}),
