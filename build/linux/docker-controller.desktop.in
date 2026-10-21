@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Docker Controller
+GenericName=Gestione Docker Compose
+Comment=Gestione dei Progetti docker-compose
+Exec=@BINDIR@/docker-controller
+Icon=docker-controller
+Terminal=false
+Categories=Development;
