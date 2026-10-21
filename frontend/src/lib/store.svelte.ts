@@ -1,10 +1,16 @@
 // The only module that talks to the Go bindings. Components stay
 // presentational and read from here.
 import { Events } from '@wailsio/runtime'
-import { ProjectsService } from '../../bindings/dockercontroller'
-import { Activity as ActivityBusEvent, Log as LogBusEvent, Snapshot as SnapshotEvent } from '../../bindings/events'
+import { ProjectsService, SettingsService } from '../../bindings/dockercontroller'
+import {
+  Activity as ActivityBusEvent,
+  CloseRequested as CloseRequestedEvent, Log as LogBusEvent,
+  Snapshot as SnapshotEvent,
+} from '../../bindings/events'
 import { LogEventType } from '../../bindings/dockercontroller/models'
 import type { LogEvent } from '../../bindings/dockercontroller/models'
+import { CloseBehavior } from '../../bindings/dockercontroller/internal/settings/models'
+import type { Settings } from '../../bindings/dockercontroller/internal/settings/models'
 import {
   ActionKind,
   ActivityEventType,
@@ -15,7 +21,8 @@ import type {
   Snapshot,
 } from '../../bindings/dockercontroller/internal/compose/models'
 
-export { ActionKind }
+export { ActionKind, CloseBehavior }
+export type { Settings }
 
 /** Italian label of an Action, as shown on buttons and indicators. */
 export const actionLabels: Record<string, string> = {
@@ -89,6 +96,9 @@ let selectedId = $state<string | null>(null)
 let toast = $state<Toast | null>(null)
 let selectedProject = $state<string | null>(null)
 let adding = $state(false)
+let settings = $state<Settings | null>(null)
+let showingSettings = $state(false)
+let closeAsked = $state(false)
 
 function applyActivity(e: ActivityEvent) {
   if (e.type === ActivityEventType.ActivityStarted) {
@@ -159,6 +169,8 @@ export function start() {
   Events.On(SnapshotEvent, (event) => apply(event.data))
   Events.On(ActivityBusEvent, (event) => applyActivity(event.data))
   Events.On(LogBusEvent, (event) => applyLog(event.data))
+  Events.On(CloseRequestedEvent, () => (closeAsked = true))
+  SettingsService.Get().then((s) => (settings = s)).catch(fail)
   ProjectsService.Snapshot().then((s) => {
     // An event may already have delivered something newer.
     if (!loaded) apply(s)
@@ -238,6 +250,47 @@ export async function openPort(port: number) {
   } catch (err) {
     fail(err)
   }
+}
+
+/** Opens a terminal in the folder of a Project (the command comes from the settings). */
+export async function openTerminal(project: string) {
+  try {
+    await ProjectsService.OpenTerminal(project)
+  } catch (err) {
+    fail(err)
+  }
+}
+
+/** Shows or hides the settings screen. */
+export function setShowingSettings(value: boolean) {
+  showingSettings = value
+}
+
+/** Saves the app settings; resolves to the error message when refused, null when saved. */
+export async function saveSettings(next: Settings): Promise<string | null> {
+  try {
+    await SettingsService.Save(next)
+    settings = (await SettingsService.Get()) ?? next
+    return null
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err)
+  }
+}
+
+/** Answers the "Chiedi ogni volta" dialog: hide in the tray or quit, optionally remembering the choice. */
+export async function resolveClose(choice: CloseBehavior, remember: boolean) {
+  closeAsked = false
+  try {
+    await SettingsService.ResolveClose(choice, remember)
+    if (remember) settings = await SettingsService.Get()
+  } catch (err) {
+    fail(err)
+  }
+}
+
+/** Dismisses the "Chiedi ogni volta" dialog: the window stays open. */
+export function cancelClose() {
+  closeAsked = false
 }
 
 /** Opens the folder of a Project in the file manager. */
@@ -322,6 +375,17 @@ export const store = {
   /** The open log stream; null when the panel is closed. */
   get logs(): LogView | null {
     return logView
+  },
+  /** The app settings; null until loaded. */
+  get settings(): Settings | null {
+    return settings
+  },
+  get showingSettings(): boolean {
+    return showingSettings
+  },
+  /** The window was closed with "Chiedi ogni volta": the dialog is to be shown. */
+  get closeAsked(): boolean {
+    return closeAsked
   },
   get toast(): Toast | null {
     return toast

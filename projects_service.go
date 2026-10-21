@@ -9,6 +9,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/settings"
 )
 
 // ProjectsService is the thin Wails binding over the compose module. The
@@ -16,6 +17,8 @@ import (
 // serves the initial load.
 type ProjectsService struct {
 	manager *compose.Manager
+	// settings holds the terminal command of "Apri terminale".
+	settings *settings.Store
 	// ctx bounds the Activities: they are stopped when the app quits.
 	ctx context.Context
 	// emit sends an event to the frontend.
@@ -80,19 +83,53 @@ func (s *ProjectsService) OpenPort(port int) error {
 
 // OpenFolder opens the folder of a saved Project in the file manager.
 func (s *ProjectsService) OpenFolder(project string) error {
+	folder, err := s.projectFolder(project)
+	if err != nil {
+		return err
+	}
+	return xdgOpen(folder)
+}
+
+// OpenTerminal opens a terminal in the folder of a saved Project, running the
+// terminal command of the settings with {dir} replaced by the folder. No shell
+// is involved: the command is split into arguments before the substitution.
+func (s *ProjectsService) OpenTerminal(project string) error {
+	folder, err := s.projectFolder(project)
+	if err != nil {
+		return err
+	}
+	cfg, err := s.settings.Get(s.ctx)
+	if err != nil {
+		return err
+	}
+	argv, err := settings.TerminalArgv(cfg.TerminalCommand, folder)
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Dir = folder
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("terminale (%s): %w", argv[0], err)
+	}
+	go func() { _ = cmd.Wait() }() // reap the process
+	return nil
+}
+
+// projectFolder is the existing folder of a saved Project.
+func (s *ProjectsService) projectFolder(project string) (string, error) {
 	for _, p := range s.manager.Snapshot().Projects {
 		if p.Name != project {
 			continue
 		}
 		if p.Folder == "" {
-			return fmt.Errorf("il Progetto %s non ha una cartella", project)
+			return "", fmt.Errorf("il Progetto %s non ha una cartella", project)
 		}
 		if info, err := os.Stat(p.Folder); err != nil || !info.IsDir() {
-			return fmt.Errorf("la cartella %s non esiste", p.Folder)
+			return "", fmt.Errorf("la cartella %s non esiste", p.Folder)
 		}
-		return xdgOpen(p.Folder)
+		return p.Folder, nil
 	}
-	return fmt.Errorf("Progetto sconosciuto: %s", project)
+	return "", fmt.Errorf("Progetto sconosciuto: %s", project)
 }
 
 // xdgOpen hands a URL or path to the desktop's default handler.

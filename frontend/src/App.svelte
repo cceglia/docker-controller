@@ -5,18 +5,25 @@
   import ActivityPanel from './lib/ActivityPanel.svelte'
   import ErrorToast from './lib/ErrorToast.svelte'
   import AddProjectDialog from './lib/AddProjectDialog.svelte'
+  import SettingsView from './lib/SettingsView.svelte'
+  import CloseDialog from './lib/CloseDialog.svelte'
   import {
     addProject,
+    cancelClose,
     closeLogs,
     openFolder,
     openLogs,
     openPort,
+    openTerminal,
     pickComposeFile,
     proposeName,
     removeFromList,
+    resolveClose,
     run,
+    saveSettings,
     selectProject,
     setAdding,
+    setShowingSettings,
     start,
     store,
     updateSettings,
@@ -29,18 +36,24 @@
 <main>
   <header>
     <h1>Docker Controller</h1>
-    <button onclick={() => setAdding(true)}>Aggiungi Progetto</button>
+    <div class="header-actions">
+      <button onclick={() => setShowingSettings(true)}>Impostazioni</button>
+      <button onclick={() => setAdding(true)}>Aggiungi Progetto</button>
+    </div>
   </header>
   {#if !store.dockerReachable}
     <p class="banner">Docker non raggiungibile</p>
   {/if}
   {#if store.loaded}
-    {#if store.selectedProject}
+    {#if store.showingSettings && store.settings}
+      <SettingsView settings={store.settings} onsave={saveSettings} onback={() => setShowingSettings(false)} />
+    {:else if store.selectedProject}
       <ProjectDetail
         project={store.selectedProject}
         onaction={run}
         onopenport={openPort}
         onopenfolder={openFolder}
+        onopenterminal={openTerminal}
         onback={() => selectProject(null)}
         onremove={removeFromList}
         onsettings={updateSettings}
@@ -64,6 +77,10 @@
   <AddProjectDialog onpick={pickComposeFile} onpropose={proposeName} onadd={addProject} oncancel={() => setAdding(false)} />
 {/if}
 
+{#if store.closeAsked}
+  <CloseDialog onchoose={resolveClose} oncancel={cancelClose} />
+{/if}
+
 {#if store.toast}
   <ErrorToast toast={store.toast} />
 {/if}
@@ -72,6 +89,7 @@
   main { max-width: 56rem; margin: 0 auto; padding: 1.25rem; }
   header { display: flex; align-items: center; justify-content: space-between; margin: 0 0 1rem; }
   h1 { font-size: 1.25rem; margin: 0; }
+  .header-actions { display: flex; gap: 0.5rem; }
   header button {
     font: inherit; font-size: 0.85rem; padding: 0.3rem 0.8rem; border-radius: 6px;
     border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;

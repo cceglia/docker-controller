@@ -11,6 +11,7 @@
     onaction,
     onopenport,
     onopenfolder,
+    onopenterminal,
     onback,
     onremove,
     onsettings,
@@ -26,6 +27,8 @@
     /** Opens http://localhost:<port> in the browser. */
     onopenport: (port: number) => void
     onopenfolder: (project: string) => void
+    /** Opens a terminal in the Project folder. */
+    onopenterminal: (project: string) => void
     onback: () => void
     /** Removes the (Rimosso) Project from the saved list. */
     onremove: (project: string) => void
@@ -95,6 +98,7 @@
     <button onclick={onback}>← Progetti</button>
     <h2>{project.displayName || project.name}</h2>
     <button onclick={() => onopenfolder(project.name)} title={project.folder}>Apri cartella</button>
+    <button onclick={() => onopenterminal(project.name)} title="Apri un terminale in {project.folder}">Apri terminale</button>
   </header>
   <p class="folder">{project.folder}</p>
   {#if project.displayName}<p class="compose-name">Nome compose: {project.name}</p>{/if}

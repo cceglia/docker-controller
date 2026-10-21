@@ -10,6 +10,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/db"
+	"dockercontroller/internal/settings"
 )
 
 // The frontend build output is embedded in the binary.
@@ -28,6 +29,7 @@ func init() {
 	// Lets the binding generator emit a typed event for the frontend.
 	application.RegisterEvent[compose.Snapshot](snapshotEvent)
 	application.RegisterEvent[compose.ActivityEvent](activityEvent)
+	application.RegisterEvent[application.Void](closeRequestedEvent)
 }
 
 func main() {
@@ -67,11 +69,14 @@ func run() error {
 	}
 
 	notifs := notifications.New()
+	settingsStore := settings.New(conn)
+	closer := &windowCloser{settings: settingsStore}
 	app = application.New(application.Options{
 		Name:        "Docker Controller",
 		Description: "Gestione dei Progetti docker-compose",
 		Services: []application.Service{
-			application.NewService(&ProjectsService{manager: manager, ctx: ctx, emit: func(name string, data any) { app.Event.Emit(name, data) }}),
+			application.NewService(&ProjectsService{manager: manager, settings: settingsStore, ctx: ctx, emit: func(name string, data any) { app.Event.Emit(name, data) }}),
+			application.NewService(&SettingsService{store: settingsStore, ctx: ctx, closer: closer}),
 			application.NewService(notifs),
 		},
 		Assets: application.AssetOptions{
@@ -85,6 +90,9 @@ func run() error {
 		Height: 700,
 		URL:    "/",
 	})
+
+	closer.app, closer.window = app, window
+	closer.install()
 
 	systemTray = newTrayAdapter(ctx, app, manager, window, notifs)
 
