@@ -30,6 +30,8 @@ type Project struct {
 	// Running and Total count the Project's Containers.
 	Running int `json:"running"`
 	Total   int `json:"total"`
+	// Activity is the Activity running on the Project, nil when there is none.
+	Activity *ActivityRef `json:"activity"`
 }
 
 // Snapshot is the complete, resolved view of every saved Project.

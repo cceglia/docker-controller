@@ -19,9 +19,13 @@ var assets embed.FS
 // snapshotEvent carries a compose.Snapshot to the frontend.
 const snapshotEvent = "snapshot"
 
+// activityEvent carries a compose.ActivityEvent to the frontend.
+const activityEvent = "activity"
+
 func init() {
 	// Lets the binding generator emit a typed event for the frontend.
 	application.RegisterEvent[compose.Snapshot](snapshotEvent)
+	application.RegisterEvent[compose.ActivityEvent](activityEvent)
 }
 
 func main() {
@@ -41,16 +45,24 @@ func run() error {
 	}
 	defer conn.Close()
 
-	manager, err := compose.New(compose.Config{Docker: compose.ExecDocker{}, DB: conn})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var app *application.App
+	manager, err := compose.New(compose.Config{
+		Docker:     compose.ExecDocker{},
+		DB:         conn,
+		OnActivity: func(e compose.ActivityEvent) { app.Event.Emit(activityEvent, e) },
+	})
 	if err != nil {
 		return err
 	}
 
-	app := application.New(application.Options{
+	app = application.New(application.Options{
 		Name:        "Docker Controller",
 		Description: "Gestione dei Progetti docker-compose",
 		Services: []application.Service{
-			application.NewService(&ProjectsService{manager: manager}),
+			application.NewService(&ProjectsService{manager: manager, ctx: ctx}),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -63,9 +75,6 @@ func run() error {
 		Height: 700,
 		URL:    "/",
 	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Snapshot -> frontend event. The first value is the current snapshot.
 	go func() {

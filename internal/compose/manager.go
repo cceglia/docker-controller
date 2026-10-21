@@ -16,6 +16,9 @@ type Config struct {
 	Docker Docker
 	// DB is the app database, already migrated (see package db).
 	DB *sql.DB
+	// OnActivity, when not nil, receives the events of every Activity (see
+	// Do). Calls are serialised; it must not block for long.
+	OnActivity func(ActivityEvent)
 }
 
 // Manager is the interface of the compose module.
@@ -25,8 +28,14 @@ type Manager struct {
 
 	refreshMu sync.Mutex // serialises Refresh
 
-	mu       sync.Mutex // guards snap and watchers
-	snap     Snapshot
+	onActivity func(ActivityEvent)
+	emitMu     sync.Mutex // serialises onActivity calls
+
+	mu       sync.Mutex // guards the fields below
+	base     Snapshot   // what Docker and the store say
+	snap     Snapshot   // base plus the running Activities
+	running  map[string]ActivityRef
+	nextID   uint64
 	watchers []chan Snapshot
 }
 
@@ -36,9 +45,12 @@ func New(cfg Config) (*Manager, error) {
 		return nil, errors.New("compose: Docker and DB are required")
 	}
 	return &Manager{
-		docker: cfg.Docker,
-		store:  store{db: cfg.DB},
-		snap:   Snapshot{Projects: []Project{}},
+		docker:     cfg.Docker,
+		store:      store{db: cfg.DB},
+		base:       Snapshot{Projects: []Project{}},
+		snap:       Snapshot{Projects: []Project{}},
+		running:    map[string]ActivityRef{},
+		onActivity: cfg.OnActivity,
 	}, nil
 }
 
@@ -135,7 +147,9 @@ func (m *Manager) build(ctx context.Context) (Snapshot, error) {
 // unreachable keeps the last known Projects (or the saved ones, as Rimosso,
 // when nothing is known yet) and flags Docker as not reachable.
 func (m *Manager) unreachable(ctx context.Context) (Snapshot, error) {
-	prev := m.Snapshot()
+	m.mu.Lock()
+	prev := m.base
+	m.mu.Unlock()
 	if len(prev.Projects) > 0 {
 		return Snapshot{DockerReachable: false, Projects: prev.Projects}, nil
 	}
@@ -149,9 +163,25 @@ func (m *Manager) unreachable(ctx context.Context) (Snapshot, error) {
 	return Snapshot{DockerReachable: false, Projects: projects}, nil
 }
 
+// publish stores a new base snapshot and notifies watchers if the result
+// changed.
 func (m *Manager) publish(next Snapshot) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.base = next
+	m.recompose()
+}
+
+// recompose rebuilds snap from base and the running Activities and notifies
+// watchers if it changed. m.mu must be held.
+func (m *Manager) recompose() {
+	next := Snapshot{DockerReachable: m.base.DockerReachable, Projects: make([]Project, len(m.base.Projects))}
+	copy(next.Projects, m.base.Projects)
+	for i := range next.Projects {
+		if a, ok := m.running[next.Projects[i].Name]; ok {
+			next.Projects[i].Activity = &a
+		}
+	}
 	if reflect.DeepEqual(m.snap, next) {
 		return
 	}

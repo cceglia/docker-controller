@@ -17,17 +17,19 @@ import (
 type Fake struct {
 	mu        sync.Mutex
 	responses map[string]response
+	holds     map[string]chan struct{}
 	calls     [][]string
 }
 
 type response struct {
-	out []byte
-	err error
+	out    []byte
+	stderr []byte // streamed after out, flagged as stderr
+	err    error
 }
 
 // New returns an empty Fake: any call without a configured response fails.
 func New() *Fake {
-	return &Fake{responses: map[string]response{}}
+	return &Fake{responses: map[string]response{}, holds: map[string]chan struct{}{}}
 }
 
 func key(args []string) string { return strings.Join(args, "\x00") }
@@ -42,6 +44,26 @@ func (f *Fake) RespondErr(out []byte, err error, args ...string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.responses[key(args)] = response{out: out, err: err}
+}
+
+// RespondStream configures a streamed command: stdout lines, then stderr
+// lines, then err as the command's exit error.
+func (f *Fake) RespondStream(stdout, stderr []byte, err error, args ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.responses[key(args)] = response{out: stdout, stderr: stderr, err: err}
+}
+
+// Hold makes the streamed command with exactly these arguments block, once it
+// has started, until the returned release function is called or its context is
+// cancelled. It lets a test observe an Activity while it is running.
+func (f *Fake) Hold(args ...string) (release func()) {
+	ch := make(chan struct{})
+	f.mu.Lock()
+	f.holds[key(args)] = ch
+	f.mu.Unlock()
+	var once sync.Once
+	return func() { once.Do(func() { close(ch) }) }
 }
 
 // Calls returns every argument list received so far, in order.
@@ -72,17 +94,32 @@ func (f *Fake) Run(_ context.Context, args ...string) ([]byte, error) {
 	return r.out, err
 }
 
-// Stream implements "run streaming": it replays the canned output line by
-// line. stderr is always false in the fake.
+// Stream implements "run streaming": it replays the canned stdout then stderr
+// line by line, after waiting for a Hold if one is set.
 func (f *Fake) Stream(ctx context.Context, args []string, onLine func(line string, stderr bool)) error {
 	r, err := f.lookup(args)
-	sc := bufio.NewScanner(bytes.NewReader(r.out))
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		if ctx.Err() != nil {
+	f.mu.Lock()
+	hold := f.holds[key(args)]
+	f.mu.Unlock()
+	if hold != nil {
+		select {
+		case <-hold:
+		case <-ctx.Done():
 			return ctx.Err()
 		}
-		onLine(sc.Text(), false)
+	}
+	for _, part := range []struct {
+		data   []byte
+		stderr bool
+	}{{r.out, false}, {r.stderr, true}} {
+		sc := bufio.NewScanner(bytes.NewReader(part.data))
+		sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+		for sc.Scan() {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			onLine(sc.Text(), part.stderr)
+		}
 	}
 	return err
 }

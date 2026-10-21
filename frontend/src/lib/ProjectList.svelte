@@ -1,8 +1,20 @@
 <script lang="ts">
   import { Status } from '../../bindings/dockercontroller/internal/compose/models'
   import type { Project } from '../../bindings/dockercontroller/internal/compose/models'
+  import { ActionKind, actionLabels } from './store.svelte'
 
-  let { projects }: { projects: Project[] } = $props()
+  let {
+    projects,
+    onaction,
+  }: { projects: Project[]; onaction: (project: string, kind: ActionKind) => void } = $props()
+
+  const kinds = [
+    ActionKind.ActionUp,
+    ActionKind.ActionStop,
+    ActionKind.ActionRestart,
+    ActionKind.ActionPull,
+    ActionKind.ActionBuild,
+  ]
 
   const labels: Record<string, string> = {
     [Status.StatusActive]: 'Attivo',
@@ -26,6 +38,16 @@
           {project.running}/{project.total}
         </span>
         <span class="status {project.status}">{labels[project.status] ?? project.status}</span>
+        <div class="actions">
+          {#if project.activity}
+            <span class="busy">⏳ {actionLabels[project.activity.kind] ?? project.activity.kind} in corso</span>
+          {/if}
+          {#each kinds as kind (kind)}
+            <button disabled={project.activity !== null} onclick={() => onaction(project.name, kind)}>
+              {actionLabels[kind]}
+            </button>
+          {/each}
+        </div>
       </li>
     {/each}
   </ul>
@@ -47,5 +69,12 @@
   .partial { color: var(--warn); }
   .stopped { color: var(--muted); }
   .removed { color: var(--muted); border-style: dashed; }
+  .actions { display: flex; align-items: center; gap: 0.3rem; }
+  .busy { color: var(--warn); font-size: 0.8rem; margin-right: 0.3rem; }
+  button {
+    font: inherit; font-size: 0.8rem; padding: 0.2rem 0.55rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+  }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
   .empty { color: var(--muted); }
 </style>

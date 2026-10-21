@@ -2,8 +2,8 @@
 // discovers docker-compose Projects through the Docker CLI (ADR-0002), saves
 // them, computes their status and tells subscribers when something changed.
 //
-// Window and tray only use Manager: Snapshot, Refresh and Watch today;
-// Actions, Logs, project settings and manual add will join it in later
+// Window and tray only use Manager: Snapshot, Refresh, Watch and Do (Actions, run as
+// Activities) today; Logs, project settings and manual add will join it in later
 // tickets. Docker is reached through the Docker port (see docker.go), so tests
 // replace it with composefake fed with real captured output.
 package compose
