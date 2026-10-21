@@ -108,7 +108,7 @@ func (t *trayAdapter) run(it tray.Item) {
 	if _, err := t.manager.Do(t.ctx, a); err != nil {
 		t.notifier.Aborted(a)
 		t.app.Logger.Error("tray action", "project", a.Project, "kind", a.Kind, "error", err)
-		t.notify(string(a.Kind)+a.Project, tray.Notification{Title: "Docker Controller", Body: "Azione non eseguita: " + err.Error()})
+		t.notify(string(a.Kind)+a.Project, tray.Notification{Title: "Docker Controller", Body: userError(err).Error()})
 	}
 }
 

@@ -36,7 +36,10 @@ type LogEvent struct {
 
 // errLogStopped reports that StopLogs for the id came before StartLogs
 // registered it: the stream must not start.
-var errLogStopped = errors.New("flusso di log già fermato")
+var errLogStopped = errors.New("log stream already stopped")
+
+// errLogOpen reports a stream id that is already in use.
+var errLogOpen = errors.New("log stream already open")
 
 // maxStoppedLogIDs bounds the ids remembered by logStreams.stop.
 const maxStoppedLogIDs = 64
@@ -62,7 +65,7 @@ func (l *logStreams) add(id string, cancel context.CancelFunc) error {
 		return errLogStopped
 	}
 	if _, taken := l.cancels[id]; taken {
-		return fmt.Errorf("flusso di log già aperto: %s", id)
+		return fmt.Errorf("%w: %s", errLogOpen, id)
 	}
 	if l.cancels == nil {
 		l.cancels = map[string]context.CancelFunc{}
@@ -116,13 +119,14 @@ func (s *ProjectsService) StartLogs(id, project, service string) error {
 	}
 	go func() {
 		defer s.logs.release(id)
+		var stderr []string // only touched by the callback, in this goroutine
 		err := s.manager.Logs(ctx, compose.LogRequest{Project: project, Service: service}, func(l compose.LogLine) {
 			s.emit(logEvent, LogEvent{ID: id, Type: LogLineEvent, Line: l})
 		})
 		if ctx.Err() == nil { // not stopped: tell the frontend why it ended
 			e := LogEvent{ID: id, Type: LogEndedEvent}
 			if err != nil {
-				e.Error = userError(err).Error()
+				e.Error = logEndedMessage(err, stderr)
 			}
 			s.emit(logEvent, e)
 		}

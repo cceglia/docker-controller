@@ -110,15 +110,6 @@ const serviceUsage = $derived(
   new Map((usage?.dockerReachable ? (usage.services ?? []) : []).map((u) => [`${u.project}/${u.service}`, u.measures])),
 )
 
-/** The longest error excerpt shown in a toast. */
-const EXCERPT_MAX = 140
-
-/** The first non-empty line of an error text, truncated for a toast ('' when there is none). */
-export function errorExcerpt(text: string, max = EXCERPT_MAX): string {
-  const line = text.split('\n').map((l) => l.trim()).find((l) => l !== '') ?? ''
-  return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line
-}
-
 function applyActivity(e: ActivityEvent) {
   if (e.type === ActivityEventType.ActivityStarted) {
     activities.unshift({ id: e.id, project: e.project, service: e.service, kind: e.kind, state: 'running', error: '', lines: [] })
@@ -135,7 +126,8 @@ function applyActivity(e: ActivityEvent) {
   record.error = e.error
   if (e.error) {
     const what = `${actionLabels[e.kind] ?? e.kind} su ${e.service ? `${e.project}/${e.service}` : e.project} non riuscito`
-    const why = errorExcerpt(e.error)
+    // The summary is chosen by the backend (compose.Summarize), the same one the tray shows.
+    const why = e.summary
     toast = { message: why ? `${what}: ${why}` : what, activityId: e.id }
   }
 }

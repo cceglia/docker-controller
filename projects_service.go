@@ -78,18 +78,18 @@ func (s *ProjectsService) AddProject(name string, files []string) error {
 // built here from the number, never taken from the frontend.
 func (s *ProjectsService) OpenPort(port int) error {
 	if port < 1 || port > 65535 {
-		return fmt.Errorf("porta non valida: %d", port)
+		return userError(fmt.Errorf("%w: %d", errInvalidPort, port))
 	}
-	return xdgOpen(fmt.Sprintf("http://localhost:%d", port))
+	return userError(xdgOpen(fmt.Sprintf("http://localhost:%d", port)))
 }
 
 // OpenFolder opens the folder of a saved Project in the file manager.
 func (s *ProjectsService) OpenFolder(project string) error {
 	folder, err := s.projectFolder(project)
 	if err != nil {
-		return err
+		return userError(err)
 	}
-	return xdgOpen(folder)
+	return userError(xdgOpen(folder))
 }
 
 // OpenTerminal opens a terminal in the folder of a saved Project, running the
@@ -98,7 +98,7 @@ func (s *ProjectsService) OpenFolder(project string) error {
 func (s *ProjectsService) OpenTerminal(project string) error {
 	folder, err := s.projectFolder(project)
 	if err != nil {
-		return err
+		return userError(err)
 	}
 	cfg, err := s.settings.Get(s.ctx)
 	if err != nil {
@@ -106,12 +106,12 @@ func (s *ProjectsService) OpenTerminal(project string) error {
 	}
 	argv, err := settings.TerminalArgv(cfg.TerminalCommand, folder)
 	if err != nil {
-		return err
+		return userError(err)
 	}
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = folder
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("terminale (%s): %w", argv[0], err)
+		return userError(fmt.Errorf("%w: %s: %w", errTerminalStart, argv[0], err))
 	}
 	go func() { _ = cmd.Wait() }() // reap the process
 	return nil
@@ -124,21 +124,21 @@ func (s *ProjectsService) projectFolder(project string) (string, error) {
 			continue
 		}
 		if p.Folder == "" {
-			return "", fmt.Errorf("il Progetto %s non ha una cartella", project)
+			return "", fmt.Errorf("%w: %s", errNoFolder, project)
 		}
 		if info, err := os.Stat(p.Folder); err != nil || !info.IsDir() {
-			return "", fmt.Errorf("la cartella %s non esiste", p.Folder)
+			return "", fmt.Errorf("%w: %s", errFolderMissing, p.Folder)
 		}
 		return p.Folder, nil
 	}
-	return "", fmt.Errorf("Progetto sconosciuto: %s", project)
+	return "", fmt.Errorf("%w: %q", compose.ErrUnknownProject, project)
 }
 
 // xdgOpen hands a URL or path to the desktop's default handler.
 func xdgOpen(target string) error {
 	cmd := exec.Command("xdg-open", target)
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("xdg-open: %w", err)
+		return fmt.Errorf("%w: %w", errCannotOpen, err)
 	}
 	go func() { _ = cmd.Wait() }() // reap the process
 	return nil

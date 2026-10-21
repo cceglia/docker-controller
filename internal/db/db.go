@@ -56,8 +56,10 @@ func Open(path string) (*sql.DB, error) {
 }
 
 // legacyVersion is the schema version of a database created by the former
-// hand-rolled runner (PRAGMA user_version) that has no schema_migrations table
-// yet; 0 when the database is new or already managed by golang-migrate.
+// hand-rolled runner (PRAGMA user_version) whose adoption by golang-migrate is
+// not recorded yet: schema_migrations is missing or has no row (an adoption
+// that crashed after the driver created the table, before Force). It is 0
+// when the database is new or already managed by golang-migrate.
 func legacyVersion(ctx context.Context, conn *sql.DB) (int, error) {
 	var managed int
 	err := conn.QueryRowContext(ctx,
@@ -66,7 +68,15 @@ func legacyVersion(ctx context.Context, conn *sql.DB) (int, error) {
 		return 0, fmt.Errorf("db: look for %s: %w", migsqlite.DefaultMigrationsTable, err)
 	}
 	if managed > 0 {
-		return 0, nil
+		var recorded int
+		// The table name is a constant of the driver, not user input.
+		query := "SELECT count(*) FROM " + migsqlite.DefaultMigrationsTable
+		if err := conn.QueryRowContext(ctx, query).Scan(&recorded); err != nil {
+			return 0, fmt.Errorf("db: read %s: %w", migsqlite.DefaultMigrationsTable, err)
+		}
+		if recorded > 0 {
+			return 0, nil
+		}
 	}
 	var current int
 	if err := conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&current); err != nil {
@@ -76,7 +86,7 @@ func legacyVersion(ctx context.Context, conn *sql.DB) (int, error) {
 }
 
 // migrateUp applies the embedded migrations with golang-migrate. A database
-// left by the former runner (user_version >= 1, no schema_migrations) is
+// left by the former runner (user_version >= 1, no recorded schema_migrations row) is
 // adopted at its version first, so its tables and rows are kept untouched.
 func migrateUp(conn *sql.DB) error {
 	ctx, cancel := context.WithTimeout(context.Background(), migrationTimeout)

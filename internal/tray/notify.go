@@ -2,7 +2,6 @@ package tray
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 
 	"dockercontroller/internal/compose"
@@ -13,8 +12,6 @@ type Notification struct {
 	Title string
 	Body  string
 }
-
-const maxErrorRunes = 200
 
 // Notifier decides which Activity events deserve a notification: the end of
 // every Activity launched from the tray, and every failed Activity whatever
@@ -85,11 +82,10 @@ func body(e compose.ActivityEvent, name string) string {
 	if e.Error == "" {
 		return what + " completato"
 	}
-	first, _, _ := strings.Cut(strings.TrimSpace(e.Error), "\n")
-	if r := []rune(first); len(r) > maxErrorRunes {
-		first = string(r[:maxErrorRunes]) + "…"
+	if e.Summary == "" {
+		return what + " fallito"
 	}
-	return what + " fallito: " + first
+	return what + " fallito: " + e.Summary
 }
 
 func kindLabel(k compose.ActionKind) string {

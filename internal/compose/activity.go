@@ -93,6 +93,37 @@ type ActivityEvent struct {
 	Stderr bool   `json:"stderr"`
 	// Error is set for a failed ActivityFinished event.
 	Error string `json:"error"`
+	// Summary is the one line of Error worth showing in a toast or a
+	// notification (see Summarize); the full text stays in Error.
+	Summary string `json:"summary"`
+}
+
+// maxSummaryRunes is the longest Summary.
+const maxSummaryRunes = 200
+
+// Summarize picks the most informative line of an error text: the last one
+// that mentions "error" (compose prints progress lines before the real cause),
+// otherwise the last non-empty one, truncated. It returns "" for blank text.
+func Summarize(text string) string {
+	var last, lastError string
+	for _, l := range strings.Split(text, "\n") {
+		l = strings.TrimSpace(l)
+		if l == "" {
+			continue
+		}
+		last = l
+		if strings.Contains(strings.ToLower(l), "error") {
+			lastError = l
+		}
+	}
+	line := last
+	if lastError != "" {
+		line = lastError
+	}
+	if r := []rune(line); len(r) > maxSummaryRunes {
+		line = strings.TrimSpace(string(r[:maxSummaryRunes])) + "…"
+	}
+	return line
 }
 
 var (
@@ -205,6 +236,7 @@ func (m *Manager) runActivity(ctx context.Context, id ActivityID, a Action, args
 		if outcome.Error == "" || ctx.Err() != nil {
 			outcome.Error = err.Error()
 		}
+		outcome.Summary = Summarize(outcome.Error)
 	}
 
 	// The Activity is over: free the Project and show what Docker now says in

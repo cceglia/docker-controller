@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strings"
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/settings"
@@ -17,21 +18,37 @@ var italianMessages = []struct {
 }{
 	{compose.ErrDuplicateProject, "Esiste già un Progetto con questo nome."},
 	{compose.ErrInvalidName, "Nome non valido: usa lettere minuscole, cifre, - e _."},
-	{compose.ErrNoComposeFile, "Serve almeno un file compose."},
-	{compose.ErrComposeFileUnusable, "Il file compose non esiste, non è leggibile o non è un percorso assoluto."},
-	{compose.ErrInvalidProject, "Progetto non valido: i file compose indicati non sono utilizzabili."},
-	{compose.ErrActivityRunning, "C'è già un'attività in corso su questo Progetto."},
+	{compose.ErrNoComposeFile, "Serve almeno un File compose."},
+	{compose.ErrComposeFileUnusable, "Il File compose non esiste, non è leggibile o non è un percorso assoluto."},
+	{compose.ErrInvalidProject, "Progetto non valido: i File compose indicati non sono utilizzabili."},
+	{compose.ErrActivityRunning, "C'è già un'Attività in corso su questo Progetto."},
 	{compose.ErrUnknownProject, "Progetto sconosciuto."},
 	{compose.ErrUnknownAction, "Azione sconosciuta."},
-	{compose.ErrInvalidService, "Nome del servizio non valido."},
-	{compose.ErrProjectOnly, "Questa azione riguarda l'intero Progetto, non un singolo servizio."},
-	{compose.ErrProjectNotRemoved, "Si può togliere dall'elenco solo un Progetto Rimosso, senza container."},
+	{compose.ErrInvalidService, "Nome del Servizio non valido."},
+	{compose.ErrProjectOnly, "Questa Azione riguarda l'intero Progetto, non un singolo Servizio."},
+	{compose.ErrProjectNotRemoved, "Si può togliere dalla lista solo un Progetto Rimosso, senza Container."},
 	{compose.ErrDockerUnreachable, "Docker non è raggiungibile."},
 	{settings.ErrInvalidCloseBehavior, "Comportamento alla chiusura non valido."},
+	{settings.ErrInvalidTerminalCommand, "Comando del terminale non valido: controlla virgolette e backslash, e che non sia vuoto."},
+	{errInvalidPort, "Porta non valida."},
+	{errNoFolder, "Il Progetto non ha una cartella."},
+	{errFolderMissing, "La cartella del Progetto non esiste."},
+	{errLogOpen, "Flusso dei log già aperto."},
+	{errCannotOpen, "Impossibile aprire: xdg-open non è riuscito a partire."},
+	{errTerminalStart, "Impossibile avviare il terminale: controlla il comando nelle Impostazioni."},
 }
 
+// Errors of the bindings that open things on the desktop.
+var (
+	errInvalidPort   = errors.New("invalid port")
+	errNoFolder      = errors.New("project has no folder")
+	errFolderMissing = errors.New("project folder does not exist")
+	errCannotOpen    = errors.New("cannot open with xdg-open")
+	errTerminalStart = errors.New("cannot start the terminal")
+)
+
 // unknownErrorPrefix introduces the detail of an error without a message above.
-const unknownErrorPrefix = "Operazione non riuscita: "
+const unknownErrorPrefix = "Errore: "
 
 // localizedError is an error whose text is Italian and whose chain still holds
 // the original error, so errors.Is keeps working.
@@ -55,4 +72,21 @@ func userError(err error) error {
 		}
 	}
 	return &localizedError{msg: unknownErrorPrefix + err.Error(), cause: err}
+}
+
+// logEndedMessage is the Italian reason a log stream ended on its own: the
+// message of a known error, otherwise a generic one with the most informative
+// stderr line of compose when there is one. The raw command line of a failed
+// process is never shown.
+func logEndedMessage(err error, stderr []string) string {
+	for _, m := range italianMessages {
+		if errors.Is(err, m.err) {
+			return m.msg
+		}
+	}
+	const base = "Flusso dei log interrotto"
+	if detail := compose.Summarize(strings.Join(stderr, "\n")); detail != "" {
+		return base + ": " + detail
+	}
+	return base + "."
 }

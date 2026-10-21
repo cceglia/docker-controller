@@ -8,7 +8,7 @@ import (
 )
 
 func ev(id string, typ compose.ActivityEventType, project string, kind compose.ActionKind, errText string) compose.ActivityEvent {
-	return compose.ActivityEvent{ID: compose.ActivityID(id), Type: typ, Project: project, Kind: kind, Error: errText}
+	return compose.ActivityEvent{ID: compose.ActivityID(id), Type: typ, Project: project, Kind: kind, Error: errText, Summary: compose.Summarize(errText)}
 }
 
 func TestNotifier_TrayLaunchedActivityNotifiesOnSuccess(t *testing.T) {
@@ -45,11 +45,11 @@ func TestNotifier_ServiceActivityNamesTheService(t *testing.T) {
 func TestNotifier_FailureNotifiesWhateverTheOrigin(t *testing.T) {
 	var n Notifier // never launched from the tray
 	n.Observe(ev("act-7", compose.ActivityStarted, "p", compose.ActionPull, ""), "p")
-	got, ok := n.Observe(ev("act-7", compose.ActivityFinished, "p", compose.ActionPull, "pull access denied\nsecond line"), "p")
+	got, ok := n.Observe(ev("act-7", compose.ActivityFinished, "p", compose.ActionPull, "progress\nError response from daemon: pull access denied\nsecond line"), "p")
 	if !ok {
 		t.Fatal("failed Activity must notify")
 	}
-	if got.Body != "Pull di p fallito: pull access denied" {
+	if got.Body != "Pull di p fallito: Error response from daemon: pull access denied" {
 		t.Errorf("body = %q", got.Body)
 	}
 }

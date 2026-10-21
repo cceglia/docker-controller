@@ -438,3 +438,20 @@ func TestWatch_FirstSnapshotIsLoadingUntilTheFirstRefresh(t *testing.T) {
 		})
 	}
 }
+
+func TestRefresh_FirstRefreshFailureStopsLoadingAndIsVisible(t *testing.T) {
+	f := composefake.New()
+	f.Respond([]byte("this is not json"), lsArgs...)
+	m := newManager(t, f, tempDB(t))
+
+	if err := m.Refresh(context.Background()); err == nil {
+		t.Fatal("a malformed ls must be reported as an error")
+	}
+	s := m.Snapshot()
+	if s.Loading {
+		t.Error("Loading must clear after the first refresh attempt, whatever its outcome")
+	}
+	if s.DockerReachable {
+		t.Error("a failed first refresh must show the not-reachable state the UI handles, not an empty healthy list")
+	}
+}

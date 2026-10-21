@@ -29,7 +29,7 @@ const DefaultTerminalCommand = "konsole --workdir {dir}"
 
 // ErrInvalidCloseBehavior is returned by Save for a value that is not one of
 // the CloseBehavior constants.
-var ErrInvalidCloseBehavior = errors.New("comportamento alla chiusura non valido")
+var ErrInvalidCloseBehavior = errors.New("settings: invalid close behavior")
 
 const (
 	keyCloseBehavior   = "close_behavior"

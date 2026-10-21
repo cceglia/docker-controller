@@ -2,11 +2,16 @@ package settings
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
 // dirPlaceholder is replaced by the Project folder in the terminal command.
 const dirPlaceholder = "{dir}"
+
+// ErrInvalidTerminalCommand is returned for a terminal command that cannot be
+// split into arguments (empty, unterminated quote or trailing backslash).
+var ErrInvalidTerminalCommand = errors.New("settings: invalid terminal command")
 
 // TerminalArgv splits the terminal command into the argument vector to run,
 // without any shell, and then replaces {dir} with dir in every argument: the
@@ -65,13 +70,13 @@ func TerminalArgv(command, dir string) ([]string, error) {
 	}
 	switch {
 	case escaped:
-		return nil, errors.New("comando terminale: backslash finale")
+		return nil, fmt.Errorf("%w: trailing backslash", ErrInvalidTerminalCommand)
 	case quote != 0:
-		return nil, errors.New("comando terminale: virgolette non chiuse")
+		return nil, fmt.Errorf("%w: unterminated quote", ErrInvalidTerminalCommand)
 	}
 	flush()
 	if len(args) == 0 {
-		return nil, errors.New("comando terminale vuoto")
+		return nil, fmt.Errorf("%w: empty command", ErrInvalidTerminalCommand)
 	}
 	for i := range args {
 		args[i] = strings.ReplaceAll(args[i], dirPlaceholder, dir)

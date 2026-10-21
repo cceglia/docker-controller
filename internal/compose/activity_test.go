@@ -179,6 +179,70 @@ func TestDo_ErrorOutcomeCarriesComposeStderr(t *testing.T) {
 	}
 }
 
+func TestDo_FailureSummaryPicksTheInformativeLine(t *testing.T) {
+	cases := []struct {
+		name   string
+		stderr string
+		want   string
+	}{
+		{
+			name:   "real pull failure: progress lines then the daemon error",
+			stderr: " Image registry.invalid/nonexistent:1 Pulling \n Image registry.invalid/nonexistent:1 Error \nError response from daemon: pull access denied for registry.invalid/nonexistent",
+			want:   "Error response from daemon: pull access denied for registry.invalid/nonexistent",
+		},
+		{
+			name:   "no error word: the last non-empty line",
+			stderr: "first\nlast line\n\n",
+			want:   "last line",
+		},
+		{
+			name:   "long line is truncated",
+			stderr: "Error " + strings.Repeat("x", 500),
+			want:   "…",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := realDocker(t)
+			m, rec := activityManager(t, f)
+			args := composeArgs(t, m, "stellantisvpn", "pull")
+			f.RespondStream(nil, []byte(c.stderr), errors.New("exit status 1"), args...)
+
+			id, err := m.Do(context.Background(), compose.Action{Project: "stellantisvpn", Kind: compose.ActionPull})
+			if err != nil {
+				t.Fatal(err)
+			}
+			evs := rec.finished(t, id)
+			last := evs[len(evs)-1]
+			if c.want == "…" {
+				if !strings.HasSuffix(last.Summary, "…") || len([]rune(last.Summary)) > 201 {
+					t.Errorf("summary = %q, want truncated", last.Summary)
+				}
+			} else if last.Summary != c.want {
+				t.Errorf("summary = %q, want %q", last.Summary, c.want)
+			}
+			if !strings.Contains(last.Error, strings.Split(strings.TrimSpace(c.stderr), "\n")[0]) {
+				t.Errorf("full Error must keep every line, got %q", last.Error)
+			}
+		})
+	}
+}
+
+func TestDo_SuccessHasNoSummary(t *testing.T) {
+	f := realDocker(t)
+	m, rec := activityManager(t, f)
+	args := composeArgs(t, m, "stellantisvpn", "stop")
+	f.RespondStream([]byte("ok"), nil, nil, args...)
+	id, err := m.Do(context.Background(), compose.Action{Project: "stellantisvpn", Kind: compose.ActionStop})
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := rec.finished(t, id)
+	if last := evs[len(evs)-1]; last.Summary != "" {
+		t.Errorf("summary = %q", last.Summary)
+	}
+}
+
 func TestDo_OneActivityPerProjectButProjectsInParallel(t *testing.T) {
 	f := realDocker(t)
 	m, rec := activityManager(t, f)

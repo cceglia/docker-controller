@@ -1,6 +1,7 @@
 package settings_test
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -37,6 +38,9 @@ func TestTerminalArgv(t *testing.T) {
 			got, err := settings.TerminalArgv(tt.command, tt.dir)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && !errors.Is(err, settings.ErrInvalidTerminalCommand) {
+				t.Errorf("error = %v, want ErrInvalidTerminalCommand", err)
 			}
 			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("argv = %q, want %q", got, tt.want)

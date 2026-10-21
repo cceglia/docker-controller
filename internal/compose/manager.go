@@ -114,10 +114,29 @@ func (m *Manager) Refresh(ctx context.Context) error {
 
 	next, err := m.build(ctx)
 	if err != nil {
+		m.settleLoading(ctx)
 		return err
 	}
 	m.publish(next)
 	return nil
+}
+
+// settleLoading ends the Loading state after a first Refresh that failed (not
+// because ctx ended): the snapshot shows the saved Projects with Docker as not
+// reachable, which the UI already handles, instead of loading forever. The
+// error itself is still returned to the caller.
+func (m *Manager) settleLoading(ctx context.Context) {
+	m.mu.Lock()
+	loading := m.base.Loading
+	m.mu.Unlock()
+	if !loading || ctx.Err() != nil {
+		return
+	}
+	next, err := m.unreachable(ctx)
+	if err != nil {
+		next = Snapshot{Projects: []Project{}}
+	}
+	m.publish(next)
 }
 
 func (m *Manager) build(ctx context.Context) (Snapshot, error) {

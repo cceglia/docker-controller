@@ -96,3 +96,31 @@ func TestOpen_AdoptsLegacyDatabaseWithoutDataLoss(t *testing.T) {
 		t.Fatalf("after reopen: projects = %d, want 1", n)
 	}
 }
+
+func TestOpen_CompletesAHalfFinishedLegacyAdoption(t *testing.T) {
+	path := legacyDB(t)
+	// A crash after the migration driver created schema_migrations but before
+	// the version was recorded leaves an empty table behind.
+	raw, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := raw.ExecContext(context.Background(), "CREATE TABLE schema_migrations (version uint64, dirty bool)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := raw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	conn, err := Open(path)
+	if err != nil {
+		t.Fatalf("open after a half-finished adoption: %v", err)
+	}
+	defer conn.Close()
+	if v, dirty := migrationVersion(t, conn); v != 1 || dirty {
+		t.Fatalf("version = %d dirty = %v, want 1 false", v, dirty)
+	}
+	if n := countProjects(t, conn); n != 1 {
+		t.Fatalf("legacy row lost: projects = %d, want 1", n)
+	}
+}
