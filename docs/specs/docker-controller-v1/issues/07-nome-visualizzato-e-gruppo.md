@@ -4,9 +4,13 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Un'unica operazione del modulo `compose` aggiorna le impostazioni del Progetto
 - [ ] Nome visualizzato e Gruppo sopravvivono alla riapertura del DB e al Down (test)
 - [ ] L'eliminazione di Nome visualizzato o Gruppo riporta al comportamento predefinito (test)
 - [ ] Lista raggruppata per Gruppo nella UI, con il Gruppo modificabile scegliendo un esistente o creandone uno nuovo
+
+## Comments
+
+- 2026-10-21 (my-implement-orchestrator): implementato nel commit `920591f`. Review finale (fixed point `4d05bd7`) approvata al ciclo 4. `make check` e `go test -race -tags gtk3 ./...` verdi. I criteri verificati da test automatici sono coperti; i criteri di UI, tray e desktop restano da verificare a mano con `wails3 dev` (l'app non è stata avviata per la verifica).

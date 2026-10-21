@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Un'unica operazione del modulo `compose` esegue un'Azione e restituisce l'id dell'Attività, consegnando l'output riga per riga e l'esito
 - [ ] Build corrisponde a `up -d --build`; Up a `up -d` (verificato sugli argomenti registrati dal fake)
@@ -13,3 +13,7 @@
 - [ ] Watch notifica subito dopo la fine di un'Attività (test)
 - [ ] Il pannello Attività mostra l'output in tempo reale e lo storico della sessione
 - [ ] Verifica manuale: Stop e poi Up su `stellantisvpn` cambiano lo stato in lista
+
+## Comments
+
+- 2026-10-21 (my-implement-orchestrator): implementato nel commit `913627f`, correzioni dalla review finale in `91274a2`. Review finale (fixed point `4d05bd7`) approvata al ciclo 4. `make check` e `go test -race -tags gtk3 ./...` verdi. I criteri verificati da test automatici sono coperti; i criteri di UI, tray e desktop restano da verificare a mano con `wails3 dev` (l'app non è stata avviata per la verifica).
