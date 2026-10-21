@@ -1,7 +1,9 @@
 # build output
 /bin/
 /build/bin/
-/frontend/dist/
+/frontend/dist/*
+!/frontend/dist/.gitkeep
+/frontend/bindings/
 node_modules/
 # local state
 *.db
@@ -10,3 +12,4 @@ node_modules/
 .scratch/
 .env
 .env.*
+/.task/

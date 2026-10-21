@@ -1,0 +1,29 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application for Linux (native, CGO, gtk3 build tag)
+    deps:
+      - task: common:go:mod:tidy
+      - task: common:build:frontend
+        vars:
+          BUILD_FLAGS:
+            ref: .BUILD_FLAGS
+          DEV:
+            ref: .DEV
+    cmds:
+      - go build {{.BUILD_FLAGS}} -o {{.OUTPUT}}
+    vars:
+      OUTPUT: '{{ .OUTPUT | default (printf "%s/%s" .BIN_DIR .APP_NAME) }}'
+      # gtk3 is mandatory on this machine (GTK3/WebKitGTK-4.1 only), see ADR-0001.
+      BUILD_FLAGS: '{{if eq .DEV "true"}}-tags gtk3 -buildvcs=false -gcflags=all="-l"{{else}}-tags production,gtk3 -trimpath -buildvcs=false -ldflags="-w -s"{{end}}'
+    env:
+      GOOS: linux
+      CGO_ENABLED: 1
+
+  run:
+    cmds:
+      - '{{.BIN_DIR}}/{{.APP_NAME}}'
