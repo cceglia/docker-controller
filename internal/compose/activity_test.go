@@ -227,6 +227,75 @@ func TestDo_RejectsUnknownProjectAndAction(t *testing.T) {
 	}
 }
 
+func TestDo_ServiceActionsPassTheServiceNameToCompose(t *testing.T) {
+	cases := []struct {
+		kind compose.ActionKind
+		verb string
+	}{
+		{compose.ActionStart, "start"},
+		{compose.ActionStop, "stop"},
+		{compose.ActionRestart, "restart"},
+	}
+	for _, c := range cases {
+		t.Run(string(c.kind), func(t *testing.T) {
+			f := realDocker(t)
+			m, rec := activityManager(t, f)
+			args := composeArgs(t, m, "sunlinkdocker", c.verb, "redis")
+			f.RespondStream([]byte("ok"), nil, nil, args...)
+
+			id, err := m.Do(context.Background(), compose.Action{Project: "sunlinkdocker", Service: "redis", Kind: c.kind})
+			if err != nil {
+				t.Fatal(err)
+			}
+			rec.finished(t, id)
+
+			var found bool
+			for _, call := range f.Calls() {
+				found = found || strings.Join(call, " ") == strings.Join(args, " ")
+			}
+			if !found {
+				t.Errorf("never ran %v; calls: %v", args, f.Calls())
+			}
+		})
+	}
+}
+
+func TestDo_ServiceActionIsAnActivityOfTheProject(t *testing.T) {
+	f := realDocker(t)
+	m, rec := activityManager(t, f)
+	a1 := composeArgs(t, m, "sunlinkdocker", "restart", "redis")
+	release := f.Hold(a1...)
+	f.RespondStream(nil, nil, nil, a1...)
+
+	id, err := m.Do(context.Background(), compose.Action{Project: "sunlinkdocker", Service: "redis", Kind: compose.ActionRestart})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if act := find(t, m.Snapshot(), "sunlinkdocker").Activity; act == nil || act.ID != id || act.Service != "redis" {
+		t.Errorf("running Activity = %+v, want it exposed with its Service", act)
+	}
+
+	// Another Service of the same Project, or the whole Project, must wait.
+	for _, a := range []compose.Action{
+		{Project: "sunlinkdocker", Service: "nats", Kind: compose.ActionStop},
+		{Project: "sunlinkdocker", Kind: compose.ActionStop},
+	} {
+		if _, err := m.Do(context.Background(), a); !errors.Is(err, compose.ErrActivityRunning) {
+			t.Errorf("%+v: err = %v, want ErrActivityRunning", a, err)
+		}
+	}
+	release()
+	rec.finished(t, id)
+}
+
+func TestDo_RejectsAServiceNameThatLooksLikeAnOption(t *testing.T) {
+	m, _ := activityManager(t, realDocker(t))
+	_, err := m.Do(context.Background(), compose.Action{Project: "sunlinkdocker", Service: "--all", Kind: compose.ActionStop})
+	if !errors.Is(err, compose.ErrInvalidService) {
+		t.Errorf("err = %v, want ErrInvalidService", err)
+	}
+}
+
 func TestWatch_NotifiesRightAfterAnActivityEnds(t *testing.T) {
 	f := realDocker(t)
 	m, rec := activityManager(t, f)

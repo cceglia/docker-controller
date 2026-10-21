@@ -135,9 +135,9 @@ func (m *Manager) refreshProject(ctx context.Context, name string) error {
 	defer m.refreshMu.Unlock()
 
 	out, err := m.docker.Run(ctx, "compose", "-p", name, "ps", "-a", "--format", "json")
-	var running, total int
+	var cs []psContainer
 	if err == nil {
-		running, total, err = containerCounts(out)
+		cs, err = parsePs(out)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
@@ -153,8 +153,10 @@ func (m *Manager) refreshProject(ctx context.Context, name string) error {
 		return nil
 	}
 	projects := append([]Project(nil), base.Projects...)
-	projects[idx].Running, projects[idx].Total = running, total
-	projects[idx].Status = statusOf(running, total)
+	running := runningCount(cs)
+	projects[idx].Running, projects[idx].Total = running, len(cs)
+	projects[idx].Status = statusOf(running, len(cs))
+	projects[idx].Services = groupByService(cs)
 	m.publish(Snapshot{DockerReachable: true, Projects: projects})
 	return nil
 }

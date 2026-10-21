@@ -7,13 +7,14 @@ import (
 	"strings"
 )
 
-// ActionKind is what an Action does. Down, Down with volumes (ticket 05) and
-// the Service actions (ticket 04) join the table below; nothing else in the
-// Activity machinery has to change.
+// ActionKind is what an Action does. Down and Down with volumes (ticket 05)
+// join the table below; nothing else in the Activity machinery has to change.
 type ActionKind string
 
 const (
-	ActionUp      ActionKind = "up"
+	ActionUp ActionKind = "up"
+	// ActionStart starts existing Containers; it is meant for a Service.
+	ActionStart   ActionKind = "start"
 	ActionStop    ActionKind = "stop"
 	ActionRestart ActionKind = "restart"
 	ActionPull    ActionKind = "pull"
@@ -24,18 +25,21 @@ const (
 // project selection.
 var verbs = map[ActionKind][]string{
 	ActionUp:      {"up", "-d"},
+	ActionStart:   {"start"},
 	ActionStop:    {"stop"},
 	ActionRestart: {"restart"},
 	ActionPull:    {"pull"},
 	ActionBuild:   {"up", "-d", "--build"},
 }
 
-// Action is a request to run an ActionKind on a Project. Ticket 04 adds the
-// Service it targets, ticket 08 the active Profiles; both only extend
-// composeArgs.
+// Action is a request to run an ActionKind on a Project, or on one of its
+// Services. Ticket 08 adds the active Profiles; it only extends composeArgs.
 type Action struct {
 	// Project is the compose name of the Project.
-	Project string     `json:"project"`
+	Project string `json:"project"`
+	// Service, when not empty, restricts the Action to that Service (all its
+	// Containers). It is still an Activity of the whole Project.
+	Service string     `json:"service"`
 	Kind    ActionKind `json:"kind"`
 }
 
@@ -44,8 +48,10 @@ type ActivityID string
 
 // ActivityRef is the running Activity of a Project, as shown in the snapshot.
 type ActivityRef struct {
-	ID   ActivityID `json:"id"`
-	Kind ActionKind `json:"kind"`
+	ID ActivityID `json:"id"`
+	// Service is the Service the Activity targets, "" for the whole Project.
+	Service string     `json:"service"`
+	Kind    ActionKind `json:"kind"`
 }
 
 // ActivityEventType tells what an ActivityEvent reports.
@@ -67,7 +73,9 @@ type ActivityEvent struct {
 	ID      ActivityID        `json:"id"`
 	Type    ActivityEventType `json:"type"`
 	Project string            `json:"project"`
-	Kind    ActionKind        `json:"kind"`
+	// Service is the Service the Action targets, "" for the whole Project.
+	Service string     `json:"service"`
+	Kind    ActionKind `json:"kind"`
 	// Line and Stderr are set for ActivityLine events.
 	Line   string `json:"line"`
 	Stderr bool   `json:"stderr"`
@@ -82,6 +90,9 @@ var (
 	ErrUnknownProject = errors.New("compose: unknown Project")
 	// ErrUnknownAction is returned for an ActionKind that does not exist.
 	ErrUnknownAction = errors.New("compose: unknown Action")
+	// ErrInvalidService is returned for a Service name compose could take for
+	// an option.
+	ErrInvalidService = errors.New("compose: invalid Service name")
 )
 
 // composeArgs builds the Docker arguments of an Action on a Project.
@@ -90,11 +101,18 @@ func composeArgs(p Project, a Action) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownAction, a.Kind)
 	}
+	if strings.HasPrefix(a.Service, "-") {
+		return nil, fmt.Errorf("%w: %q", ErrInvalidService, a.Service)
+	}
 	args := []string{"compose", "-p", p.Name}
 	for _, f := range p.ComposeFiles {
 		args = append(args, "-f", f)
 	}
-	return append(args, verb...), nil
+	args = append(args, verb...)
+	if a.Service != "" {
+		args = append(args, a.Service)
+	}
+	return args, nil
 }
 
 // Do starts an Action on a Project and returns the id of its Activity without
@@ -126,11 +144,11 @@ func (m *Manager) Do(ctx context.Context, a Action) (ActivityID, error) {
 	}
 	m.nextID++
 	id := ActivityID(fmt.Sprintf("act-%d", m.nextID))
-	m.running[a.Project] = ActivityRef{ID: id, Kind: a.Kind}
+	m.running[a.Project] = ActivityRef{ID: id, Service: a.Service, Kind: a.Kind}
 	m.recompose()
 	m.mu.Unlock()
 
-	m.emit(ActivityEvent{ID: id, Type: ActivityStarted, Project: a.Project, Kind: a.Kind})
+	m.emit(ActivityEvent{ID: id, Type: ActivityStarted, Project: a.Project, Service: a.Service, Kind: a.Kind})
 	go m.runActivity(ctx, id, a, args)
 	return id, nil
 }
@@ -141,10 +159,10 @@ func (m *Manager) runActivity(ctx context.Context, id ActivityID, a Action, args
 		if isErr {
 			stderr = append(stderr, line)
 		}
-		m.emit(ActivityEvent{ID: id, Type: ActivityLine, Project: a.Project, Kind: a.Kind, Line: line, Stderr: isErr})
+		m.emit(ActivityEvent{ID: id, Type: ActivityLine, Project: a.Project, Service: a.Service, Kind: a.Kind, Line: line, Stderr: isErr})
 	})
 
-	outcome := ActivityEvent{ID: id, Type: ActivityFinished, Project: a.Project, Kind: a.Kind}
+	outcome := ActivityEvent{ID: id, Type: ActivityFinished, Project: a.Project, Service: a.Service, Kind: a.Kind}
 	if err != nil {
 		outcome.Error = strings.TrimSpace(strings.Join(stderr, "\n"))
 		if outcome.Error == "" || ctx.Err() != nil {

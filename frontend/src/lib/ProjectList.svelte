@@ -6,10 +6,13 @@
   let {
     projects,
     onaction,
+    onselect,
     unavailable = false,
   }: {
     projects: Project[]
     onaction: (project: string, kind: ActionKind) => void
+    /** Opens the detail of a Project. */
+    onselect: (project: string) => void
     /** Docker does not answer: the list is greyed out and Actions are disabled. */
     unavailable?: boolean
   } = $props()
@@ -37,7 +40,9 @@
     {#each projects as project (project.name)}
       <li class="row">
         <div class="main">
-          <span class="name">{project.displayName || project.name}</span>
+          <button class="name" title="Apri il dettaglio" onclick={() => onselect(project.name)}>
+            {project.displayName || project.name}
+          </button>
           <span class="folder">{project.folder}</span>
         </div>
         <span class="count" title="Container in esecuzione sul totale">
@@ -67,7 +72,8 @@
     background: var(--surface); border: 1px solid var(--border);
   }
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .name { font-weight: 600; }
+  button.name { font-weight: 600; font-size: 1rem; align-self: flex-start; border: none; background: none; padding: 0; text-align: left; }
+  button.name:hover { text-decoration: underline; }
   .folder { color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .count { font-variant-numeric: tabular-nums; color: var(--muted); }
   .status { min-width: 5.5rem; text-align: center; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.8rem; border: 1px solid currentColor; }

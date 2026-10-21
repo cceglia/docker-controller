@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -131,6 +132,110 @@ func TestRefresh_PartialStatus(t *testing.T) {
 	p := find(t, m.Snapshot(), "sunlinkdocker")
 	if p.Status != compose.StatusPartial || p.Running != 13 || p.Total != 14 {
 		t.Errorf("got %s %d/%d, want Parziale 13/14", p.Status, p.Running, p.Total)
+	}
+}
+
+func service(t *testing.T, p compose.Project, name string) compose.Service {
+	t.Helper()
+	for _, s := range p.Services {
+		if s.Name == name {
+			return s
+		}
+	}
+	t.Fatalf("service %q not in project %q: %+v", name, p.Name, p.Services)
+	return compose.Service{}
+}
+
+func TestRefresh_ExposesContainersGroupedByServiceFromRealOutput(t *testing.T) {
+	m := newManager(t, realDocker(t), tempDB(t))
+	if err := m.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	s := m.Snapshot()
+
+	sl := find(t, s, "sunlinkdocker")
+	if len(sl.Services) != 14 {
+		t.Fatalf("sunlinkdocker has %d services, want 14: %+v", len(sl.Services), sl.Services)
+	}
+
+	// Image, state, health and a published port, as Docker reported them.
+	redis := service(t, sl, "redis")
+	if len(redis.Containers) != 1 {
+		t.Fatalf("redis containers = %+v", redis.Containers)
+	}
+	c := redis.Containers[0]
+	want := compose.Container{
+		Name: "sunlinkdocker-redis-1", Image: "redis:7-alpine", State: "running", Health: "healthy",
+		// 0.0.0.0 and :: publish the same port: it is listed once.
+		Ports: []compose.Port{{Published: 6379, Target: 6379, Protocol: "tcp"}},
+	}
+	if !reflect.DeepEqual(c, want) {
+		t.Errorf("redis container = %+v, want %+v", c, want)
+	}
+
+	// Only published ports are listed: traefik also exposes an unpublished 80/tcp.
+	traefik := service(t, sl, "traefik").Containers[0]
+	if !reflect.DeepEqual(traefik.Ports, []compose.Port{{Published: 8080, Target: 8080, Protocol: "tcp"}}) {
+		t.Errorf("traefik ports = %+v", traefik.Ports)
+	}
+	// A published port may map to a different container port.
+	ts := service(t, sl, "timescale").Containers[0]
+	if !reflect.DeepEqual(ts.Ports, []compose.Port{{Published: 5433, Target: 5432, Protocol: "tcp"}}) {
+		t.Errorf("timescale ports = %+v", ts.Ports)
+	}
+	// A service without published ports has an empty (not nil) list.
+	if cron := service(t, sl, "cron").Containers[0]; cron.Ports == nil || len(cron.Ports) != 0 {
+		t.Errorf("cron ports = %#v, want empty non-nil", cron.Ports)
+	}
+
+	// A stopped container keeps its service.
+	win := service(t, find(t, s, "personalvpn"), "personal-vpn").Containers[0]
+	if win.State != "running" {
+		t.Errorf("personal-vpn state = %q", win.State)
+	}
+	st := find(t, s, "stellantisvpn")
+	if len(st.Services) != 1 || st.Services[0].Containers[0].State != "exited" {
+		t.Errorf("stellantisvpn services = %+v", st.Services)
+	}
+
+	// A Project with no Container has no Services, as an empty list.
+	rm := find(t, s, "sunlinkvpn")
+	if rm.Services == nil || len(rm.Services) != 0 {
+		t.Errorf("removed project services = %#v, want empty non-nil", rm.Services)
+	}
+}
+
+func TestRefresh_ReplicatedServiceShowsAllItsContainers(t *testing.T) {
+	// No captured project has replicas, so the second replica is derived from
+	// the real `redis` line of ps-sunlinkdocker.json: only the container name and
+	// the host port change (replicas of a published service use a port range).
+	lines := strings.Split(strings.TrimSpace(string(fixture(t, "ps-sunlinkdocker.json"))), "\n")
+	var replica string
+	for _, l := range lines {
+		if strings.Contains(l, `"Service":"redis"`) {
+			replica = strings.NewReplacer("sunlinkdocker-redis-1", "sunlinkdocker-redis-2", "6379", "6380").Replace(l)
+		}
+	}
+	if replica == "" || !strings.Contains(replica, "sunlinkdocker-redis-2") {
+		t.Fatal("fixture has no redis line to derive a replica from")
+	}
+	f := realDocker(t)
+	f.Respond([]byte(strings.Join(append(lines, replica), "\n")), psArgs("sunlinkdocker")...)
+
+	m := newManager(t, f, tempDB(t))
+	if err := m.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p := find(t, m.Snapshot(), "sunlinkdocker")
+	if len(p.Services) != 14 || p.Total != 15 {
+		t.Errorf("%d services, %d containers; want 14 services, 15 containers", len(p.Services), p.Total)
+	}
+	var names []string
+	for _, c := range service(t, p, "redis").Containers {
+		names = append(names, c.Name)
+	}
+	if !reflect.DeepEqual(names, []string{"sunlinkdocker-redis-1", "sunlinkdocker-redis-2"}) {
+		t.Errorf("redis containers = %v", names)
 	}
 }
 

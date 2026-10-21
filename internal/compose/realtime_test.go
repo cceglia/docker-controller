@@ -114,6 +114,9 @@ func TestRun_ContainerEventRefreshesOnlyTheAffectedProject(t *testing.T) {
 	if p := find(t, s, "stellantisvpn"); p.Running != 1 || p.Total != 1 {
 		t.Errorf("got %d/%d, want 1/1", p.Running, p.Total)
 	}
+	if c := service(t, find(t, s, "stellantisvpn"), "personal-vpn").Containers; len(c) != 1 || c[0].State != "running" {
+		t.Errorf("the Services were not refreshed with the Project: %+v", c)
+	}
 	if n := count(f, lsArgs); n != lsBefore {
 		t.Errorf("a full refresh ran on a container event (%d ls calls, was %d)", n, lsBefore)
 	}

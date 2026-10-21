@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import ProjectList from './lib/ProjectList.svelte'
+  import ProjectDetail from './lib/ProjectDetail.svelte'
   import ActivityPanel from './lib/ActivityPanel.svelte'
   import ErrorToast from './lib/ErrorToast.svelte'
-  import { run, start, store } from './lib/store.svelte'
+  import { openFolder, openPort, run, selectProject, start, store } from './lib/store.svelte'
 
   onMount(start)
 </script>
@@ -14,7 +15,18 @@
     <p class="banner">Docker non raggiungibile</p>
   {/if}
   {#if store.loaded}
-    <ProjectList projects={store.projects} onaction={run} unavailable={!store.dockerReachable} />
+    {#if store.selectedProject}
+      <ProjectDetail
+        project={store.selectedProject}
+        onaction={run}
+        onopenport={openPort}
+        onopenfolder={openFolder}
+        onback={() => selectProject(null)}
+        unavailable={!store.dockerReachable}
+      />
+    {:else}
+      <ProjectList projects={store.projects} onaction={run} onselect={selectProject} unavailable={!store.dockerReachable} />
+    {/if}
     <ActivityPanel activities={store.activities} selected={store.selectedActivity} />
   {:else}
     <p class="loading">Caricamento…</p>

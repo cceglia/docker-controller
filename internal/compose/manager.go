@@ -127,17 +127,21 @@ func (m *Manager) build(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 
-	counts := map[string][2]int{} // name -> running, total
+	type observed struct {
+		running, total int
+		services       []Service
+	}
+	seen := map[string]observed{}
 	for _, d := range found {
 		psOut, err := m.docker.Run(ctx, "compose", "-p", d.Name, "ps", "-a", "--format", "json")
 		if err != nil {
 			return Snapshot{}, fmt.Errorf("compose: ps %s: %w", d.Name, err)
 		}
-		running, total, err := containerCounts(psOut)
+		cs, err := parsePs(psOut)
 		if err != nil {
 			return Snapshot{}, err
 		}
-		counts[d.Name] = [2]int{running, total}
+		seen[d.Name] = observed{running: runningCount(cs), total: len(cs), services: groupByService(cs)}
 		if err := m.store.upsertDiscovered(ctx, d); err != nil {
 			return Snapshot{}, err
 		}
@@ -148,9 +152,13 @@ func (m *Manager) build(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	for i := range projects {
-		c := counts[projects[i].Name]
-		projects[i].Running, projects[i].Total = c[0], c[1]
-		projects[i].Status = statusOf(c[0], c[1])
+		o := seen[projects[i].Name]
+		projects[i].Running, projects[i].Total = o.running, o.total
+		projects[i].Status = statusOf(o.running, o.total)
+		projects[i].Services = o.services
+		if projects[i].Services == nil {
+			projects[i].Services = []Service{}
+		}
 	}
 	return Snapshot{DockerReachable: true, Projects: projects}, nil
 }
@@ -170,6 +178,7 @@ func (m *Manager) unreachable(ctx context.Context) (Snapshot, error) {
 	}
 	for i := range projects {
 		projects[i].Status = StatusRemoved
+		projects[i].Services = []Service{}
 	}
 	return Snapshot{DockerReachable: false, Projects: projects}, nil
 }
