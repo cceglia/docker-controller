@@ -23,6 +23,7 @@ const snapshotEvent = "snapshot"
 const activityEvent = "activity"
 
 func init() {
+	application.RegisterEvent[LogEvent](logEvent)
 	// Lets the binding generator emit a typed event for the frontend.
 	application.RegisterEvent[compose.Snapshot](snapshotEvent)
 	application.RegisterEvent[compose.ActivityEvent](activityEvent)
@@ -62,7 +63,7 @@ func run() error {
 		Name:        "Docker Controller",
 		Description: "Gestione dei Progetti docker-compose",
 		Services: []application.Service{
-			application.NewService(&ProjectsService{manager: manager, ctx: ctx}),
+			application.NewService(&ProjectsService{manager: manager, ctx: ctx, emit: func(name string, data any) { app.Event.Emit(name, data) }}),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

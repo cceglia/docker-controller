@@ -18,6 +18,10 @@ type ProjectsService struct {
 	manager *compose.Manager
 	// ctx bounds the Activities: they are stopped when the app quits.
 	ctx context.Context
+	// emit sends an event to the frontend.
+	emit func(name string, data any)
+	// logs maps the open log streams to their cancellation.
+	logs logStreams
 }
 
 // Snapshot returns the current snapshot of the saved Projects.

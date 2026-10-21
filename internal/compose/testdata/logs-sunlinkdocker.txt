@@ -1,0 +1,24 @@
+gateway-1  | 2026-10-21T12:17:42.590889285Z 2026-10-21 12:17:42,590 INFO success: sshd entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+gateway-1    | 2026-10-21T12:17:42.590935101Z 2026-10-21 12:17:42,590 INFO success: sshd entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+timescale-1  | 2026-10-21T14:19:31.945908876Z 2026-10-21 14:19:31.945 UTC [38915] STATEMENT:  DROP DATABASE IF EXISTS "concentrator_readstatus_it_1792592369778928125"
+timescale-1  | 2026-10-21T14:19:32.347307670Z 2026-10-21 14:19:32.347 UTC [38939] WARNING:  column "signal" should be used for segmenting or ordering
+buffer-1     | 2026-10-21T12:17:37.376631333Z Server listening on 0.0.0.0 port 22.
+buffer-1     | 2026-10-21T12:17:38.377542397Z 2026-10-21 12:17:38,377 INFO success: sshd entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+nats-1       | 2026-10-21T12:17:34.558899937Z [1] 2026/10/21 12:17:34.558652 [INF] Server is ready
+nats-1       | 2026-10-21T12:59:26.701655088Z [1] 2026/10/21 12:59:26.701547 [INF] Creating MQTT streams/consumers with replicas 1 for account "CONCENTRATOR_TEST"
+scheduler-1  | 2026-10-21T12:10:11.807499864Z ==========================================
+scheduler-1  | 2026-10-21T12:10:11.807502441Z 
+traefik-1    | 2026-10-21T12:17:40.664276686Z [90m2026-10-21T12:17:40Z[0m [32mINF[0m Starting provider *traefik.Provider
+traefik-1    | 2026-10-21T12:17:40.664288757Z [90m2026-10-21T12:17:40Z[0m [32mINF[0m Starting provider *acme.ChallengeTLSALPN
+cron-1       | 2026-10-21T12:10:12.308098030Z ==========================================
+db-1         | 2026-10-21T13:31:37.235572641Z 2026-10-21 13:31:37.235 UTC [306] ERROR:  relation "table_that_does_not_exist_xyz" does not exist at character 15
+cron-1       | 2026-10-21T12:10:12.308099688Z 
+db-1         | 2026-10-21T13:31:37.235599632Z 2026-10-21 13:31:37.235 UTC [306] STATEMENT:  SELECT * FROM table_that_does_not_exist_xyz
+concentrator-1  | 2026-10-21T12:17:42.607218533Z 2026-10-21 12:17:42,606 INFO success: sshd entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+concentrator-1  | 2026-10-21T12:17:42.607263112Z 2026-10-21 12:17:42,606 INFO success: sshd entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+nodejs-api-1    | 2026-10-21T12:18:08.603333233Z Server listening on 0.0.0.0 port 22.
+nodejs-api-1    | 2026-10-21T12:18:08.603364429Z Server listening on :: port 22.
+redis-1         | 2026-10-21T13:17:35.153667595Z 967:C 21 Oct 2026 13:17:35.153 * Fork CoW for RDB: current 0 MB, peak 0 MB, average 0 MB
+redis-1         | 2026-10-21T13:17:35.185219879Z 8:M 21 Oct 2026 13:17:35.185 * Background saving terminated with success
+odoo-1          | 2026-10-21T12:17:41.170728315Z 2026-10-21 12:17:41,170 INFO success: sshd entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+odoo-1          | 2026-10-21T12:17:41.170786521Z 2026-10-21 12:17:41,170 INFO success: sshd entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)

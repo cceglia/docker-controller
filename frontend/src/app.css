@@ -10,6 +10,7 @@
   --warn: #b45309;
   --warn-bg: #fef3c7;
   --danger: #b91c1c;
+  --log-lightness: 38%;
   font-family: system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
@@ -23,6 +24,7 @@
     --warn: #fbbf24;
     --warn-bg: #3a2f10;
     --danger: #f87171;
+    --log-lightness: 68%;
   }
 }
 body { margin: 0; background: var(--bg); color: var(--text); }

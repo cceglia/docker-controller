@@ -2,7 +2,9 @@
   import type { Project } from '../../bindings/dockercontroller/internal/compose/models'
   import { Status } from '../../bindings/dockercontroller/internal/compose/models'
   import ConfirmModal from './ConfirmModal.svelte'
+  import LogPanel from './LogPanel.svelte'
   import { ActionKind, actionLabels } from './store.svelte'
+  import type { LogView } from './store.svelte'
 
   let {
     project,
@@ -14,6 +16,9 @@
     onsettings,
     onprofiles,
     groups,
+    logs,
+    onopenlogs,
+    oncloselogs,
     unavailable = false,
   }: {
     project: Project
@@ -30,6 +35,11 @@
     onprofiles: (project: string, profiles: string[]) => void
     /** The existing Groups. */
     groups: string[]
+    /** The open log stream, null when closed. */
+    logs: LogView | null
+    /** Opens the log stream of the Project, restricted to a Service ('' for all). */
+    onopenlogs: (project: string, service: string) => void
+    oncloselogs: () => void
     /** Docker does not answer: Actions are disabled. */
     unavailable?: boolean
   } = $props()
@@ -157,6 +167,17 @@
     </p>
   {/if}
 
+  {#if logs && logs.project === project.name}
+    <LogPanel
+      {logs}
+      services={services.map((s) => s.name)}
+      onservice={(service) => onopenlogs(project.name, service)}
+      onclose={oncloselogs}
+    />
+  {:else}
+    <button class="open-logs" onclick={() => onopenlogs(project.name, '')}>Mostra log</button>
+  {/if}
+
   {#if services.length === 0}
     <p class="empty">Nessun Container: il Progetto non ha Servizi da mostrare.</p>
   {/if}
@@ -238,6 +259,7 @@
   .busy { color: var(--warn); font-size: 0.85rem; }
   .empty { color: var(--muted); }
   .missing { padding: 0.5rem 0.8rem; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: 0.85rem; }
+  .open-logs { margin-bottom: 0.75rem; }
   .destructive { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
   button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
   button.highlight { border-color: var(--warn); color: var(--warn); font-weight: 600; box-shadow: 0 0 0 2px var(--warn-bg); }

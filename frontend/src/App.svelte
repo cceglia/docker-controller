@@ -7,7 +7,9 @@
   import AddProjectDialog from './lib/AddProjectDialog.svelte'
   import {
     addProject,
+    closeLogs,
     openFolder,
+    openLogs,
     openPort,
     pickComposeFile,
     proposeName,
@@ -44,6 +46,9 @@
         onsettings={updateSettings}
         onprofiles={setProfiles}
         groups={store.groups}
+        logs={store.logs}
+        onopenlogs={openLogs}
+        oncloselogs={closeLogs}
         unavailable={!store.dockerReachable}
       />
     {:else}
