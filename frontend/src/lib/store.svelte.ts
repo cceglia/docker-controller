@@ -6,6 +6,7 @@ import {
   Activity as ActivityBusEvent,
   CloseRequested as CloseRequestedEvent, Log as LogBusEvent,
   Snapshot as SnapshotEvent,
+  Usage as UsageBusEvent, UsageStopped as UsageStoppedEvent,
 } from '../../bindings/events'
 import { LogEventType } from '../../bindings/dockercontroller/models'
 import type { LogEvent } from '../../bindings/dockercontroller/models'
@@ -17,8 +18,10 @@ import {
 } from '../../bindings/dockercontroller/internal/compose/models'
 import type {
   ActivityEvent,
+  Measures,
   Project,
   Snapshot,
+  UsageSample,
 } from '../../bindings/dockercontroller/internal/compose/models'
 
 export { ActionKind, CloseBehavior }
@@ -99,6 +102,13 @@ let adding = $state(false)
 let settings = $state<Settings | null>(null)
 let showingSettings = $state(false)
 let closeAsked = $state(false)
+// Utilizzo risorse: separate from the snapshot. null while the stream is
+// stopped (window hidden) or no sample has arrived yet.
+let usage = $state<UsageSample | null>(null)
+// Measures of the Services that have running Containers, by "project/service".
+const serviceUsage = $derived(
+  new Map((usage?.dockerReachable ? (usage.services ?? []) : []).map((u) => [`${u.project}/${u.service}`, u.measures])),
+)
 
 function applyActivity(e: ActivityEvent) {
   if (e.type === ActivityEventType.ActivityStarted) {
@@ -170,6 +180,8 @@ export function start() {
   Events.On(ActivityBusEvent, (event) => applyActivity(event.data))
   Events.On(LogBusEvent, (event) => applyLog(event.data))
   Events.On(CloseRequestedEvent, () => (closeAsked = true))
+  Events.On(UsageBusEvent, (event) => (usage = event.data))
+  Events.On(UsageStoppedEvent, () => (usage = null))
   SettingsService.Get().then((s) => (settings = s)).catch(fail)
   ProjectsService.Snapshot().then((s) => {
     // An event may already have delivered something newer.
@@ -361,7 +373,24 @@ export function dismissToast() {
   toast = null
 }
 
+/**
+ * The Utilizzo risorse of the Services of a Project: Service name -> measures.
+ * A Service without running Containers is absent (the UI shows "—"), which is
+ * not the same as zero.
+ */
+export function usageOfProject(project: string): Record<string, Measures> {
+  const out: Record<string, Measures> = {}
+  for (const [key, measures] of serviceUsage) {
+    if (key.startsWith(`${project}/`)) out[key.slice(project.length + 1)] = measures
+  }
+  return out
+}
+
 export const store = {
+  /** The global Utilizzo risorse; null until the first sample of the stream. */
+  get usage(): UsageSample | null {
+    return usage
+  },
   get activities(): ActivityRecord[] {
     return activities
   },

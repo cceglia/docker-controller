@@ -7,6 +7,7 @@
   import AddProjectDialog from './lib/AddProjectDialog.svelte'
   import SettingsView from './lib/SettingsView.svelte'
   import CloseDialog from './lib/CloseDialog.svelte'
+  import UsageBar from './lib/UsageBar.svelte'
   import {
     addProject,
     cancelClose,
@@ -28,12 +29,14 @@
     store,
     updateSettings,
     setProfiles,
+    usageOfProject,
   } from './lib/store.svelte'
 
   onMount(start)
 </script>
 
 <main>
+  <UsageBar usage={store.usage} />
   <header>
     <h1>Docker Controller</h1>
     <div class="header-actions">
@@ -63,6 +66,7 @@
         onopenlogs={openLogs}
         oncloselogs={closeLogs}
         unavailable={!store.dockerReachable}
+        usage={usageOfProject(store.selectedProject.name)}
       />
     {:else}
       <ProjectList projects={store.projects} onaction={run} onselect={selectProject} unavailable={!store.dockerReachable} />

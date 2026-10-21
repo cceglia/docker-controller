@@ -3,7 +3,8 @@
 // them, computes their status and tells subscribers when something changed.
 //
 // Window and tray only use Manager: Snapshot, Refresh, Watch, AddProject,
-// RemoveFromList, Do (Actions, run as Activities) and Logs (log streams).
+// RemoveFromList, Do (Actions, run as Activities), Logs (log streams) and
+// Usage (Utilizzo risorse samples, a flow separate from Watch).
 // Docker is reached through the Docker port (see docker.go), so tests replace
 // it with composefake fed with real captured output.
 package compose

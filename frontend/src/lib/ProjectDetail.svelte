@@ -1,8 +1,9 @@
 <script lang="ts">
-  import type { Project } from '../../bindings/dockercontroller/internal/compose/models'
+  import type { Measures, Project } from '../../bindings/dockercontroller/internal/compose/models'
   import { Status } from '../../bindings/dockercontroller/internal/compose/models'
   import ConfirmModal from './ConfirmModal.svelte'
   import LogPanel from './LogPanel.svelte'
+  import { formatBytes, formatCores, formatPercent } from './format'
   import { ActionKind, actionLabels } from './store.svelte'
   import type { LogView } from './store.svelte'
 
@@ -21,6 +22,7 @@
     onopenlogs,
     oncloselogs,
     unavailable = false,
+    usage,
   }: {
     project: Project
     onaction: (project: string, kind: ActionKind, service: string) => void
@@ -45,6 +47,8 @@
     oncloselogs: () => void
     /** Docker does not answer: Actions are disabled. */
     unavailable?: boolean
+    /** Utilizzo risorse by Service name; a Service without running Containers is absent. */
+    usage: Record<string, Measures>
   } = $props()
 
   const kinds = [ActionKind.ActionStart, ActionKind.ActionStop, ActionKind.ActionRestart]
@@ -197,6 +201,17 @@
           {/each}
         </div>
       </div>
+      {#if usage[service.name]}
+        {@const u = usage[service.name]}
+        <p class="usage" aria-label="Utilizzo risorse di {service.name}">
+          <span><b>CPU</b> {formatPercent(u.cpuPercent)} <small>({formatCores(u.cpuPercent)})</small></span>
+          <span><b>Memoria</b> {formatBytes(u.memoryBytes)}</span>
+          <span><b>Rete</b> in {formatBytes(u.netInBytes, 'decimal')} · out {formatBytes(u.netOutBytes, 'decimal')}</span>
+          <span><b>Disco</b> lettura {formatBytes(u.blockReadBytes, 'decimal')} · scrittura {formatBytes(u.blockWriteBytes, 'decimal')}</span>
+        </p>
+      {:else}
+        <p class="usage none" aria-label="Utilizzo risorse di {service.name}" title="Nessun Container in esecuzione">Utilizzo risorse: —</p>
+      {/if}
       <ul class="containers">
         {#each (service.containers ?? []) as c (c.name)}
           <li>
@@ -270,6 +285,9 @@
   .service { margin-bottom: 0.6rem; padding: 0.6rem 0.9rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); }
   .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
   .actions { display: flex; gap: 0.3rem; }
+  .usage { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0.4rem 0; font-size: 0.8rem; }
+  .usage b { font-weight: 600; margin-right: 0.2rem; }
+  .usage small, .usage.none { color: var(--muted); }
   .containers { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
   .containers li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; font-size: 0.82rem; }
   .cname { font-weight: 600; }

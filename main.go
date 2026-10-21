@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 
 	"dockercontroller/internal/compose"
@@ -29,6 +30,8 @@ func init() {
 	// Lets the binding generator emit a typed event for the frontend.
 	application.RegisterEvent[compose.Snapshot](snapshotEvent)
 	application.RegisterEvent[compose.ActivityEvent](activityEvent)
+	application.RegisterEvent[compose.UsageSample](usageEvent)
+	application.RegisterEvent[application.Void](usageStoppedEvent)
 	application.RegisterEvent[application.Void](closeRequestedEvent)
 }
 
@@ -91,10 +94,25 @@ func run() error {
 		URL:    "/",
 	})
 
-	closer.app, closer.window = app, window
+	// The usage stream runs while the window is visible: it starts with the
+	// application (the window is created shown) and follows Show and Hide.
+	usage := &usageStreamer{
+		manager: manager,
+		ctx:     ctx,
+		emit:    func(name string, data any) { app.Event.Emit(name, data) },
+		onError: func(err error) { app.Logger.Error("usage stream", "error", err) },
+	}
+	shown := visibleWindow{Window: window, usage: usage}
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		if window.IsVisible() {
+			usage.Start()
+		}
+	})
+
+	closer.app, closer.window = app, shown
 	closer.install()
 
-	systemTray = newTrayAdapter(ctx, app, manager, window, notifs)
+	systemTray = newTrayAdapter(ctx, app, manager, shown, notifs)
 
 	// Snapshot -> frontend event. The first value is the current snapshot.
 	go func() {
