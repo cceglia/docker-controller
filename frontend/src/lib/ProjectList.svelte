@@ -58,9 +58,11 @@
   {#if section.title}<h2>{section.title}</h2>{/if}
   <ul class="list" class:unavailable>
     {#each section.items as project (project.name)}
-      <li class="row">
+      <!-- The whole row opens the detail; keyboard users use the name button. -->
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+      <li class="row" onclick={() => onselect(project.name)}>
         <div class="main">
-          <button class="name" title="Apri il dettaglio" onclick={() => onselect(project.name)}>
+          <button class="name" title="Apri il dettaglio">
             {project.displayName || project.name}
           </button>
           {#if project.displayName}<span class="compose-name">{project.name}</span>{/if}
@@ -71,7 +73,8 @@
           {project.running}/{project.total}
         </span>
         <span class="status {project.status}">{labels[project.status] ?? project.status}</span>
-        <div class="actions">
+        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+        <div class="actions" onclick={(e) => e.stopPropagation()}>
           {#if project.activity}
             <span class="busy">⏳ {actionLabels[project.activity.kind] ?? project.activity.kind} in corso</span>
           {/if}
@@ -96,7 +99,8 @@
     background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
     transition: border-color 0.12s;
   }
-  .row:hover { border-color: var(--muted); }
+  .row { cursor: pointer; }
+  .row:hover { border-color: var(--accent); }
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   button.name { font-weight: 600; font-size: 1.05rem; color: var(--text); align-self: flex-start; border: none; background: none; padding: 0; text-align: left; }
   button.name:hover { text-decoration: underline; }
