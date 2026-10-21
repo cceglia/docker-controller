@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/db"
@@ -50,32 +51,42 @@ func run() error {
 	defer cancel()
 
 	var app *application.App
+	var systemTray *trayAdapter
 	manager, err := compose.New(compose.Config{
-		Docker:     compose.ExecDocker{},
-		DB:         conn,
-		OnActivity: func(e compose.ActivityEvent) { app.Event.Emit(activityEvent, e) },
+		Docker: compose.ExecDocker{},
+		DB:     conn,
+		OnActivity: func(e compose.ActivityEvent) {
+			app.Event.Emit(activityEvent, e)
+			if systemTray != nil {
+				systemTray.onActivity(e)
+			}
+		},
 	})
 	if err != nil {
 		return err
 	}
 
+	notifs := notifications.New()
 	app = application.New(application.Options{
 		Name:        "Docker Controller",
 		Description: "Gestione dei Progetti docker-compose",
 		Services: []application.Service{
 			application.NewService(&ProjectsService{manager: manager, ctx: ctx, emit: func(name string, data any) { app.Event.Emit(name, data) }}),
+			application.NewService(notifs),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
 	})
 
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "Docker Controller",
 		Width:  1000,
 		Height: 700,
 		URL:    "/",
 	})
+
+	systemTray = newTrayAdapter(ctx, app, manager, window, notifs)
 
 	// Snapshot -> frontend event. The first value is the current snapshot.
 	go func() {
