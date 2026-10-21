@@ -192,7 +192,7 @@ func TestBuildMenu_DockerUnreachableDisablesEveryAction(t *testing.T) {
 func TestBuildMenu_NeverOffersDestructiveOrHeavyActions(t *testing.T) {
 	p := project("p", "", "G", compose.StatusActive, "web")
 	m := BuildMenu(snapshot(true, p, project("q", "", "", compose.StatusStopped, "db")))
-	banned := map[compose.ActionKind]bool{compose.ActionDown: true, compose.ActionDownVolumes: true, compose.ActionPull: true, compose.ActionBuild: true}
+	banned := map[compose.ActionKind]bool{compose.ActionDown: true, compose.ActionDownVolumes: true, compose.ActionDownService: true, compose.ActionPull: true, compose.ActionBuild: true}
 	walk(m, func(it Item) {
 		if it.Action != nil && banned[it.Action.Kind] {
 			t.Errorf("%q offers %s", it.Label, it.Action.Kind)

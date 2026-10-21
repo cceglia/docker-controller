@@ -536,3 +536,35 @@ func TestDo_ProjectStaysListedAsRemovedAfterADown(t *testing.T) {
 		})
 	}
 }
+
+func TestDo_DownOfAServiceRemovesItsContainersButNeverVolumes(t *testing.T) {
+	f := realDocker(t)
+	m, rec := activityManager(t, f)
+	args := composeArgs(t, m, "sunlinkdocker", "--profile", "*", "rm", "-s", "-f", "redis")
+	f.RespondStream(nil, nil, nil, args...)
+
+	id, err := m.Do(context.Background(), compose.Action{Project: "sunlinkdocker", Service: "redis", Kind: compose.ActionDownService})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec.finished(t, id)
+
+	calls := actionCalls(f)
+	if len(calls) != 1 || strings.Join(calls[0], " ") != strings.Join(args, " ") {
+		t.Errorf("ran %v, want exactly %v", calls, args)
+	}
+	for _, a := range calls[0] {
+		if a == "-v" {
+			t.Errorf("must never remove volumes, ran %v", calls[0])
+		}
+	}
+}
+
+func TestDo_DownOfAServiceIsRefusedForTheWholeProject(t *testing.T) {
+	f := realDocker(t)
+	m, _ := activityManager(t, f)
+	_, err := m.Do(context.Background(), compose.Action{Project: "sunlinkdocker", Kind: compose.ActionDownService})
+	if !errors.Is(err, compose.ErrServiceOnly) {
+		t.Errorf("err = %v, want ErrServiceOnly", err)
+	}
+}

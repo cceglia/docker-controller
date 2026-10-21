@@ -106,6 +106,8 @@ func kindLabel(k compose.ActionKind) string {
 		return "Down"
 	case compose.ActionDownVolumes:
 		return "Down con volumi"
+	case compose.ActionDownService:
+		return "Down"
 	}
 	return string(k)
 }

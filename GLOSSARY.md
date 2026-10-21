@@ -79,8 +79,11 @@ _Avoid_: job, task
 **Down**:
 Rimuove Container e reti di un Progetto, conservando i volumi.
 
+**Down di un Servizio**:
+Ferma e rimuove i Container di un solo Servizio, conservando i volumi. Richiede conferma.
+
 **Down con volumi**:
 Down che elimina anche i volumi del Progetto, e quindi i suoi dati.
 
 **Azione distruttiva**:
-Un'azione che rimuove qualcosa e richiede conferma esplicita: Down, Down con volumi, Rimuovi dalla lista.
+Un'azione che rimuove qualcosa e richiede conferma esplicita: Down, Down di un Servizio, Down con volumi, Rimuovi dalla lista.

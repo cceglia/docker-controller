@@ -23,6 +23,9 @@ const (
 	// ActionDownVolumes is Down that also deletes the Project's volumes, and so
 	// its data (Project only). It is the only kind that ever passes -v.
 	ActionDownVolumes ActionKind = "down-volumes"
+	// ActionDownService stops and removes the Containers of one Service, keeping
+	// volumes (Service only): `compose rm -s -f`, never -v.
+	ActionDownService ActionKind = "down-service"
 )
 
 // verbs maps every ActionKind to the compose arguments that follow the
@@ -38,7 +41,12 @@ var verbs = map[ActionKind][]string{
 	// appear in any other verb.
 	ActionDown:        {"down"},
 	ActionDownVolumes: {"down", "-v"},
+	ActionDownService: {"rm", "-s", "-f"},
 }
+
+// serviceOnly are the kinds that need a Service and are refused for the whole
+// Project.
+var serviceOnly = map[ActionKind]bool{ActionDownService: true}
 
 // projectOnly are the kinds that act on the whole Project and are refused for
 // a Service.
@@ -136,6 +144,8 @@ var (
 	// ErrInvalidService is returned for a Service name compose could take for
 	// an option.
 	ErrInvalidService = errors.New("compose: invalid Service name")
+	// ErrServiceOnly is returned for Down of a Service on the whole Project.
+	ErrServiceOnly = errors.New("compose: this Action applies to a Service, not to the whole Project")
 	// ErrProjectOnly is returned for Down or Down with volumes on a Service.
 	ErrProjectOnly = errors.New("compose: this Action applies to the whole Project, not to a Service")
 )
@@ -162,11 +172,14 @@ func composeArgs(p Project, a Action) ([]string, error) {
 	if a.Service != "" && projectOnly[a.Kind] {
 		return nil, fmt.Errorf("%w: %s on %q", ErrProjectOnly, a.Kind, a.Service)
 	}
+	if a.Service == "" && serviceOnly[a.Kind] {
+		return nil, fmt.Errorf("%w: %s", ErrServiceOnly, a.Kind)
+	}
 	if strings.HasPrefix(a.Service, "-") {
 		return nil, fmt.Errorf("%w: %q", ErrInvalidService, a.Service)
 	}
 	args := projectArgs(p)
-	if projectOnly[a.Kind] {
+	if projectOnly[a.Kind] || serviceOnly[a.Kind] {
 		// Down acts on every Profile, so no Container of a Profile that is
 		// not active is left behind. compose reads "*" as "all of them", also
 		// those added to the files since they were last read.
