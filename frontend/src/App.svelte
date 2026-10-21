@@ -17,6 +17,7 @@
     setAdding,
     start,
     store,
+    updateSettings,
   } from './lib/store.svelte'
 
   onMount(start)
@@ -39,6 +40,8 @@
         onopenfolder={openFolder}
         onback={() => selectProject(null)}
         onremove={removeFromList}
+        onsettings={updateSettings}
+        groups={store.groups}
         unavailable={!store.dockerReachable}
       />
     {:else}

@@ -57,8 +57,8 @@ func New(cfg Config) (*Manager, error) {
 	return &Manager{
 		docker:     cfg.Docker,
 		store:      store{db: cfg.DB},
-		base:       Snapshot{Projects: []Project{}},
-		snap:       Snapshot{Projects: []Project{}},
+		base:       Snapshot{Projects: []Project{}, Groups: []string{}},
+		snap:       Snapshot{Projects: []Project{}, Groups: []string{}},
 		running:    map[string]ActivityRef{},
 		onActivity: cfg.OnActivity,
 
@@ -212,6 +212,7 @@ func (m *Manager) publish(next Snapshot) {
 func (m *Manager) recompose() {
 	next := Snapshot{DockerReachable: m.base.DockerReachable, Projects: make([]Project, len(m.base.Projects))}
 	copy(next.Projects, m.base.Projects)
+	next.Groups = groupsOf(next.Projects)
 	for i := range next.Projects {
 		if a, ok := m.running[next.Projects[i].Name]; ok {
 			next.Projects[i].Activity = &a

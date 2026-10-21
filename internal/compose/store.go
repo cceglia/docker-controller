@@ -68,6 +68,38 @@ func (s store) add(ctx context.Context, d discovered) error {
 	return tx.Commit()
 }
 
+// updateSettings applies the non-nil fields of st to a saved Project; an empty
+// value is stored as NULL. It reports whether the Project exists.
+func (s store) updateSettings(ctx context.Context, name string, st Settings) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("compose: update settings of %s: %w", name, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var exists bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM projects WHERE name = ?)`, name).Scan(&exists); err != nil {
+		return false, fmt.Errorf("compose: update settings of %s: %w", name, err)
+	}
+	if !exists {
+		return false, nil
+	}
+	if st.DisplayName != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE projects SET display_name = NULLIF(?, '') WHERE name = ?`, *st.DisplayName, name); err != nil {
+			return false, fmt.Errorf("compose: update display name of %s: %w", name, err)
+		}
+	}
+	if st.Group != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE projects SET group_name = NULLIF(?, '') WHERE name = ?`, *st.Group, name); err != nil {
+			return false, fmt.Errorf("compose: update group of %s: %w", name, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("compose: update settings of %s: %w", name, err)
+	}
+	return true, nil
+}
+
 // list returns every saved Project, sorted by name, without status.
 func (s store) list(ctx context.Context) ([]Project, error) {
 	rows, err := s.db.QueryContext(ctx,

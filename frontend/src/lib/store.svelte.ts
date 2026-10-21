@@ -50,7 +50,7 @@ export interface Toast {
   activityId: string | null
 }
 
-const empty: Snapshot = { dockerReachable: true, projects: [] }
+const empty: Snapshot = { dockerReachable: true, projects: [], groups: [] }
 
 let snapshot = $state<Snapshot>(empty)
 let loaded = $state(false)
@@ -118,6 +118,15 @@ export async function run(project: string, kind: ActionKind, service = '') {
 export async function removeFromList(project: string) {
   try {
     await ProjectsService.RemoveFromList(project)
+  } catch (err) {
+    fail(err)
+  }
+}
+
+/** Sets (or, with an empty string, clears) the Display name and/or Group of a Project; null leaves a field as it is. */
+export async function updateSettings(project: string, displayName: string | null, group: string | null) {
+  try {
+    await ProjectsService.UpdateSettings(project, { displayName, group })
   } catch (err) {
     fail(err)
   }
@@ -198,6 +207,10 @@ export const store = {
   /** The Project whose detail is open; null when it was removed from the list. */
   get selectedProject(): Project | null {
     return (snapshot.projects ?? []).find((p) => p.name === selectedProject) ?? null
+  },
+  /** The Groups in use, each once, sorted. */
+  get groups(): string[] {
+    return snapshot.groups ?? []
   },
   get projects(): Project[] {
     return snapshot.projects ?? []

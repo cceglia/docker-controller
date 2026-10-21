@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Status } from '../../bindings/dockercontroller/internal/compose/models'
   import type { Project } from '../../bindings/dockercontroller/internal/compose/models'
+  import { SvelteMap } from 'svelte/reactivity'
   import { ActionKind, actionLabels } from './store.svelte'
 
   let {
@@ -31,18 +32,38 @@
     [Status.StatusStopped]: 'Fermo',
     [Status.StatusRemoved]: 'Rimosso',
   }
+
+  // Projects by Group (Groups sorted), then those without a Group in a section of their own.
+  const sections = $derived.by(() => {
+    const byGroup = new SvelteMap<string, Project[]>()
+    const ungrouped: Project[] = []
+    for (const p of projects) {
+      if (!p.group) ungrouped.push(p)
+      else byGroup.set(p.group, [...(byGroup.get(p.group) ?? []), p])
+    }
+    const named = [...byGroup.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([title, items]) => ({ title, items }))
+    // Without any Group the list stays flat, with no section heading.
+    if (named.length === 0) return [{ title: '', items: ungrouped }]
+    return ungrouped.length > 0 ? [...named, { title: 'Senza Gruppo', items: ungrouped }] : named
+  })
 </script>
 
 {#if projects.length === 0}
   <p class="empty">Nessun Progetto.</p>
 {:else}
+  {#each sections as section (section.title)}
+  <section class="group">
+  {#if section.title}<h2>{section.title}</h2>{/if}
   <ul class="list" class:unavailable>
-    {#each projects as project (project.name)}
+    {#each section.items as project (project.name)}
       <li class="row">
         <div class="main">
           <button class="name" title="Apri il dettaglio" onclick={() => onselect(project.name)}>
             {project.displayName || project.name}
           </button>
+          {#if project.displayName}<span class="compose-name">{project.name}</span>{/if}
           <span class="folder">{project.folder}</span>
           {#if project.composeMissing}<span class="missing">File compose mancante</span>{/if}
         </div>
@@ -63,6 +84,8 @@
       </li>
     {/each}
   </ul>
+  </section>
+  {/each}
 {/if}
 
 <style>
@@ -75,6 +98,9 @@
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   button.name { font-weight: 600; font-size: 1rem; align-self: flex-start; border: none; background: none; padding: 0; text-align: left; }
   button.name:hover { text-decoration: underline; }
+  .group { margin-bottom: 1rem; }
+  h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 0.4rem; }
+  .compose-name { color: var(--muted); font-size: 0.8rem; }
   .folder { color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .missing { color: var(--warn); font-size: 0.8rem; }
   .count { font-variant-numeric: tabular-nums; color: var(--muted); }

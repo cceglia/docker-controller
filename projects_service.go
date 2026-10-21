@@ -37,6 +37,12 @@ func (s *ProjectsService) RemoveFromList(project string) error {
 	return s.manager.RemoveFromList(s.ctx, project)
 }
 
+// UpdateSettings changes the Display name and/or Group of a Project: a null
+// field is left as it is, an empty one is cleared.
+func (s *ProjectsService) UpdateSettings(project string, settings compose.Settings) error {
+	return s.manager.UpdateSettings(s.ctx, project, settings)
+}
+
 // PickComposeFile shows the native file picker and returns the chosen compose
 // file, or "" when the user cancels.
 func (s *ProjectsService) PickComposeFile() (string, error) {

@@ -11,6 +11,8 @@
     onopenfolder,
     onback,
     onremove,
+    onsettings,
+    groups,
     unavailable = false,
   }: {
     project: Project
@@ -21,6 +23,10 @@
     onback: () => void
     /** Removes the (Rimosso) Project from the saved list. */
     onremove: (project: string) => void
+    /** Saves the Display name and Group of the Project ('' clears one). */
+    onsettings: (project: string, displayName: string, group: string) => void
+    /** The existing Groups. */
+    groups: string[]
     /** Docker does not answer: Actions are disabled. */
     unavailable?: boolean
   } = $props()
@@ -34,6 +40,26 @@
   // The destructive Action waiting for a confirmation, if any.
   let pending: 'down' | 'downVolumes' | 'remove' | null = $state(null)
   const name = $derived(project.displayName || project.name)
+
+  // Settings form: edited values, reset whenever another Project is opened.
+  const NEW_GROUP = '\u0000new'
+  let editing = $state(false)
+  let displayNameInput = $state('')
+  let groupChoice = $state('')
+  let newGroupInput = $state('')
+
+  function startEditing() {
+    displayNameInput = project.displayName
+    groupChoice = project.group
+    newGroupInput = ''
+    editing = true
+  }
+
+  function saveSettings() {
+    const group = groupChoice === NEW_GROUP ? newGroupInput : groupChoice
+    editing = false
+    onsettings(project.name, displayNameInput, group)
+  }
 
   function confirm() {
     const what = pending
@@ -51,6 +77,38 @@
     <button onclick={() => onopenfolder(project.name)} title={project.folder}>Apri cartella</button>
   </header>
   <p class="folder">{project.folder}</p>
+  {#if project.displayName}<p class="compose-name">Nome compose: {project.name}</p>{/if}
+  <p class="folder">{project.group ? `Gruppo: ${project.group}` : 'Nessun Gruppo'}</p>
+  {#if editing}
+    <form class="settings" onsubmit={(e) => { e.preventDefault(); saveSettings() }}>
+      <label>
+        Nome visualizzato
+        <input bind:value={displayNameInput} placeholder={project.name} />
+      </label>
+      <label>
+        Gruppo
+        <select bind:value={groupChoice}>
+          <option value="">Nessun Gruppo</option>
+          {#each groups as g (g)}
+            <option value={g}>{g}</option>
+          {/each}
+          <option value={NEW_GROUP}>Nuovo Gruppo…</option>
+        </select>
+      </label>
+      {#if groupChoice === NEW_GROUP}
+        <label>
+          Nome del nuovo Gruppo
+          <input bind:value={newGroupInput} />
+        </label>
+      {/if}
+      <div class="form-actions">
+        <button type="submit" disabled={groupChoice === NEW_GROUP && newGroupInput.trim() === ''}>Salva</button>
+        <button type="button" onclick={() => (editing = false)}>Annulla</button>
+      </div>
+    </form>
+  {:else}
+    <button class="edit" onclick={startEditing}>Modifica nome e Gruppo</button>
+  {/if}
   {#if project.composeMissing}
     <p class="missing">File compose mancante: i file del Progetto non esistono più. Puoi toglierlo dalla lista.</p>
   {/if}
@@ -142,6 +200,12 @@
   h2 { flex: 1; font-size: 1.1rem; margin: 0; }
   h3 { font-size: 0.95rem; margin: 0; }
   .folder { color: var(--muted); font-size: 0.8rem; margin: 0.25rem 0 0.75rem; }
+  .compose-name { color: var(--muted); font-size: 0.8rem; margin: 0; }
+  .edit { margin-bottom: 0.75rem; }
+  .settings { display: grid; gap: 0.5rem; max-width: 24rem; margin-bottom: 0.75rem; padding: 0.6rem 0.9rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); }
+  .settings label { display: grid; gap: 0.2rem; font-size: 0.85rem; }
+  .settings input, .settings select { font: inherit; padding: 0.25rem 0.4rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+  .form-actions { display: flex; gap: 0.4rem; }
   .busy { color: var(--warn); font-size: 0.85rem; }
   .empty { color: var(--muted); }
   .missing { padding: 0.5rem 0.8rem; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: 0.85rem; }
