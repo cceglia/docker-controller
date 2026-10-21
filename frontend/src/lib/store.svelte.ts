@@ -60,6 +60,7 @@ let activities = $state<ActivityRecord[]>([])
 let selectedId = $state<string | null>(null)
 let toast = $state<Toast | null>(null)
 let selectedProject = $state<string | null>(null)
+let adding = $state(false)
 
 function applyActivity(e: ActivityEvent) {
   if (e.type === ActivityEventType.ActivityStarted) {
@@ -122,6 +123,32 @@ export async function removeFromList(project: string) {
   }
 }
 
+/** Shows the native file picker; resolves to the chosen File compose, '' when cancelled. */
+export function pickComposeFile(): Promise<string> {
+  return ProjectsService.PickComposeFile()
+}
+
+/** The compose name proposed for a Project whose main File compose is `mainFile`. */
+export function proposeName(mainFile: string): Promise<string> {
+  return ProjectsService.ProposeName(mainFile)
+}
+
+/** Adds a Project by hand; resolves to the error message when it is refused, null when saved. */
+export async function addProject(name: string, files: string[]): Promise<string | null> {
+  try {
+    await ProjectsService.AddProject(name, files)
+    adding = false
+    return null
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err)
+  }
+}
+
+/** Opens or closes the "Aggiungi Progetto" dialog. */
+export function setAdding(value: boolean) {
+  adding = value
+}
+
 /** Opens http://localhost:<port> in the browser. */
 export async function openPort(port: number) {
   try {
@@ -160,6 +187,10 @@ export const store = {
   },
   get selectedActivity(): ActivityRecord | null {
     return activities.find((a) => a.id === selectedId) ?? null
+  },
+  /** The "Aggiungi Progetto" dialog is open. */
+  get adding(): boolean {
+    return adding
   },
   get toast(): Toast | null {
     return toast

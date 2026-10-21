@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/wailsapp/wails/v3/pkg/application"
+
 	"dockercontroller/internal/compose"
 )
 
@@ -33,6 +35,27 @@ func (s *ProjectsService) Do(action compose.Action) (compose.ActivityID, error) 
 // touches Docker; a Project with Containers is refused.
 func (s *ProjectsService) RemoveFromList(project string) error {
 	return s.manager.RemoveFromList(s.ctx, project)
+}
+
+// PickComposeFile shows the native file picker and returns the chosen compose
+// file, or "" when the user cancels.
+func (s *ProjectsService) PickComposeFile() (string, error) {
+	return application.Get().Dialog.OpenFile().
+		SetTitle("Scegli un File compose").
+		AddFilter("File compose (*.yml, *.yaml)", "*.yml;*.yaml").
+		PromptForSingleSelection()
+}
+
+// ProposeName returns the compose name compose would give to a Project whose
+// main File compose is mainFile.
+func (s *ProjectsService) ProposeName(mainFile string) (string, error) {
+	return compose.ProposeName(mainFile)
+}
+
+// AddProject saves a Project added by hand: its compose name and its File
+// compose in -f order (the main one first). A name already saved is refused.
+func (s *ProjectsService) AddProject(name string, files []string) error {
+	return s.manager.AddProject(s.ctx, name, files)
 }
 
 // OpenPort opens http://localhost:<port> in the default browser. The URL is

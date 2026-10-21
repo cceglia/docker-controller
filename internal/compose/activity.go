@@ -125,6 +125,9 @@ func composeArgs(p Project, a Action) ([]string, error) {
 	for _, f := range p.ComposeFiles {
 		args = append(args, "-f", f)
 	}
+	if p.Folder != "" {
+		args = append(args, "--project-directory", p.Folder)
+	}
 	args = append(args, verb...)
 	if a.Service != "" {
 		args = append(args, a.Service)

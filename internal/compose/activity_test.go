@@ -70,8 +70,9 @@ func activityManager(t *testing.T, docker compose.Docker) (*compose.Manager, *re
 	return m, rec
 }
 
-// composeArgs is what the Manager must run for a Project: the project name and
-// its compose files, then the verb.
+// composeArgs is what the Manager must run for a Project: the project name,
+// its compose files in saved order and its folder as project directory, then
+// the verb.
 func composeArgs(t *testing.T, m *compose.Manager, project string, verb ...string) []string {
 	t.Helper()
 	p := find(t, m.Snapshot(), project)
@@ -79,6 +80,7 @@ func composeArgs(t *testing.T, m *compose.Manager, project string, verb ...strin
 	for _, f := range p.ComposeFiles {
 		args = append(args, "-f", f)
 	}
+	args = append(args, "--project-directory", p.Folder)
 	return append(args, verb...)
 }
 

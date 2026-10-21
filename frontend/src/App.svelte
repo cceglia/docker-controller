@@ -4,13 +4,29 @@
   import ProjectDetail from './lib/ProjectDetail.svelte'
   import ActivityPanel from './lib/ActivityPanel.svelte'
   import ErrorToast from './lib/ErrorToast.svelte'
-  import { openFolder, openPort, removeFromList, run, selectProject, start, store } from './lib/store.svelte'
+  import AddProjectDialog from './lib/AddProjectDialog.svelte'
+  import {
+    addProject,
+    openFolder,
+    openPort,
+    pickComposeFile,
+    proposeName,
+    removeFromList,
+    run,
+    selectProject,
+    setAdding,
+    start,
+    store,
+  } from './lib/store.svelte'
 
   onMount(start)
 </script>
 
 <main>
-  <h1>Docker Controller</h1>
+  <header>
+    <h1>Docker Controller</h1>
+    <button onclick={() => setAdding(true)}>Aggiungi Progetto</button>
+  </header>
   {#if !store.dockerReachable}
     <p class="banner">Docker non raggiungibile</p>
   {/if}
@@ -34,13 +50,22 @@
   {/if}
 </main>
 
+{#if store.adding}
+  <AddProjectDialog onpick={pickComposeFile} onpropose={proposeName} onadd={addProject} oncancel={() => setAdding(false)} />
+{/if}
+
 {#if store.toast}
   <ErrorToast toast={store.toast} />
 {/if}
 
 <style>
   main { max-width: 56rem; margin: 0 auto; padding: 1.25rem; }
-  h1 { font-size: 1.25rem; margin: 0 0 1rem; }
+  header { display: flex; align-items: center; justify-content: space-between; margin: 0 0 1rem; }
+  h1 { font-size: 1.25rem; margin: 0; }
+  header button {
+    font: inherit; font-size: 0.85rem; padding: 0.3rem 0.8rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+  }
   .banner { padding: 0.6rem 0.9rem; border-radius: 8px; background: var(--warn-bg); color: var(--warn); }
   .loading { color: var(--muted); }
 </style>

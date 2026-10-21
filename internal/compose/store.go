@@ -39,6 +39,35 @@ func (s store) upsertDiscovered(ctx context.Context, d discovered) error {
 	return tx.Commit()
 }
 
+// add saves a Project added by hand; a name already saved is refused with
+// ErrDuplicateProject and nothing is changed.
+func (s store) add(ctx context.Context, d discovered) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("compose: add %s: %w", d.Name, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var taken bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM projects WHERE name = ?)`, d.Name).Scan(&taken); err != nil {
+		return fmt.Errorf("compose: add %s: %w", d.Name, err)
+	}
+	if taken {
+		return fmt.Errorf("%w: %q", ErrDuplicateProject, d.Name)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO projects (name, folder) VALUES (?, ?)`, d.Name, d.folder()); err != nil {
+		return fmt.Errorf("compose: add %s: %w", d.Name, err)
+	}
+	for i, f := range d.ComposeFiles {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO project_files (project_name, position, path) VALUES (?, ?, ?)`,
+			d.Name, i, f); err != nil {
+			return fmt.Errorf("compose: add %s files: %w", d.Name, err)
+		}
+	}
+	return tx.Commit()
+}
+
 // list returns every saved Project, sorted by name, without status.
 func (s store) list(ctx context.Context) ([]Project, error) {
 	rows, err := s.db.QueryContext(ctx,
