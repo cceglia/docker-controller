@@ -19,12 +19,20 @@ type Config struct {
 	// OnActivity, when not nil, receives the events of every Activity (see
 	// Do). Calls are serialised; it must not block for long.
 	OnActivity func(ActivityEvent)
+	// RefreshEvery is the interval of the safety-net full refresh done by Run;
+	// 30 seconds when zero.
+	RefreshEvery time.Duration
+	// RetryEvery is how often Run retries while Docker is unreachable or its
+	// events stream is down; 5 seconds when zero.
+	RetryEvery time.Duration
 }
 
 // Manager is the interface of the compose module.
 type Manager struct {
 	docker Docker
 	store  store
+
+	refreshEvery, retryEvery time.Duration
 
 	refreshMu sync.Mutex // serialises Refresh
 
@@ -51,6 +59,9 @@ func New(cfg Config) (*Manager, error) {
 		snap:       Snapshot{Projects: []Project{}},
 		running:    map[string]ActivityRef{},
 		onActivity: cfg.OnActivity,
+
+		refreshEvery: orDefault(cfg.RefreshEvery, defaultRefreshEvery),
+		retryEvery:   orDefault(cfg.RetryEvery, defaultRetryEvery),
 	}, nil
 }
 
@@ -192,26 +203,5 @@ func (m *Manager) recompose() {
 		default:
 		}
 		w <- next
-	}
-}
-
-// refreshEvery is the interval of the full refresh done by Run.
-const refreshEvery = 30 * time.Second
-
-// Run keeps the snapshot up to date until ctx is done: an immediate refresh,
-// then a full one every 30 seconds. Refresh errors are passed to onError when
-// it is not nil.
-func (m *Manager) Run(ctx context.Context, onError func(error)) {
-	tick := time.NewTicker(refreshEvery)
-	defer tick.Stop()
-	for {
-		if err := m.Refresh(ctx); err != nil && ctx.Err() == nil && onError != nil {
-			onError(err)
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-tick.C:
-		}
 	}
 }

@@ -18,6 +18,7 @@ type Fake struct {
 	mu        sync.Mutex
 	responses map[string]response
 	holds     map[string]chan struct{}
+	follows   map[string]bool
 	calls     [][]string
 }
 
@@ -29,7 +30,7 @@ type response struct {
 
 // New returns an empty Fake: any call without a configured response fails.
 func New() *Fake {
-	return &Fake{responses: map[string]response{}, holds: map[string]chan struct{}{}}
+	return &Fake{responses: map[string]response{}, holds: map[string]chan struct{}{}, follows: map[string]bool{}}
 }
 
 func key(args []string) string { return strings.Join(args, "\x00") }
@@ -66,6 +67,15 @@ func (f *Fake) Hold(args ...string) (release func()) {
 	return func() { once.Do(func() { close(ch) }) }
 }
 
+// Follow makes the streamed command with exactly these arguments stay open
+// after replaying its output, until its context is cancelled, like
+// `docker events` does.
+func (f *Fake) Follow(args ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.follows[key(args)] = true
+}
+
 // Calls returns every argument list received so far, in order.
 func (f *Fake) Calls() [][]string {
 	f.mu.Lock()
@@ -100,6 +110,7 @@ func (f *Fake) Stream(ctx context.Context, args []string, onLine func(line strin
 	r, err := f.lookup(args)
 	f.mu.Lock()
 	hold := f.holds[key(args)]
+	follow := f.follows[key(args)]
 	f.mu.Unlock()
 	if hold != nil {
 		select {
@@ -120,6 +131,10 @@ func (f *Fake) Stream(ctx context.Context, args []string, onLine func(line strin
 			}
 			onLine(sc.Text(), part.stderr)
 		}
+	}
+	if follow {
+		<-ctx.Done()
+		return ctx.Err()
 	}
 	return err
 }

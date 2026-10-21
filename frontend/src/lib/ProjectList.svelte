@@ -6,7 +6,13 @@
   let {
     projects,
     onaction,
-  }: { projects: Project[]; onaction: (project: string, kind: ActionKind) => void } = $props()
+    unavailable = false,
+  }: {
+    projects: Project[]
+    onaction: (project: string, kind: ActionKind) => void
+    /** Docker does not answer: the list is greyed out and Actions are disabled. */
+    unavailable?: boolean
+  } = $props()
 
   const kinds = [
     ActionKind.ActionUp,
@@ -27,7 +33,7 @@
 {#if projects.length === 0}
   <p class="empty">Nessun Progetto.</p>
 {:else}
-  <ul class="list">
+  <ul class="list" class:unavailable>
     {#each projects as project (project.name)}
       <li class="row">
         <div class="main">
@@ -43,7 +49,7 @@
             <span class="busy">⏳ {actionLabels[project.activity.kind] ?? project.activity.kind} in corso</span>
           {/if}
           {#each kinds as kind (kind)}
-            <button disabled={project.activity !== null} onclick={() => onaction(project.name, kind)}>
+            <button disabled={unavailable || project.activity !== null} onclick={() => onaction(project.name, kind)}>
               {actionLabels[kind]}
             </button>
           {/each}
@@ -76,5 +82,6 @@
     border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
   }
   button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .unavailable { opacity: 0.5; filter: grayscale(1); }
   .empty { color: var(--muted); }
 </style>

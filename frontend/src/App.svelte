@@ -14,7 +14,7 @@
     <p class="banner">Docker non raggiungibile</p>
   {/if}
   {#if store.loaded}
-    <ProjectList projects={store.projects} onaction={run} />
+    <ProjectList projects={store.projects} onaction={run} unavailable={!store.dockerReachable} />
     <ActivityPanel activities={store.activities} selected={store.selectedActivity} />
   {:else}
     <p class="loading">Caricamento…</p>
