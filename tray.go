@@ -37,6 +37,7 @@ func newTrayAdapter(ctx context.Context, app *application.App, manager *compose.
 	t := &trayAdapter{app: app, manager: manager, window: window, notifications: notifs, ctx: ctx}
 	t.systemTray = app.SystemTray.New()
 	t.systemTray.SetTooltip("Docker Controller")
+	t.systemTray.OnDoubleClick(t.showWindow)
 	t.apply(manager.Snapshot())
 
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
@@ -88,13 +89,18 @@ func (t *trayAdapter) fill(menu *application.Menu, items []tray.Item) {
 	}
 }
 
+// showWindow brings the application window to the front.
+func (t *trayAdapter) showWindow() {
+	t.window.Show()
+	t.window.UnMinimise()
+	t.window.Focus()
+}
+
 // run executes the click on an entry.
 func (t *trayAdapter) run(it tray.Item) {
 	switch it.Command {
 	case tray.CommandShowWindow:
-		t.window.Show()
-		t.window.UnMinimise()
-		t.window.Focus()
+		t.showWindow()
 		return
 	case tray.CommandQuit:
 		t.app.Quit()

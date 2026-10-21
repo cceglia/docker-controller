@@ -37,6 +37,7 @@ export const actionLabels: Record<string, string> = {
   [ActionKind.ActionBuild]: 'Build',
   [ActionKind.ActionDown]: 'Down',
   [ActionKind.ActionDownVolumes]: 'Down con volumi',
+  [ActionKind.ActionDownService]: 'Down',
 }
 
 export interface OutputLine {

@@ -10,6 +10,9 @@
   --warn: #b45309;
   --warn-bg: #fef3c7;
   --danger: #b91c1c;
+  --accent: #1769e0;
+  --hover: #eef1f5;
+  --shadow: 0 1px 2px rgb(16 24 40 / 6%);
   --log-lightness: 38%;
   font-family: system-ui, sans-serif;
 }
@@ -24,7 +27,15 @@
     --warn: #fbbf24;
     --warn-bg: #3a2f10;
     --danger: #f87171;
+    --accent: #4d94ff;
+    --hover: #2e3238;
+    --shadow: 0 1px 2px rgb(0 0 0 / 30%);
     --log-lightness: 68%;
   }
 }
 body { margin: 0; background: var(--bg); color: var(--text); }
+
+button { transition: background-color 0.12s, border-color 0.12s; }
+button:not(:disabled):hover { background: var(--hover); border-color: var(--muted); }
+button:not(:disabled):active { transform: translateY(1px); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

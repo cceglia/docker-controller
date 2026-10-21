@@ -92,23 +92,25 @@
   .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
   .row {
     display: flex; align-items: center; gap: 1rem;
-    padding: 0.6rem 0.9rem; border-radius: 8px;
-    background: var(--surface); border: 1px solid var(--border);
+    padding: 0.7rem 1rem; border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+    transition: border-color 0.12s;
   }
+  .row:hover { border-color: var(--muted); }
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  button.name { font-weight: 600; font-size: 1rem; align-self: flex-start; border: none; background: none; padding: 0; text-align: left; }
+  button.name { font-weight: 600; font-size: 1.05rem; color: var(--text); align-self: flex-start; border: none; background: none; padding: 0; text-align: left; }
   button.name:hover { text-decoration: underline; }
-  .group { margin-bottom: 1rem; }
-  h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 0.4rem; }
+  .group { margin-bottom: 1.4rem; }
+  h2 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 0.5rem 0.25rem; }
   .compose-name { color: var(--muted); font-size: 0.8rem; }
   .folder { color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .missing { color: var(--warn); font-size: 0.8rem; }
   .count { font-variant-numeric: tabular-nums; color: var(--muted); }
-  .status { min-width: 5.5rem; text-align: center; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.8rem; border: 1px solid currentColor; }
+  .status { min-width: 5.5rem; text-align: center; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 500; border: 1px solid transparent; background: color-mix(in srgb, currentColor 14%, transparent); }
   .active { color: var(--ok); }
   .partial { color: var(--warn); }
   .stopped { color: var(--muted); }
-  .removed { color: var(--muted); border-style: dashed; }
+  .removed { color: var(--muted); border: 1px dashed currentColor; background: none; }
   .actions { display: flex; align-items: center; gap: 0.3rem; }
   .busy { color: var(--warn); font-size: 0.8rem; margin-right: 0.3rem; }
   button {

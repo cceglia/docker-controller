@@ -6,6 +6,8 @@
     /** The latest sample; null while none has arrived (streaming just started). */
     usage: UsageSample | null
   } = $props()
+
+  const rate = (bytesPerSec: number) => `${formatBytes(bytesPerSec, 'decimal')}/s`
 </script>
 
 <div class="usage-bar" class:error={usage !== null && !usage.dockerReachable} aria-label="Utilizzo risorse di Docker">
@@ -14,26 +16,54 @@
   {:else if !usage.dockerReachable}
     <span class="failure" title={usage.error}>Utilizzo risorse non disponibile: Docker non raggiungibile</span>
   {:else}
-    <span title="{usage.cpus} CPU">
-      <b>CPU</b> {formatCores(usage.total.cpuPercent)} · {formatPercent(usage.cpuMachinePercent)}
-    </span>
-    <span title="Memoria totale della macchina: {formatBytes(usage.memoryTotalBytes)}">
-      <b>Memoria</b> {formatBytes(usage.total.memoryBytes)} · {formatPercent(usage.memoryMachinePercent)} di {formatBytes(usage.memoryTotalBytes)}
-    </span>
-    <span><b>Rete</b> in {formatBytes(usage.total.netInBytes, 'decimal')} · out {formatBytes(usage.total.netOutBytes, 'decimal')}</span>
-    <span><b>Disco</b> lettura {formatBytes(usage.total.blockReadBytes, 'decimal')} · scrittura {formatBytes(usage.total.blockWriteBytes, 'decimal')}</span>
-    <span class="count">{usage.containers} Container in esecuzione</span>
+    <div class="cell c4" title="{usage.cpus} CPU">
+      <span class="label">CPU</span>
+      <span class="main"><b>{formatCores(usage.total.cpuPercent)}</b><span class="sub">{formatPercent(usage.cpuMachinePercent)} della macchina</span></span>
+    </div>
+    <div class="cell c5" title="Memoria totale della macchina: {formatBytes(usage.memoryTotalBytes)}">
+      <span class="label">Memoria</span>
+      <span class="main"><b>{formatBytes(usage.total.memoryBytes)}</b><span class="sub">{formatPercent(usage.memoryMachinePercent)} di {formatBytes(usage.memoryTotalBytes)}</span></span>
+    </div>
+    <div class="cell c3">
+      <span class="label">Container</span>
+      <span class="main"><b>{usage.containers}</b><span class="sub">in esecuzione</span></span>
+    </div>
+    <div class="cell c6" title="Traffico istantaneo">
+      <span class="label">Rete</span>
+      <span class="pair">
+        <span class="stat"><span class="dir">↓ in</span><b>{rate(usage.rate.netInBytesPerSec)}</b></span>
+        <span class="stat"><span class="dir">↑ out</span><b>{rate(usage.rate.netOutBytesPerSec)}</b></span>
+      </span>
+    </div>
+    <div class="cell c6" title="I/O istantaneo">
+      <span class="label">Disco</span>
+      <span class="pair">
+        <span class="stat"><span class="dir">lettura</span><b>{rate(usage.rate.blockReadBytesPerSec)}</b></span>
+        <span class="stat"><span class="dir">scrittura</span><b>{rate(usage.rate.blockWriteBytesPerSec)}</b></span>
+      </span>
+    </div>
   {/if}
 </div>
 
 <style>
   .usage-bar {
-    display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; align-items: baseline;
-    margin: 0 0 1rem; padding: 0.5rem 0.9rem; border-radius: 8px; font-size: 0.85rem;
-    background: var(--surface); border: 1px solid var(--border);
+    display: grid; grid-template-columns: repeat(12, 1fr); margin: 0 0 1.25rem;
+    border-radius: 10px; font-size: 0.85rem; overflow: hidden;
+    background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
   }
-  .usage-bar.error { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
-  b { font-weight: 600; margin-right: 0.2rem; }
-  .waiting, .count { color: var(--muted); }
-  .count { margin-left: auto; }
+  .usage-bar.error { display: block; background: var(--warn-bg); color: var(--warn); border-color: transparent; padding: 0.6rem 1rem; }
+  .waiting { display: block; padding: 0.6rem 1rem; color: var(--muted); }
+  .cell { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.6rem 1rem; min-width: 0; border-bottom: 1px solid var(--border); }
+  .cell:nth-child(n + 4) { border-bottom: none; }
+  .cell:not(:nth-child(3n + 1)):not(:nth-child(n + 4)) { border-left: 1px solid var(--border); }
+  .cell:nth-child(5) { border-left: 1px solid var(--border); }
+  .c3 { grid-column: span 3; } .c4 { grid-column: span 4; } .c5 { grid-column: span 5; } .c6 { grid-column: span 6; }
+  .label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .main { display: flex; align-items: baseline; gap: 0.5rem; white-space: nowrap; }
+  .main b { font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .sub { color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .stat { display: flex; align-items: baseline; gap: 0.5rem; white-space: nowrap; }
+  .stat b { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 6.5ch; }
+  .dir { color: var(--muted); font-size: 0.8rem; min-width: 4.2rem; }
 </style>

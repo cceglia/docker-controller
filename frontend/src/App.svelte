@@ -98,7 +98,7 @@
 <style>
   main { max-width: 56rem; margin: 0 auto; padding: 1.25rem; }
   header { display: flex; align-items: center; justify-content: space-between; margin: 0 0 1rem; }
-  h1 { font-size: 1.25rem; margin: 0; }
+  h1 { font-size: 1.35rem; font-weight: 700; margin: 0; }
   .header-actions { display: flex; gap: 0.5rem; }
   header button {
     font: inherit; font-size: 0.85rem; padding: 0.3rem 0.8rem; border-radius: 6px;

@@ -61,6 +61,8 @@
 
   // The destructive Action waiting for a confirmation, if any.
   let pending: 'down' | 'downVolumes' | 'remove' | null = $state(null)
+  // The Service whose Down is waiting for a confirmation, if any.
+  let pendingService: string | null = $state(null)
   const name = $derived(project.displayName || project.name)
 
   // Settings form: edited values, reset whenever another Project is opened.
@@ -86,6 +88,12 @@
   function toggleProfile(profile: string, on: boolean) {
     const rest = activeProfiles.filter((p) => p !== profile)
     onprofiles(project.name, on ? [...rest, profile] : rest)
+  }
+
+  function confirmDownService() {
+    const service = pendingService
+    pendingService = null
+    if (service) onaction(project.name, ActionKind.ActionDownService, service)
   }
 
   function confirm() {
@@ -199,6 +207,9 @@
               {actionLabels[kind]}
             </button>
           {/each}
+          <button disabled={unavailable || busy} onclick={() => (pendingService = service.name)}>
+            {actionLabels[ActionKind.ActionDownService]}
+          </button>
         </div>
       </div>
       {#if usage?.[service.name]}
@@ -234,6 +245,16 @@
     </article>
   {/each}
 </section>
+
+{#if pendingService}
+  <ConfirmModal
+    title="Down di {pendingService}"
+    message="Ferma e rimuove i Container del Servizio. I volumi restano."
+    confirmLabel="Down"
+    onconfirm={confirmDownService}
+    oncancel={() => (pendingService = null)}
+  />
+{/if}
 
 {#if pending === 'down'}
   <ConfirmModal
@@ -284,7 +305,7 @@
   .destructive { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
   button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
   button.highlight { border-color: var(--warn); color: var(--warn); font-weight: 600; box-shadow: 0 0 0 2px var(--warn-bg); }
-  .service { margin-bottom: 0.6rem; padding: 0.6rem 0.9rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); }
+  .service { margin-bottom: 0.6rem; padding: 0.7rem 1rem; border-radius: 10px; box-shadow: var(--shadow); background: var(--surface); border: 1px solid var(--border); }
   .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
   .actions { display: flex; gap: 0.3rem; }
   .usage { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0.4rem 0; font-size: 0.8rem; }
