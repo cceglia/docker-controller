@@ -20,6 +20,12 @@ import (
 //
 //	docker compose ls -a --format json
 //	docker compose -p <name> ps -a --format json
+//	docker compose -p <name> -f <file> --project-directory <dir> config --profiles
+//
+// None of those projects defines a Profile, so config-profiles-none.txt is
+// the real (empty) output. config-profiles.txt is derived: the real output of
+// `config --profiles` for a minimal compose file whose services use the
+// profiles `debug` and `tools` (see profiles_test.go).
 func fixture(t *testing.T, name string) []byte {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("testdata", name))
@@ -30,7 +36,10 @@ func fixture(t *testing.T, name string) []byte {
 }
 
 var (
-	lsArgs = []string{"compose", "ls", "-a", "--format", "json"}
+	lsArgs       = []string{"compose", "ls", "-a", "--format", "json"}
+	profilesArgs = func(project, file string) []string {
+		return []string{"compose", "-p", project, "-f", file, "--project-directory", filepath.Dir(file), "config", "--profiles"}
+	}
 	psArgs = func(project string) []string {
 		return []string{"compose", "-p", project, "ps", "-a", "--format", "json"}
 	}
@@ -47,6 +56,15 @@ func realDocker(t *testing.T) *composefake.Fake {
 	// The remaining projects of the capture have no fixture of their own.
 	for _, p := range []string{"sunlinkvpn", "travelgrouplaravel"} {
 		f.Respond(nil, psArgs(p)...)
+	}
+	for name, file := range map[string]string{
+		"sunlinkdocker":      "/home/cristiano/Sunlink/Dockers/SunlinkDocker/docker-compose.yml",
+		"stellantisvpn":      "/home/cristiano/Sunlink/Dockers/StellantisVpn/docker-compose.yml",
+		"personalvpn":        "/home/cristiano/Personal/Dockers/PersonalVpn/docker-compose.yml",
+		"sunlinkvpn":         "/home/cristiano/Personal/Dockers/SunlinkVpn/docker-compose.yml",
+		"travelgrouplaravel": "/home/cristiano/Personal/Lavoro/TravelGroupLaravel/docker-compose.yml",
+	} {
+		f.Respond(fixture(t, "config-profiles-none.txt"), profilesArgs(name, file)...)
 	}
 	return f
 }

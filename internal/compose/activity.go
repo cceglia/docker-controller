@@ -45,7 +45,7 @@ var verbs = map[ActionKind][]string{
 var projectOnly = map[ActionKind]bool{ActionDown: true, ActionDownVolumes: true}
 
 // Action is a request to run an ActionKind on a Project, or on one of its
-// Services. Ticket 08 adds the active Profiles; it only extends composeArgs.
+// Services. The Profiles it runs with come from the Project, not from here.
 type Action struct {
 	// Project is the compose name of the Project.
 	Project string `json:"project"`
@@ -109,6 +109,19 @@ var (
 	ErrProjectOnly = errors.New("compose: this Action applies to the whole Project, not to a Service")
 )
 
+// projectArgs selects the Project (name, compose files, folder) for any
+// compose command.
+func projectArgs(p Project) []string {
+	args := []string{"compose", "-p", p.Name}
+	for _, f := range p.ComposeFiles {
+		args = append(args, "-f", f)
+	}
+	if p.Folder != "" {
+		args = append(args, "--project-directory", p.Folder)
+	}
+	return args
+}
+
 // composeArgs builds the Docker arguments of an Action on a Project.
 func composeArgs(p Project, a Action) ([]string, error) {
 	verb, ok := verbs[a.Kind]
@@ -121,12 +134,16 @@ func composeArgs(p Project, a Action) ([]string, error) {
 	if strings.HasPrefix(a.Service, "-") {
 		return nil, fmt.Errorf("%w: %q", ErrInvalidService, a.Service)
 	}
-	args := []string{"compose", "-p", p.Name}
-	for _, f := range p.ComposeFiles {
-		args = append(args, "-f", f)
-	}
-	if p.Folder != "" {
-		args = append(args, "--project-directory", p.Folder)
+	args := projectArgs(p)
+	if projectOnly[a.Kind] {
+		// Down acts on every Profile, so no Container of a Profile that is
+		// not active is left behind. compose reads "*" as "all of them", also
+		// those added to the files since they were last read.
+		args = append(args, "--profile", "*")
+	} else {
+		for _, profile := range p.ActiveProfiles {
+			args = append(args, "--profile", profile)
+		}
 	}
 	args = append(args, verb...)
 	if a.Service != "" {

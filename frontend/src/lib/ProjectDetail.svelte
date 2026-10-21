@@ -12,6 +12,7 @@
     onback,
     onremove,
     onsettings,
+    onprofiles,
     groups,
     unavailable = false,
   }: {
@@ -25,6 +26,8 @@
     onremove: (project: string) => void
     /** Saves the Display name and Group of the Project ('' clears one). */
     onsettings: (project: string, displayName: string, group: string) => void
+    /** Saves the complete set of active Profiles; it launches nothing. */
+    onprofiles: (project: string, profiles: string[]) => void
     /** The existing Groups. */
     groups: string[]
     /** Docker does not answer: Actions are disabled. */
@@ -34,6 +37,8 @@
   const kinds = [ActionKind.ActionStart, ActionKind.ActionStop, ActionKind.ActionRestart]
   // Generated bindings type arrays as nullable; the backend never sends null.
   const services = $derived(project.services ?? [])
+  const profiles = $derived(project.profiles ?? [])
+  const activeProfiles = $derived(project.activeProfiles ?? [])
   const busy = $derived(project.activity !== null)
   const removable = $derived(project.status === Status.StatusRemoved && project.total === 0)
 
@@ -59,6 +64,11 @@
     const group = groupChoice === NEW_GROUP ? newGroupInput : groupChoice
     editing = false
     onsettings(project.name, displayNameInput, group)
+  }
+
+  function toggleProfile(profile: string, on: boolean) {
+    const rest = activeProfiles.filter((p) => p !== profile)
+    onprofiles(project.name, on ? [...rest, profile] : rest)
   }
 
   function confirm() {
@@ -111,6 +121,22 @@
   {/if}
   {#if project.composeMissing}
     <p class="missing">File compose mancante: i file del Progetto non esistono più. Puoi toglierlo dalla lista.</p>
+  {/if}
+  {#if profiles.length > 0}
+    <fieldset class="profiles">
+      <legend>Profili</legend>
+      {#each profiles as profile (profile)}
+        <label>
+          <input
+            type="checkbox"
+            checked={activeProfiles.includes(profile)}
+            onchange={(e) => toggleProfile(profile, e.currentTarget.checked)}
+          />
+          {profile}
+        </label>
+      {/each}
+      <p class="hint">Vengono usati da Up, Stop, Restart, Pull e Build. Cambiarli non avvia né ferma nulla. Down agisce su tutti i Profili.</p>
+    </fieldset>
   {/if}
   <div class="destructive">
     <button disabled={unavailable || busy} onclick={() => (pending = 'down')}>Down</button>
@@ -206,6 +232,9 @@
   .settings label { display: grid; gap: 0.2rem; font-size: 0.85rem; }
   .settings input, .settings select { font: inherit; padding: 0.25rem 0.4rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
   .form-actions { display: flex; gap: 0.4rem; }
+  .profiles { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0 0 0.75rem; padding: 0.4rem 0.9rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); }
+  .profiles label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
+  .profiles .hint { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 0.75rem; }
   .busy { color: var(--warn); font-size: 0.85rem; }
   .empty { color: var(--muted); }
   .missing { padding: 0.5rem 0.8rem; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: 0.85rem; }

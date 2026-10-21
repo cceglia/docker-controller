@@ -18,6 +18,7 @@
     start,
     store,
     updateSettings,
+    setProfiles,
   } from './lib/store.svelte'
 
   onMount(start)
@@ -41,6 +42,7 @@
         onback={() => selectProject(null)}
         onremove={removeFromList}
         onsettings={updateSettings}
+        onprofiles={setProfiles}
         groups={store.groups}
         unavailable={!store.dockerReachable}
       />

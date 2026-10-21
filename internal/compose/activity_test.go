@@ -346,6 +346,9 @@ func actionCalls(f *composefake.Fake) [][]string {
 		if call[len(call)-1] == "json" { // ps -a --format json
 			continue
 		}
+		if call[len(call)-1] == "--profiles" { // config --profiles
+			continue
+		}
 		out = append(out, call)
 	}
 	return out
@@ -364,7 +367,7 @@ func TestDo_DownRunsDownAndDownVolumesRunsDownDashV(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			f := realDocker(t)
 			m, rec := activityManager(t, f)
-			args := composeArgs(t, m, "stellantisvpn", c.verb...)
+			args := composeArgs(t, m, "stellantisvpn", append([]string{"--profile", "*"}, c.verb...)...)
 			f.RespondStream(nil, nil, nil, args...)
 
 			id, err := m.Do(context.Background(), compose.Action{Project: "stellantisvpn", Kind: c.kind})
@@ -452,7 +455,7 @@ func TestDo_ProjectStaysListedAsRemovedAfterADown(t *testing.T) {
 			if kind == compose.ActionDownVolumes {
 				verb = append(verb, "-v")
 			}
-			f.RespondStream(nil, nil, nil, composeArgs(t, m, "personalvpn", verb...)...)
+			f.RespondStream(nil, nil, nil, composeArgs(t, m, "personalvpn", append([]string{"--profile", "*"}, verb...)...)...)
 			// From now on Docker no longer knows the Project, as after a real Down.
 			f.Respond([]byte("[]"), lsArgs...)
 

@@ -36,6 +36,12 @@ type Project struct {
 	// Services groups the Project's Containers by Service, sorted by Service
 	// name. It is empty (not nil) when the Project has no Container.
 	Services []Service `json:"services"`
+	// Profiles are the Profiles the compose files define, sorted; empty (not
+	// nil) when there are none.
+	Profiles []string `json:"profiles"`
+	// ActiveProfiles are the Profiles the user chose, sorted; empty (not nil)
+	// when there are none. They may include Profiles no longer defined.
+	ActiveProfiles []string `json:"activeProfiles"`
 	// Activity is the Activity running on the Project, nil when there is none.
 	Activity *ActivityRef `json:"activity"`
 }

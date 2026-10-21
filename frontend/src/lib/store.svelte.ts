@@ -126,7 +126,16 @@ export async function removeFromList(project: string) {
 /** Sets (or, with an empty string, clears) the Display name and/or Group of a Project; null leaves a field as it is. */
 export async function updateSettings(project: string, displayName: string | null, group: string | null) {
   try {
-    await ProjectsService.UpdateSettings(project, { displayName, group })
+    await ProjectsService.UpdateSettings(project, { displayName, group, profiles: null })
+  } catch (err) {
+    fail(err)
+  }
+}
+
+/** Saves the active Profiles of a Project (the complete set). It only saves: no Action is launched. */
+export async function setProfiles(project: string, profiles: string[]) {
+  try {
+    await ProjectsService.UpdateSettings(project, { displayName: null, group: null, profiles })
   } catch (err) {
     fail(err)
   }

@@ -36,7 +36,8 @@ type Manager struct {
 
 	refreshEvery, retryEvery time.Duration
 
-	refreshMu sync.Mutex // serialises Refresh
+	refreshMu sync.Mutex              // serialises Refresh
+	profiles  map[string]profileCache // available Profiles per Project; guarded by refreshMu
 
 	onActivity func(ActivityEvent)
 	emitMu     sync.Mutex // serialises onActivity calls
@@ -60,6 +61,7 @@ func New(cfg Config) (*Manager, error) {
 		base:       Snapshot{Projects: []Project{}, Groups: []string{}},
 		snap:       Snapshot{Projects: []Project{}, Groups: []string{}},
 		running:    map[string]ActivityRef{},
+		profiles:   map[string]profileCache{},
 		onActivity: cfg.OnActivity,
 
 		refreshEvery: orDefault(cfg.RefreshEvery, defaultRefreshEvery),
@@ -162,6 +164,7 @@ func (m *Manager) build(ctx context.Context) (Snapshot, error) {
 			projects[i].Services = []Service{}
 		}
 		projects[i].ComposeMissing = composeMissing(projects[i].ComposeFiles)
+		projects[i].Profiles = m.availableProfiles(ctx, projects[i])
 	}
 	return Snapshot{DockerReachable: true, Projects: projects}, nil
 }
@@ -194,6 +197,7 @@ func (m *Manager) unreachable(ctx context.Context) (Snapshot, error) {
 		projects[i].Status = StatusRemoved
 		projects[i].Services = []Service{}
 		projects[i].ComposeMissing = composeMissing(projects[i].ComposeFiles)
+		projects[i].Profiles = orEmpty(m.profiles[projects[i].Name].names)
 	}
 	return Snapshot{DockerReachable: false, Projects: projects}, nil
 }

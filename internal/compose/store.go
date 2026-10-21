@@ -94,6 +94,16 @@ func (s store) updateSettings(ctx context.Context, name string, st Settings) (bo
 			return false, fmt.Errorf("compose: update group of %s: %w", name, err)
 		}
 	}
+	if st.Profiles != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM active_profiles WHERE project_name = ?`, name); err != nil {
+			return false, fmt.Errorf("compose: update profiles of %s: %w", name, err)
+		}
+		for _, p := range st.Profiles {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO active_profiles (project_name, profile) VALUES (?, ?)`, name, p); err != nil {
+				return false, fmt.Errorf("compose: update profiles of %s: %w", name, err)
+			}
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return false, fmt.Errorf("compose: update settings of %s: %w", name, err)
 	}
@@ -117,6 +127,8 @@ func (s store) list(ctx context.Context) ([]Project, error) {
 			return nil, fmt.Errorf("compose: list projects: %w", err)
 		}
 		p.ComposeFiles = []string{}
+		p.Profiles = []string{}
+		p.ActiveProfiles = []string{}
 		out = append(out, p)
 	}
 	if err := rows.Err(); err != nil {
@@ -143,6 +155,25 @@ func (s store) list(ctx context.Context) ([]Project, error) {
 	}
 	if err := frows.Err(); err != nil {
 		return nil, fmt.Errorf("compose: list project files: %w", err)
+	}
+
+	prows, err := s.db.QueryContext(ctx,
+		`SELECT project_name, profile FROM active_profiles ORDER BY project_name, profile`)
+	if err != nil {
+		return nil, fmt.Errorf("compose: list active profiles: %w", err)
+	}
+	defer prows.Close()
+	for prows.Next() {
+		var name, profile string
+		if err := prows.Scan(&name, &profile); err != nil {
+			return nil, fmt.Errorf("compose: list active profiles: %w", err)
+		}
+		if p := byName[name]; p != nil {
+			p.ActiveProfiles = append(p.ActiveProfiles, profile)
+		}
+	}
+	if err := prows.Err(); err != nil {
+		return nil, fmt.Errorf("compose: list active profiles: %w", err)
 	}
 
 	sort.Slice(out, func(i, j int) bool {
