@@ -29,6 +29,12 @@ func (s *ProjectsService) Do(action compose.Action) (compose.ActivityID, error) 
 	return s.manager.Do(s.ctx, action)
 }
 
+// RemoveFromList removes a Rimosso Project from the saved list. It never
+// touches Docker; a Project with Containers is refused.
+func (s *ProjectsService) RemoveFromList(project string) error {
+	return s.manager.RemoveFromList(s.ctx, project)
+}
+
 // OpenPort opens http://localhost:<port> in the default browser. The URL is
 // built here from the number, never taken from the frontend.
 func (s *ProjectsService) OpenPort(port int) error {

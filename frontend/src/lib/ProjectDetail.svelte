@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Project } from '../../bindings/dockercontroller/internal/compose/models'
+  import { Status } from '../../bindings/dockercontroller/internal/compose/models'
+  import ConfirmModal from './ConfirmModal.svelte'
   import { ActionKind, actionLabels } from './store.svelte'
 
   let {
@@ -8,6 +10,7 @@
     onopenport,
     onopenfolder,
     onback,
+    onremove,
     unavailable = false,
   }: {
     project: Project
@@ -16,6 +19,8 @@
     onopenport: (port: number) => void
     onopenfolder: (project: string) => void
     onback: () => void
+    /** Removes the (Rimosso) Project from the saved list. */
+    onremove: (project: string) => void
     /** Docker does not answer: Actions are disabled. */
     unavailable?: boolean
   } = $props()
@@ -24,6 +29,19 @@
   // Generated bindings type arrays as nullable; the backend never sends null.
   const services = $derived(project.services ?? [])
   const busy = $derived(project.activity !== null)
+  const removable = $derived(project.status === Status.StatusRemoved && project.total === 0)
+
+  // The destructive Action waiting for a confirmation, if any.
+  let pending: 'down' | 'downVolumes' | 'remove' | null = $state(null)
+  const name = $derived(project.displayName || project.name)
+
+  function confirm() {
+    const what = pending
+    pending = null
+    if (what === 'down') onaction(project.name, ActionKind.ActionDown, '')
+    else if (what === 'downVolumes') onaction(project.name, ActionKind.ActionDownVolumes, '')
+    else if (what === 'remove') onremove(project.name)
+  }
 </script>
 
 <section class="detail">
@@ -33,6 +51,21 @@
     <button onclick={() => onopenfolder(project.name)} title={project.folder}>Apri cartella</button>
   </header>
   <p class="folder">{project.folder}</p>
+  {#if project.composeMissing}
+    <p class="missing">File compose mancante: i file del Progetto non esistono più. Puoi toglierlo dalla lista.</p>
+  {/if}
+  <div class="destructive">
+    <button disabled={unavailable || busy} onclick={() => (pending = 'down')}>Down</button>
+    <button class="danger" disabled={unavailable || busy} onclick={() => (pending = 'downVolumes')}>Down con volumi</button>
+    <button
+      class:highlight={project.composeMissing && removable}
+      disabled={unavailable || busy || !removable}
+      title={removable ? 'Toglie il Progetto dalla lista senza toccare Docker' : 'Disponibile solo per un Progetto Rimosso'}
+      onclick={() => (pending = 'remove')}
+    >
+      Rimuovi dalla lista
+    </button>
+  </div>
   {#if project.activity}
     <p class="busy">
       ⏳ {actionLabels[project.activity.kind] ?? project.activity.kind}
@@ -76,6 +109,34 @@
   {/each}
 </section>
 
+{#if pending === 'down'}
+  <ConfirmModal
+    title="Down di {name}"
+    message="Ferma e rimuove i Container del Progetto. I volumi restano. Il Progetto resta in lista come Rimosso."
+    confirmLabel="Down"
+    onconfirm={confirm}
+    oncancel={() => (pending = null)}
+  />
+{:else if pending === 'downVolumes'}
+  <ConfirmModal
+    title="Down con volumi di {name}"
+    message="Rimuove i Container e ELIMINA i volumi del Progetto: i dati nei volumi andranno persi per sempre."
+    confirmLabel="Down con volumi"
+    confirmText={project.name}
+    danger
+    onconfirm={confirm}
+    oncancel={() => (pending = null)}
+  />
+{:else if pending === 'remove'}
+  <ConfirmModal
+    title="Rimuovi {name} dalla lista"
+    message="Il Progetto sparisce dalla lista dell'app. Docker e i file non vengono toccati."
+    confirmLabel="Rimuovi dalla lista"
+    onconfirm={confirm}
+    oncancel={() => (pending = null)}
+  />
+{/if}
+
 <style>
   header { display: flex; align-items: center; gap: 0.75rem; }
   h2 { flex: 1; font-size: 1.1rem; margin: 0; }
@@ -83,6 +144,10 @@
   .folder { color: var(--muted); font-size: 0.8rem; margin: 0.25rem 0 0.75rem; }
   .busy { color: var(--warn); font-size: 0.85rem; }
   .empty { color: var(--muted); }
+  .missing { padding: 0.5rem 0.8rem; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: 0.85rem; }
+  .destructive { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+  button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+  button.highlight { border-color: var(--warn); color: var(--warn); font-weight: 600; box-shadow: 0 0 0 2px var(--warn-bg); }
   .service { margin-bottom: 0.6rem; padding: 0.6rem 0.9rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); }
   .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
   .actions { display: flex; gap: 0.3rem; }

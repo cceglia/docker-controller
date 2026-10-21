@@ -337,3 +337,50 @@ func TestWatch_NotifiesOnlyWhenSomethingChanges(t *testing.T) {
 	}
 	recv(true)
 }
+
+// lsOf builds a `compose ls -a --format json` answer for one Project.
+func lsOf(name string, files ...string) []byte {
+	return []byte(`[{"Name":"` + name + `","Status":"exited(1)","ConfigFiles":"` + strings.Join(files, ",") + `"}]`)
+}
+
+func TestRefresh_FlagsAProjectWhoseComposeFilesAreGone(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "docker-compose.yml")
+	other := filepath.Join(dir, "docker-compose.override.yml")
+	for _, f := range []string{file, other} {
+		if err := os.WriteFile(f, []byte("services: {}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f := composefake.New()
+	f.Respond(lsOf("tmpproject", file, other), lsArgs...)
+	f.Respond(nil, psArgs("tmpproject")...)
+	m := newManager(t, f, tempDB(t))
+
+	if err := m.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if find(t, m.Snapshot(), "tmpproject").ComposeMissing {
+		t.Fatal("files exist: not missing")
+	}
+
+	if err := os.Remove(other); err != nil { // only one of the two files
+		t.Fatal(err)
+	}
+	if err := m.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !find(t, m.Snapshot(), "tmpproject").ComposeMissing {
+		t.Error("a deleted compose file must be flagged")
+	}
+
+	// Still flagged once Docker forgets the Project (after a Down).
+	f.Respond([]byte("[]"), lsArgs...)
+	if err := m.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p := find(t, m.Snapshot(), "tmpproject")
+	if !p.ComposeMissing || p.Status != compose.StatusRemoved {
+		t.Errorf("got missing=%v status=%s, want missing Rimosso", p.ComposeMissing, p.Status)
+	}
+}

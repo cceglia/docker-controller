@@ -4,7 +4,7 @@
   import ProjectDetail from './lib/ProjectDetail.svelte'
   import ActivityPanel from './lib/ActivityPanel.svelte'
   import ErrorToast from './lib/ErrorToast.svelte'
-  import { openFolder, openPort, run, selectProject, start, store } from './lib/store.svelte'
+  import { openFolder, openPort, removeFromList, run, selectProject, start, store } from './lib/store.svelte'
 
   onMount(start)
 </script>
@@ -22,6 +22,7 @@
         onopenport={openPort}
         onopenfolder={openFolder}
         onback={() => selectProject(null)}
+        onremove={removeFromList}
         unavailable={!store.dockerReachable}
       />
     {:else}

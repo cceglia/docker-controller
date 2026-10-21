@@ -44,6 +44,7 @@
             {project.displayName || project.name}
           </button>
           <span class="folder">{project.folder}</span>
+          {#if project.composeMissing}<span class="missing">File compose mancante</span>{/if}
         </div>
         <span class="count" title="Container in esecuzione sul totale">
           {project.running}/{project.total}
@@ -75,6 +76,7 @@
   button.name { font-weight: 600; font-size: 1rem; align-self: flex-start; border: none; background: none; padding: 0; text-align: left; }
   button.name:hover { text-decoration: underline; }
   .folder { color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .missing { color: var(--warn); font-size: 0.8rem; }
   .count { font-variant-numeric: tabular-nums; color: var(--muted); }
   .status { min-width: 5.5rem; text-align: center; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.8rem; border: 1px solid currentColor; }
   .active { color: var(--ok); }

@@ -89,3 +89,12 @@ func (s store) list(ctx context.Context) ([]Project, error) {
 	})
 	return out, nil
 }
+
+// remove deletes a saved Project; its compose files and active Profiles go
+// with it (ON DELETE CASCADE).
+func (s store) remove(ctx context.Context, name string) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM projects WHERE name = ?`, name); err != nil {
+		return fmt.Errorf("compose: remove %s: %w", name, err)
+	}
+	return nil
+}

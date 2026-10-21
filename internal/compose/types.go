@@ -26,7 +26,10 @@ type Project struct {
 	Folder string `json:"folder"`
 	// ComposeFiles are the compose files, in -f order.
 	ComposeFiles []string `json:"composeFiles"`
-	Status       Status   `json:"status"`
+	// ComposeMissing (File compose mancante) is true when at least one of the
+	// compose files no longer exists on disk.
+	ComposeMissing bool   `json:"composeMissing"`
+	Status         Status `json:"status"`
 	// Running and Total count the Project's Containers.
 	Running int `json:"running"`
 	Total   int `json:"total"`

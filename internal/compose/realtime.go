@@ -157,6 +157,7 @@ func (m *Manager) refreshProject(ctx context.Context, name string) error {
 	projects[idx].Running, projects[idx].Total = running, len(cs)
 	projects[idx].Status = statusOf(running, len(cs))
 	projects[idx].Services = groupByService(cs)
+	projects[idx].ComposeMissing = composeMissing(projects[idx].ComposeFiles)
 	m.publish(Snapshot{DockerReachable: true, Projects: projects})
 	return nil
 }

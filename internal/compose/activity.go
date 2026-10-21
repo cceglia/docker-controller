@@ -7,8 +7,7 @@ import (
 	"strings"
 )
 
-// ActionKind is what an Action does. Down and Down with volumes (ticket 05)
-// join the table below; nothing else in the Activity machinery has to change.
+// ActionKind is what an Action does.
 type ActionKind string
 
 const (
@@ -19,6 +18,11 @@ const (
 	ActionRestart ActionKind = "restart"
 	ActionPull    ActionKind = "pull"
 	ActionBuild   ActionKind = "build"
+	// ActionDown removes the Containers of the whole Project (Project only).
+	ActionDown ActionKind = "down"
+	// ActionDownVolumes is Down that also deletes the Project's volumes, and so
+	// its data (Project only). It is the only kind that ever passes -v.
+	ActionDownVolumes ActionKind = "down-volumes"
 )
 
 // verbs maps every ActionKind to the compose arguments that follow the
@@ -30,7 +34,15 @@ var verbs = map[ActionKind][]string{
 	ActionRestart: {"restart"},
 	ActionPull:    {"pull"},
 	ActionBuild:   {"up", "-d", "--build"},
+	// Down and Down with volumes are the only destructive kinds; -v must not
+	// appear in any other verb.
+	ActionDown:        {"down"},
+	ActionDownVolumes: {"down", "-v"},
 }
+
+// projectOnly are the kinds that act on the whole Project and are refused for
+// a Service.
+var projectOnly = map[ActionKind]bool{ActionDown: true, ActionDownVolumes: true}
 
 // Action is a request to run an ActionKind on a Project, or on one of its
 // Services. Ticket 08 adds the active Profiles; it only extends composeArgs.
@@ -93,6 +105,8 @@ var (
 	// ErrInvalidService is returned for a Service name compose could take for
 	// an option.
 	ErrInvalidService = errors.New("compose: invalid Service name")
+	// ErrProjectOnly is returned for Down or Down with volumes on a Service.
+	ErrProjectOnly = errors.New("compose: this Action applies to the whole Project, not to a Service")
 )
 
 // composeArgs builds the Docker arguments of an Action on a Project.
@@ -100,6 +114,9 @@ func composeArgs(p Project, a Action) ([]string, error) {
 	verb, ok := verbs[a.Kind]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownAction, a.Kind)
+	}
+	if a.Service != "" && projectOnly[a.Kind] {
+		return nil, fmt.Errorf("%w: %s on %q", ErrProjectOnly, a.Kind, a.Service)
 	}
 	if strings.HasPrefix(a.Service, "-") {
 		return nil, fmt.Errorf("%w: %q", ErrInvalidService, a.Service)

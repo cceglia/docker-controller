@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"reflect"
 	"sync"
 	"time"
@@ -159,8 +161,20 @@ func (m *Manager) build(ctx context.Context) (Snapshot, error) {
 		if projects[i].Services == nil {
 			projects[i].Services = []Service{}
 		}
+		projects[i].ComposeMissing = composeMissing(projects[i].ComposeFiles)
 	}
 	return Snapshot{DockerReachable: true, Projects: projects}, nil
+}
+
+// composeMissing reports whether any of the compose files is gone. A file that
+// cannot be inspected for another reason (permissions) is not reported missing.
+func composeMissing(files []string) bool {
+	for _, f := range files {
+		if _, err := os.Stat(f); errors.Is(err, fs.ErrNotExist) {
+			return true
+		}
+	}
+	return false
 }
 
 // unreachable keeps the last known Projects (or the saved ones, as Rimosso,
@@ -179,6 +193,7 @@ func (m *Manager) unreachable(ctx context.Context) (Snapshot, error) {
 	for i := range projects {
 		projects[i].Status = StatusRemoved
 		projects[i].Services = []Service{}
+		projects[i].ComposeMissing = composeMissing(projects[i].ComposeFiles)
 	}
 	return Snapshot{DockerReachable: false, Projects: projects}, nil
 }

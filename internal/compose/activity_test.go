@@ -332,3 +332,138 @@ func TestWatch_NotifiesRightAfterAnActivityEnds(t *testing.T) {
 }
 
 var _ = composefake.New
+
+// actionCalls returns the calls that are not the discovery/refresh traffic of
+// the Manager, i.e. the ones that ran an Action.
+func actionCalls(f *composefake.Fake) [][]string {
+	var out [][]string
+	for _, call := range f.Calls() {
+		if len(call) > 1 && call[1] == "ls" {
+			continue
+		}
+		if call[len(call)-1] == "json" { // ps -a --format json
+			continue
+		}
+		out = append(out, call)
+	}
+	return out
+}
+
+func TestDo_DownRunsDownAndDownVolumesRunsDownDashV(t *testing.T) {
+	cases := []struct {
+		name string
+		kind compose.ActionKind
+		verb []string
+	}{
+		{"down", compose.ActionDown, []string{"down"}},
+		{"down with volumes", compose.ActionDownVolumes, []string{"down", "-v"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := realDocker(t)
+			m, rec := activityManager(t, f)
+			args := composeArgs(t, m, "stellantisvpn", c.verb...)
+			f.RespondStream(nil, nil, nil, args...)
+
+			id, err := m.Do(context.Background(), compose.Action{Project: "stellantisvpn", Kind: c.kind})
+			if err != nil {
+				t.Fatal(err)
+			}
+			rec.finished(t, id)
+
+			calls := actionCalls(f)
+			if len(calls) != 1 || strings.Join(calls[0], " ") != strings.Join(args, " ") {
+				t.Errorf("ran %v, want exactly %v", calls, args)
+			}
+		})
+	}
+}
+
+func TestDo_VolumesAreRemovedOnlyByDownWithVolumes(t *testing.T) {
+	kinds := []compose.ActionKind{
+		compose.ActionUp, compose.ActionStart, compose.ActionStop, compose.ActionRestart,
+		compose.ActionPull, compose.ActionBuild, compose.ActionDown,
+	}
+	for _, kind := range kinds {
+		for _, service := range []string{"", "redis"} {
+			if service != "" && kind == compose.ActionDown {
+				continue // Down is rejected for a Service, see below
+			}
+			t.Run(string(kind)+"/"+service, func(t *testing.T) {
+				f := realDocker(t)
+				m, rec := activityManager(t, f)
+				// Accept whatever compose verb this kind maps to.
+				p := find(t, m.Snapshot(), "sunlinkdocker")
+				base := []string{"compose", "-p", "sunlinkdocker"}
+				for _, file := range p.ComposeFiles {
+					base = append(base, "-f", file)
+				}
+				for _, verb := range [][]string{{"up", "-d"}, {"start"}, {"stop"}, {"restart"}, {"pull"}, {"up", "-d", "--build"}, {"down"}} {
+					args := append(append([]string(nil), base...), verb...)
+					if service != "" {
+						args = append(args, service)
+					}
+					f.RespondStream(nil, nil, nil, args...)
+				}
+				id, err := m.Do(context.Background(), compose.Action{Project: "sunlinkdocker", Service: service, Kind: kind})
+				if err != nil {
+					t.Fatal(err)
+				}
+				rec.finished(t, id)
+				for _, call := range actionCalls(f) {
+					for _, a := range call {
+						if a == "-v" || a == "--volumes" {
+							t.Errorf("%s must never remove volumes, ran %v", kind, call)
+						}
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestDo_DownActionsAreOnlyForTheWholeProject(t *testing.T) {
+	for _, kind := range []compose.ActionKind{compose.ActionDown, compose.ActionDownVolumes} {
+		t.Run(string(kind), func(t *testing.T) {
+			f := realDocker(t)
+			m, _ := activityManager(t, f)
+			_, err := m.Do(context.Background(), compose.Action{Project: "sunlinkdocker", Service: "redis", Kind: kind})
+			if !errors.Is(err, compose.ErrProjectOnly) {
+				t.Errorf("err = %v, want ErrProjectOnly", err)
+			}
+			if calls := actionCalls(f); len(calls) != 0 {
+				t.Errorf("nothing must reach Docker, got %v", calls)
+			}
+			if find(t, m.Snapshot(), "sunlinkdocker").Activity != nil {
+				t.Error("a rejected Action must not leave an Activity behind")
+			}
+		})
+	}
+}
+
+func TestDo_ProjectStaysListedAsRemovedAfterADown(t *testing.T) {
+	for _, kind := range []compose.ActionKind{compose.ActionDown, compose.ActionDownVolumes} {
+		t.Run(string(kind), func(t *testing.T) {
+			f := realDocker(t)
+			m, rec := activityManager(t, f)
+			verb := []string{"down"}
+			if kind == compose.ActionDownVolumes {
+				verb = append(verb, "-v")
+			}
+			f.RespondStream(nil, nil, nil, composeArgs(t, m, "personalvpn", verb...)...)
+			// From now on Docker no longer knows the Project, as after a real Down.
+			f.Respond([]byte("[]"), lsArgs...)
+
+			id, err := m.Do(context.Background(), compose.Action{Project: "personalvpn", Kind: kind})
+			if err != nil {
+				t.Fatal(err)
+			}
+			rec.finished(t, id)
+
+			p := find(t, m.Snapshot(), "personalvpn")
+			if p.Status != compose.StatusRemoved || p.Total != 0 || len(p.ComposeFiles) != 1 {
+				t.Errorf("got %s %d/%d files=%v, want it kept as Rimosso", p.Status, p.Running, p.Total, p.ComposeFiles)
+			}
+		})
+	}
+}

@@ -23,6 +23,8 @@ export const actionLabels: Record<string, string> = {
   [ActionKind.ActionRestart]: 'Restart',
   [ActionKind.ActionPull]: 'Pull',
   [ActionKind.ActionBuild]: 'Build',
+  [ActionKind.ActionDown]: 'Down',
+  [ActionKind.ActionDownVolumes]: 'Down con volumi',
 }
 
 export interface OutputLine {
@@ -106,6 +108,15 @@ function fail(err: unknown) {
 export async function run(project: string, kind: ActionKind, service = '') {
   try {
     await ProjectsService.Do({ project, service, kind })
+  } catch (err) {
+    fail(err)
+  }
+}
+
+/** Removes a Rimosso Project from the saved list (Docker is not touched). */
+export async function removeFromList(project: string) {
+  try {
+    await ProjectsService.RemoveFromList(project)
   } catch (err) {
     fail(err)
   }
