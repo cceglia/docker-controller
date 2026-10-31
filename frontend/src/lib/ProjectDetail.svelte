@@ -5,9 +5,10 @@
      Down, Down con volumi and Rimuovi dalla lista sit behind the "…" menu with
      the same confirmations as before. Below: the cells of Cartella, Nome
      compose and Gruppo with their commands, then the Profili as boxes.
-     The Servizi and the log panel are not part of this block yet. -->
+     Below: one flat block per Servizio, one row per Container, and the log
+     panel inline until the drawer of ticket 06. -->
 <script lang="ts">
-  import type { Measures, Project } from '../../bindings/dockercontroller/internal/compose/models'
+  import type { Container, Measures, Project } from '../../bindings/dockercontroller/internal/compose/models'
   import { Status } from '../../bindings/dockercontroller/internal/compose/models'
   import ConfirmModal from './ConfirmModal.svelte'
   import ContainerStrip from './ContainerStrip.svelte'
@@ -58,7 +59,7 @@
     usage: Record<string, Measures> | null
   } = $props()
 
-  // The Actions of a Service stay on its own card; these are the Actions of the Project.
+  // The Actions of a Service stay on its own block; these are the Actions of the Project.
   const kinds = [ActionKind.ActionStart, ActionKind.ActionStop, ActionKind.ActionRestart]
   const projectKinds = [
     ActionKind.ActionUp,
@@ -67,6 +68,19 @@
     ActionKind.ActionPull,
     ActionKind.ActionBuild,
   ]
+
+  // Only these health states are a problem: they alone wear a pill.
+  const isProblemHealth = (health: string) => health === 'unhealthy' || health === 'starting'
+
+  // The dot of a Container follows the same grammar as the Project status.
+  function dotTone(container: Container): 'positive' | 'warning' | 'negative' | 'stopped' {
+    if (container.health === 'unhealthy' || container.state === 'dead') return 'negative'
+    if (container.health === 'starting' || container.state === 'restarting' || container.state === 'paused') {
+      return 'warning'
+    }
+    if (container.state === 'running') return 'positive'
+    return 'stopped'
+  }
 
   const statusLabels: Record<string, string> = {
     [Status.StatusActive]: 'Attivo',
@@ -398,9 +412,9 @@
   {/if}
 
   <div class="section-head">
-    <h3 class="section-title">Servizi <span class="muted">{services.length}</span></h3>
+    <h3 class="section-title">Servizi <span class="section-count mono">{services.length}</span></h3>
     {#if !(logs && logs.project === project.name)}
-      <button onclick={() => onopenlogs(project.name, '')}>Mostra log</button>
+      <button class="quiet" onclick={() => onopenlogs(project.name, '')}>Mostra log</button>
     {/if}
   </div>
 
@@ -414,19 +428,31 @@
   {/if}
 
   {#if services.length === 0}
-    <p class="empty">Nessun Container: il Progetto non ha Servizi da mostrare.</p>
+    <p class="empty">
+      {#if unavailable}
+        Nessun Servizio: Docker non risponde, quindi l'elenco non è disponibile.
+      {:else if project.composeMissing}
+        Nessun Servizio: i file compose del Progetto non esistono più.
+      {:else}
+        Nessun Servizio: Docker non riporta Container per questo Progetto. Avvialo con Up per crearli.
+      {/if}
+    </p>
   {/if}
   {#each services as service (service.name)}
-    <article class="card service">
-      <div class="head">
-        <h3>{service.name}</h3>
-        <div class="actions">
+    {@const serviceContainers = service.containers ?? []}
+    <article class="service">
+      <div class="service-head">
+        <div class="service-title">
+          <h4>{service.name}</h4>
+          <ContainerStrip containers={serviceContainers} />
+        </div>
+        <div class="service-actions">
           {#each kinds as kind (kind)}
-            <button disabled={unavailable || busy} onclick={() => onaction(project.name, kind, service.name)}>
+            <button class="quiet" disabled={unavailable || busy} onclick={() => onaction(project.name, kind, service.name)}>
               {actionLabels[kind]}
             </button>
           {/each}
-          <button disabled={unavailable || busy} onclick={() => (pendingService = service.name)}>
+          <button class="quiet danger" disabled={unavailable || busy} onclick={() => (pendingService = service.name)}>
             {actionLabels[ActionKind.ActionDownService]}
           </button>
         </div>
@@ -439,25 +465,37 @@
           <span title="Totale dall'avvio dei Container"><i>Rete</i><b>↓ {formatBytes(u.netInBytes, 'decimal')}</b> <b>↑ {formatBytes(u.netOutBytes, 'decimal')}</b></span>
           <span title="Totale dall'avvio dei Container"><i>Disco</i><b>R {formatBytes(u.blockReadBytes, 'decimal')}</b> <b>W {formatBytes(u.blockWriteBytes, 'decimal')}</b></span>
         </div>
-      {:else if usage === null && (service.containers ?? []).some((c) => c.state === 'running')}
+      {:else if usage === null && serviceContainers.some((c) => c.state === 'running')}
         <p class="usage-none" aria-label="Utilizzo risorse di {service.name}" title="In attesa della prima misura">Utilizzo risorse: caricamento…</p>
       {:else}
         <p class="usage-none" aria-label="Utilizzo risorse di {service.name}" title="Nessun Container in esecuzione">Utilizzo risorse: —</p>
       {/if}
       <ul class="containers">
-        {#each (service.containers ?? []) as c (c.name)}
-          <li>
-            <span class="cname">{c.name}</span>
-            <span class="image">{c.image}</span>
-            <span class="state {c.state}">{c.state}</span>
-            {#if c.health}<span class="health {c.health}">{c.health}</span>{/if}
-            <span class="ports">
-              {#each (c.ports ?? []) as port (`${port.published}/${port.protocol}`)}
-                <button class="port" title="Apri http://localhost:{port.published}" onclick={() => onopenport(port.published)}>
-                  {port.published}→{port.target}/{port.protocol}
-                </button>
-              {/each}
-            </span>
+        {#each serviceContainers as c (c.name)}
+          <li class="container">
+            <span class="dot {dotTone(c)}" aria-hidden="true"></span>
+            <span class="cname mono" title={c.name}>{c.name}</span>
+            <span class="image mono" title={c.image}>{c.image}</span>
+            <span class="state">{c.state}</span>
+            {#if c.health}
+              {#if isProblemHealth(c.health)}
+                <span class="pill {c.health === 'unhealthy' ? 'negative' : 'warning'}">{c.health}</span>
+              {:else}
+                <span class="health">{c.health}</span>
+              {/if}
+            {/if}
+            {#if (c.ports ?? []).length > 0}
+              <span class="ports">
+                {#each (c.ports ?? []) as port (`${port.published}/${port.protocol}`)}
+                  <button
+                    class="port"
+                    title="Apri http://localhost:{port.published}"
+                    aria-label="Apri http://localhost:{port.published} nel browser: porta {port.target}/{port.protocol}"
+                    onclick={() => onopenport(port.published)}
+                  >{port.published}→{port.target}/{port.protocol}</button>
+                {/each}
+              </span>
+            {/if}
           </li>
         {/each}
       </ul>
@@ -835,54 +873,72 @@
     font-size: var(--fs-small);
   }
 
-  /* ---------- Servizi and the log panel: unchanged until ticket 04 and 06 ---------- */
+  /* ---------- Servizi: flat blocks, one hairline apart ---------- */
   h3 {
-    font-size: 0.95rem;
+    font-size: var(--fs-section);
     margin: 0;
-  }
-  .card {
-    margin: 0;
-    padding: 0.8rem 1rem;
-    border-radius: 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
   }
   .empty {
+    padding: var(--space-1) 0;
+    border-top: 1px solid var(--border);
     color: var(--muted);
-    margin: 0;
+    font-size: var(--fs-body);
   }
   .section-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 0.4rem;
+    gap: var(--space-1);
+    margin-top: 4px;
   }
   .section-title {
-    font-size: 0.75rem;
+    font-size: var(--fs-section);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
   }
-  .muted {
+  .section-count {
+    margin-left: 4px;
+    color: var(--muted);
+    font-size: var(--fs-small);
     font-weight: 400;
   }
   .service {
     display: grid;
-    gap: 0.6rem;
+    gap: 8px;
+    padding: var(--space-1) 0 0;
+    border-top: 1px solid var(--border);
   }
-  .head {
+  .service-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    gap: 4px var(--space-1);
   }
-  .actions {
+  .service-title {
     display: flex;
-    gap: 0.3rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px var(--space-1);
+    min-width: 0;
   }
+  .service-title h4 {
+    font-size: var(--fs-section);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .service-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .service-actions .danger {
+    color: var(--negative);
+  }
+  .service-actions .danger:not(:disabled):hover {
+    color: var(--negative);
+  }
+
+  /* Utilizzo risorse: left as it is until ticket 05. */
   .usage {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
@@ -917,61 +973,110 @@
     color: var(--muted);
     font-size: 0.8rem;
   }
+
+  /* Container rows: dot, name, image, state, health, published ports. */
   .containers {
     list-style: none;
     margin: 0;
     padding: 0;
     display: grid;
-    gap: 0.3rem;
   }
-  .containers li {
+  .container {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.6rem;
-    padding-top: 0.4rem;
-    border-top: 1px solid var(--border);
-    font-size: 0.82rem;
+    gap: 4px var(--space-1);
+    min-height: var(--row-height);
+    padding: 6px 0;
+    border-top: 1px solid var(--rule);
+    font-size: var(--fs-small);
   }
   .cname {
-    font-weight: 600;
+    max-width: 100%;
+    font-size: var(--fs-body);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .image {
+    flex: 1 1 10rem;
+    min-width: 0;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .state,
+  .health {
     color: var(--muted);
   }
-  .state.running,
-  .health.healthy {
-    color: var(--ok);
+  /* A pill marks a problem only: unhealthy, or a healthcheck still starting. */
+  .pill {
+    flex: none;
+    padding: 1px 4px;
+    border-radius: var(--radius-control);
+    font-size: var(--fs-small);
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
   }
-  .state.exited,
-  .state.dead,
-  .health.unhealthy {
-    color: var(--danger);
+  .pill.negative {
+    background: var(--pill-negative-bg);
+    color: var(--pill-negative-ink);
   }
-  .health.starting,
-  .state.restarting,
-  .state.paused {
-    color: var(--warn);
+  .pill.warning {
+    background: var(--pill-warning-bg);
+    color: var(--pill-warning-ink);
   }
   .ports {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: 4px;
     margin-left: auto;
   }
   .port {
+    height: var(--control-height);
+    padding: 0 8px;
+    border: 1px solid var(--control);
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
     font-variant-numeric: tabular-nums;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+  }
+  .port:hover {
+    background: var(--raised);
+  }
+  .port:active {
+    background: var(--active);
   }
 
-  /* the one shared button rule still dresses the Serve cards' buttons */
+  /* The dots of the Container rows share the grammar of the Project status. */
+  .dot.positive {
+    background: var(--positive);
+  }
+  .dot.warning {
+    background: var(--warning);
+  }
+  .dot.negative {
+    background: var(--negative);
+  }
+
+  /* The shared control: the Settings form buttons use it; the rest sets its own. */
   button {
-    font: inherit;
-    font-size: 0.8rem;
-    padding: 0.2rem 0.55rem;
-    border-radius: 6px;
+    height: var(--control-height);
+    padding: 0 var(--space-1);
     border: 1px solid var(--border);
+    border-radius: var(--radius-control);
     background: var(--surface);
     color: var(--text);
+    font-family: var(--font-text);
+    font-size: var(--fs-body);
+    line-height: 1;
     cursor: pointer;
   }
   button:disabled {
