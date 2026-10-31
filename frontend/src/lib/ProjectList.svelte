@@ -1,32 +1,29 @@
+<!-- The Progetti as the column's navigation: a row per Project with its status
+     dot, its Display name, its compose name and the strip of its Container.
+     Choosing a row opens the Project on the canvas. The open row keeps a tone
+     step and a heavier name, never colour alone, and carries aria-current.
+     A Project whose compose files are gone carries a compact warning pill.
+     Below 900px the column keeps the dot and the strips; the row keeps its
+     accessible name, count and warning through aria-label and its tooltip. -->
 <script lang="ts">
   import { Status } from '../../bindings/dockercontroller/internal/compose/models'
   import type { Project } from '../../bindings/dockercontroller/internal/compose/models'
   import { SvelteMap } from 'svelte/reactivity'
-  import { ActionKind, actionLabels } from './store.svelte'
+  import ContainerStrip from './ContainerStrip.svelte'
 
   let {
     projects,
-    onaction,
+    selected = null,
     onselect,
-    unavailable = false,
   }: {
     projects: Project[]
-    onaction: (project: string, kind: ActionKind) => void
+    /** The compose name of the open Project; null when none is open. */
+    selected?: string | null
     /** Opens the detail of a Project. */
     onselect: (project: string) => void
-    /** Docker does not answer: the list is greyed out and Actions are disabled. */
-    unavailable?: boolean
   } = $props()
 
-  const kinds = [
-    ActionKind.ActionUp,
-    ActionKind.ActionStop,
-    ActionKind.ActionRestart,
-    ActionKind.ActionPull,
-    ActionKind.ActionBuild,
-  ]
-
-  const labels: Record<string, string> = {
+  const statusLabels: Record<string, string> = {
     [Status.StatusActive]: 'Attivo',
     [Status.StatusPartial]: 'Parziale',
     [Status.StatusStopped]: 'Fermo',
@@ -48,80 +45,217 @@
     if (named.length === 0) return [{ title: '', items: ungrouped }]
     return ungrouped.length > 0 ? [...named, { title: 'Senza Gruppo', items: ungrouped }] : named
   })
+
+  // The generated bindings type the arrays as nullable; the backend never sends null.
+  const containersOf = (project: Project) => (project.services ?? []).flatMap((s) => s.containers ?? [])
+
+  const titleOf = (project: Project) =>
+    project.displayName && project.displayName !== project.name
+      ? `${project.displayName} (${project.name})`
+      : project.name
+
+  // The accessible name of a row: it survives the narrow column, which hides
+  // the names, the count and the warning pill.
+  const labelOf = (project: Project) => {
+    const name = project.displayName || project.name
+    const status = statusLabels[project.status] ?? project.status
+    const count = `${project.running} Container in esecuzione su ${project.total}`
+    return `${name}, ${status}, ${count}${project.composeMissing ? ', File compose mancante' : ''}`
+  }
 </script>
 
 {#if projects.length === 0}
   <p class="empty">Nessun Progetto.</p>
 {:else}
-  {#each sections as section (section.title)}
-  <section class="group">
-  {#if section.title}<h2>{section.title}</h2>{/if}
-  <ul class="list" class:unavailable>
-    {#each section.items as project (project.name)}
-      <!-- The whole row opens the detail; keyboard users use the name button. -->
-      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-      <li class="row" onclick={() => onselect(project.name)}>
-        <div class="main">
-          <button class="name" title="Apri il dettaglio">
-            {project.displayName || project.name}
-          </button>
-          {#if project.displayName}<span class="compose-name">{project.name}</span>{/if}
-          <span class="folder">{project.folder}</span>
-          {#if project.composeMissing}<span class="missing">File compose mancante</span>{/if}
-        </div>
-        <span class="count" title="Container in esecuzione sul totale">
-          {project.running}/{project.total}
-        </span>
-        <span class="status {project.status}">{labels[project.status] ?? project.status}</span>
-        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-        <div class="actions" onclick={(e) => e.stopPropagation()}>
-          {#if project.activity}
-            <span class="busy">⏳ {actionLabels[project.activity.kind] ?? project.activity.kind} in corso</span>
-          {/if}
-          {#each kinds as kind (kind)}
-            <button disabled={unavailable || project.activity !== null} onclick={() => onaction(project.name, kind)}>
-              {actionLabels[kind]}
-            </button>
+  <nav aria-label="Progetti">
+    {#each sections as section (section.title)}
+      <section class="group">
+        {#if section.title}<h2 class="group-title">{section.title}</h2>{/if}
+        <ul class="rows">
+          {#each section.items as project (project.name)}
+            {@const open = project.name === selected}
+            {@const name = project.displayName || project.name}
+            <li>
+              <button
+                class="row"
+                class:open
+                aria-current={open ? 'page' : undefined}
+                aria-label={labelOf(project)}
+                title={titleOf(project)}
+                onclick={() => onselect(project.name)}
+              >
+                <span class="dot {project.status}" aria-hidden="true"></span>
+                <span class="name-cell">
+                  <span class="name">{name}</span>
+                  {#if project.composeMissing}
+                    <span
+                      class="pill"
+                      title="File compose mancante: i file del Progetto non esistono più."
+                    >File mancante</span>
+                  {/if}
+                </span>
+                <span class="count mono" aria-hidden="true">{project.running}/{project.total}</span>
+                <span class="compose mono">{project.name}</span>
+                <span class="strip-cell"><ContainerStrip containers={containersOf(project)} /></span>
+              </button>
+            </li>
           {/each}
-        </div>
-      </li>
+        </ul>
+      </section>
     {/each}
-  </ul>
-  </section>
-  {/each}
+  </nav>
 {/if}
 
 <style>
-  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+  nav {
+    display: grid;
+    gap: 8px;
+  }
+  .empty {
+    padding: 0 8px;
+    color: var(--muted);
+    font-size: var(--fs-body);
+  }
+  .group-title {
+    margin: 6px 8px 4px;
+    font-size: var(--fs-small);
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .rows {
+    display: grid;
+    gap: 1px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
   .row {
-    display: flex; align-items: center; gap: 1rem;
-    padding: 0.7rem 1rem; border-radius: 10px;
-    background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
-    transition: border-color 0.12s;
+    display: grid;
+    grid-template-columns: var(--dot-size) minmax(0, 1fr) auto;
+    grid-template-areas:
+      'dot name count'
+      'dot compose strip';
+    column-gap: 10px;
+    row-gap: 1px;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: var(--row-height);
+    padding: 4px 8px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-text);
+    font-size: var(--fs-body);
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
   }
-  .row { cursor: pointer; }
-  .row:hover { border-color: var(--accent); }
-  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  button.name { font-weight: 600; font-size: 1.05rem; color: var(--text); align-self: flex-start; border: none; background: none; padding: 0; text-align: left; }
-  button.name:hover { text-decoration: underline; }
-  .group { margin-bottom: 1.4rem; }
-  h2 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 0.5rem 0.25rem; }
-  .compose-name { color: var(--muted); font-size: 0.8rem; }
-  .folder { color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .missing { color: var(--warn); font-size: 0.8rem; }
-  .count { font-variant-numeric: tabular-nums; color: var(--muted); }
-  .status { min-width: 5.5rem; text-align: center; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 500; border: 1px solid transparent; background: color-mix(in srgb, currentColor 14%, transparent); }
-  .active { color: var(--ok); }
-  .partial { color: var(--warn); }
-  .stopped { color: var(--muted); }
-  .removed { color: var(--muted); border: 1px dashed currentColor; background: none; }
-  .actions { display: flex; align-items: center; gap: 0.3rem; }
-  .busy { color: var(--warn); font-size: 0.8rem; margin-right: 0.3rem; }
-  button {
-    font: inherit; font-size: 0.8rem; padding: 0.2rem 0.55rem; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+  .row:hover {
+    background: var(--raised);
   }
-  button:disabled { opacity: 0.45; cursor: not-allowed; }
-  .unavailable { opacity: 0.5; filter: grayscale(1); }
-  .empty { color: var(--muted); }
+  /* The open Project: a tone step and a heavier name, so it never relies on colour. */
+  .row.open {
+    background: var(--active);
+  }
+  .row.open .name {
+    font-weight: 600;
+  }
+  .dot {
+    grid-area: dot;
+    box-sizing: border-box;
+    width: var(--dot-size);
+    height: var(--dot-size);
+    border-radius: var(--dot-size);
+  }
+  .dot.active {
+    background: var(--positive);
+  }
+  .dot.partial {
+    background: var(--warning);
+  }
+  .dot.stopped {
+    background: var(--muted);
+  }
+  .dot.removed {
+    border: 1px solid var(--control);
+    background: transparent;
+  }
+  .name-cell {
+    grid-area: name;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* The pill marks a real problem only: a compose file that no longer exists. */
+  .pill {
+    flex: none;
+    padding: 1px 4px;
+    border-radius: var(--radius-control);
+    background: var(--pill-warning-bg);
+    color: var(--pill-warning-ink);
+    font-size: var(--fs-small);
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .compose {
+    grid-area: compose;
+    font-size: var(--fs-small);
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .count {
+    grid-area: count;
+    justify-self: end;
+    font-size: var(--fs-small);
+    color: var(--muted);
+  }
+  .strip-cell {
+    grid-area: strip;
+    justify-self: end;
+    display: flex;
+  }
+
+  /* Narrow column: the dot and the strips, centred on the row. */
+  @media (max-width: 900px) {
+    .row {
+      grid-template-columns: var(--dot-size) minmax(0, 1fr);
+      grid-template-areas: 'dot strip';
+      justify-items: center;
+      min-height: var(--control-height);
+      padding: 6px 4px;
+    }
+    /* the names and the pill leave the row but stay in its accessible name */
+    .name-cell,
+    .compose {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .count,
+    .group-title {
+      display: none;
+    }
+    .strip-cell {
+      justify-self: center;
+    }
+  }
 </style>

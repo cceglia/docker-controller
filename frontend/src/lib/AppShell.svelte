@@ -1,6 +1,8 @@
-<!-- The two-panel guscio: the column with the mark and the two commands, the
-     canvas with the global Utilizzo risorse on top and the current screen below.
-     It is presentational: App.svelte owns the store and passes the content in. -->
+<!-- The two-panel guscio: the column with the mark, the two commands and the
+     navigation, the canvas with the global Utilizzo risorse on top and the
+     current screen below. It is presentational: App.svelte owns the store and
+     passes the content in. Below 900px the column keeps only the mark and the
+     icons; every command keeps an aria-label. -->
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import type { UsageSample } from '../../bindings/dockercontroller/internal/compose/models'
@@ -11,12 +13,15 @@
     usage,
     onaddproject,
     onsettings,
+    navigation,
     children,
   }: {
     /** The latest global sample; null until the stream delivers one. */
     usage: UsageSample | null
     onaddproject: () => void
     onsettings: () => void
+    /** The Progetti of the column. */
+    navigation: Snippet
     /** The screen shown in the canvas. */
     children: Snippet
   } = $props()
@@ -29,10 +34,45 @@
       <h1 class="wordmark">Docker Controller</h1>
     </div>
 
-    <div class="commands">
-      <button class="command" onclick={onaddproject}>Aggiungi progetto</button>
-      <button class="command" onclick={onsettings}>Impostazioni</button>
+    <button class="command" onclick={onaddproject} aria-label="Aggiungi progetto">
+      <svg
+        class="icon"
+        viewBox="0 0 16 16"
+        width="16"
+        height="16"
+        aria-hidden="true"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+      >
+        <path d="M8 3v10M3 8h10" />
+      </svg>
+      <span class="command-label">Aggiungi progetto</span>
+    </button>
+
+    <div class="nav">
+      {@render navigation()}
     </div>
+
+    <button class="command bottom" onclick={onsettings} aria-label="Impostazioni">
+      <svg
+        class="icon"
+        viewBox="0 0 16 16"
+        width="16"
+        height="16"
+        aria-hidden="true"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+      >
+        <path d="M2.5 5h2.5M8.5 5h5M2.5 11h5M11 11h2.5" />
+        <circle cx="6.5" cy="5" r="1.5" />
+        <circle cx="9.5" cy="11" r="1.5" />
+      </svg>
+      <span class="command-label">Impostazioni</span>
+    </button>
   </aside>
 
   <div class="canvas">
@@ -76,15 +116,12 @@
     white-space: nowrap;
   }
 
-  /* the two commands keep their final place at the foot of the column */
-  .commands {
-    display: grid;
-    gap: 2px;
-    margin-top: auto;
-  }
   .command {
     display: flex;
+    flex: none;
     align-items: center;
+    gap: 8px;
+    width: 100%;
     height: var(--control-height);
     padding: 0 var(--space-1);
     border: 0;
@@ -105,6 +142,20 @@
   .command:active {
     background: var(--active);
   }
+  .command.bottom {
+    margin-top: 4px;
+  }
+  .icon {
+    flex: none;
+  }
+
+  /* the Progetti take the room between the two commands and scroll on their own */
+  .nav {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    margin: 4px 0;
+  }
 
   .canvas {
     display: flex;
@@ -118,5 +169,35 @@
     min-height: 0;
     overflow: auto;
     padding: var(--space-2);
+  }
+
+  @media (max-width: 900px) {
+    .shell {
+      grid-template-columns: var(--sidebar-narrow-width) minmax(0, 1fr);
+    }
+    .sidebar {
+      padding: 4px;
+    }
+    .brand {
+      justify-content: center;
+      padding: 0;
+    }
+    /* the wordmark leaves the row but stays the window's h1 */
+    .wordmark {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .command {
+      justify-content: center;
+      padding: 0;
+    }
+    .command-label {
+      display: none;
+    }
   }
 </style>

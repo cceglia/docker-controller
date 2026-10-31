@@ -3,6 +3,7 @@
   import AppShell from './lib/AppShell.svelte'
   import ProjectList from './lib/ProjectList.svelte'
   import ProjectDetail from './lib/ProjectDetail.svelte'
+  import ProjectSummary from './lib/ProjectSummary.svelte'
   import ActivityPanel from './lib/ActivityPanel.svelte'
   import ErrorToast from './lib/ErrorToast.svelte'
   import AddProjectDialog from './lib/AddProjectDialog.svelte'
@@ -35,16 +36,27 @@
   onMount(start)
 
   // Whatever hides the log panel (Impostazioni, the Project gone from the
-  // list, the back button) must also stop the stream.
+  // list) must also stop the stream.
   $effect(() => {
     if (store.logs !== null && (store.showingSettings || store.selectedProject === null)) closeLogs()
   })
 </script>
 
+{#snippet navigation()}
+  {#if store.loaded}
+    <ProjectList
+      projects={store.projects}
+      selected={store.selectedProject?.name ?? null}
+      onselect={selectProject}
+    />
+  {/if}
+{/snippet}
+
 <AppShell
   usage={store.usage}
   onaddproject={() => setAdding(true)}
   onsettings={() => setShowingSettings(true)}
+  {navigation}
 >
   {#if store.loaded && !store.dockerReachable}
     <p class="banner">Docker non raggiungibile</p>
@@ -59,7 +71,6 @@
         onopenport={openPort}
         onopenfolder={openFolder}
         onopenterminal={openTerminal}
-        onback={() => selectProject(null)}
         onremove={removeFromList}
         onsettings={updateSettings}
         onprofiles={setProfiles}
@@ -71,7 +82,7 @@
         usage={usageOfProject(store.selectedProject.name)}
       />
     {:else}
-      <ProjectList projects={store.projects} onaction={run} onselect={selectProject} unavailable={!store.dockerReachable} />
+      <ProjectSummary projects={store.projects} />
     {/if}
     <ActivityPanel activities={store.activities} selected={store.selectedActivity} />
   {:else}

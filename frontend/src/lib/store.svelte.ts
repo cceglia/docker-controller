@@ -317,9 +317,10 @@ export async function openFolder(project: string) {
   }
 }
 
-/** Opens the detail of a Project (null goes back to the list). The log stream of the previous one is closed. */
+/** Opens the detail of a Project (null shows the summary). The log stream of the previous one is closed and the settings screen is left. */
 export function selectProject(name: string | null) {
   closeLogs()
+  showingSettings = false
   selectedProject = name
 }
 

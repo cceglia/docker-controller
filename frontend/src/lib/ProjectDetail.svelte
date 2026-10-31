@@ -13,7 +13,6 @@
     onopenport,
     onopenfolder,
     onopenterminal,
-    onback,
     onremove,
     onsettings,
     onprofiles,
@@ -31,7 +30,6 @@
     onopenfolder: (project: string) => void
     /** Opens a terminal in the Project folder. */
     onopenterminal: (project: string) => void
-    onback: () => void
     /** Removes the (Rimosso) Project from the saved list. */
     onremove: (project: string) => void
     /** Saves the Display name and Group of the Project ('' clears one). */
@@ -107,7 +105,6 @@
 
 <section class="detail">
   <header>
-    <button onclick={onback}>← Progetti</button>
     <h2>{name}</h2>
     <span class="count" title="Container in esecuzione sul totale">{project.running}/{project.total} in esecuzione</span>
     <div class="header-actions">
