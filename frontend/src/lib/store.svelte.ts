@@ -90,6 +90,9 @@ export interface Toast {
   activityId: string | null
 }
 
+/** The two tabs of the bottom drawer: the Activities and the log stream. */
+export type DrawerTab = 'attivita' | 'log'
+
 const empty: Snapshot = { loading: true, dockerReachable: true, projects: [], groups: [] }
 
 let snapshot = $state<Snapshot>(empty)
@@ -104,6 +107,11 @@ let adding = $state(false)
 let settings = $state<Settings | null>(null)
 let showingSettings = $state(false)
 let closeAsked = $state(false)
+// The bottom drawer: three separate places open it (an Action starting, the
+// log stream opening, the error toast), and none of them is a common parent of
+// the components involved. So the state lives here.
+let drawerOpen = $state(false)
+let drawerTab = $state<DrawerTab>('attivita')
 // Utilizzo risorse: separate from the snapshot. null while the stream is
 // stopped (window hidden) or no sample has arrived yet.
 let usage = $state<UsageSample | null>(null)
@@ -121,6 +129,9 @@ function applyActivity(e: ActivityEvent) {
   if (e.type === ActivityEventType.ActivityStarted) {
     activities.unshift({ id: e.id, project: e.project, service: e.service, kind: e.kind, state: 'running', error: '', lines: [] })
     selectedId = e.id
+    // An Action started: show its output without being asked.
+    drawerTab = 'attivita'
+    drawerOpen = true
     return
   }
   const record = activities.find((a) => a.id === e.id)
@@ -336,23 +347,27 @@ export function selectProject(name: string | null) {
  * live ones; the panel keeps at most LOG_LIMIT.
  */
 export async function openLogs(project: string, service = '') {
-  closeLogs()
+  stopLogs()
   const id = crypto.randomUUID()
   logId = id
   logSeq = 0
   logView = { project, service, lines: [], live: true, error: '' }
   try {
     await ProjectsService.StartLogs(id, project, service)
+    if (logId !== id) return // closed in the meantime
+    drawerTab = 'log'
+    drawerOpen = true
   } catch (err) {
     if (logId !== id) return // closed in the meantime
     logView = null
     logId = null
+    if (drawerTab === 'log') drawerTab = 'attivita'
     fail(err)
   }
 }
 
-/** Closes the log stream: the `compose logs` process is terminated. */
-export function closeLogs() {
+/** Terminates the stream, if any, and drops its lines. It leaves the drawer as it is. */
+function stopLogs() {
   if (logTimer !== null) clearTimeout(logTimer)
   logTimer = null
   logPending = []
@@ -362,6 +377,13 @@ export function closeLogs() {
   }
   logId = null
   logView = null
+}
+
+/** Closes the log stream: the `compose logs` process is terminated. */
+export function closeLogs() {
+  stopLogs()
+  // The Log tab exists only with a stream: without one, the drawer shows the Activities.
+  if (drawerTab === 'log') drawerTab = 'attivita'
 }
 
 const SERVICE_HUES = 16
@@ -374,9 +396,24 @@ export function serviceColor(service: string): string {
   return `hsl(${(h % SERVICE_HUES) * (360 / SERVICE_HUES)} 65% var(--log-lightness, 50%))`
 }
 
-/** Shows the output of an Activity in the panel. */
+/** Shows the output of an Activity in the drawer, and opens it on the Activities. */
 export function selectActivity(id: string | null) {
   selectedId = id
+  if (id !== null) {
+    drawerTab = 'attivita'
+    drawerOpen = true
+  }
+}
+
+/** Hides the drawer. It does not stop the log stream. */
+export function closeDrawer() {
+  drawerOpen = false
+}
+
+/** Selects the drawer tab; the Log one exists only with a stream. */
+export function setDrawerTab(tab: DrawerTab) {
+  if (tab === 'log' && logView === null) return
+  drawerTab = tab
 }
 
 export function dismissToast() {
@@ -425,6 +462,14 @@ export const store = {
   /** The open log stream; null when the panel is closed. */
   get logs(): LogView | null {
     return logView
+  },
+  /** The bottom drawer is open. */
+  get drawerOpen(): boolean {
+    return drawerOpen
+  },
+  /** The tab the drawer shows. */
+  get drawerTab(): DrawerTab {
+    return drawerTab
   },
   /** The app settings; null until loaded. */
   get settings(): Settings | null {

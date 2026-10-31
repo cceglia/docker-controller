@@ -5,18 +5,17 @@
      Down, Down con volumi and Rimuovi dalla lista sit behind the "…" menu with
      the same confirmations as before. Below: the cells of Cartella, Nome
      compose and Gruppo with their commands, then the Profili as boxes.
-     Below: one flat block per Servizio, one row per Container, and the log
-     panel inline until the drawer of ticket 06. -->
+     Below: one flat block per Servizio and one row per Container. The log
+     panel lives in the bottom drawer of the guscio, not here. -->
 <script lang="ts">
   import type { Container, Project } from '../../bindings/dockercontroller/internal/compose/models'
   import { Status } from '../../bindings/dockercontroller/internal/compose/models'
   import ConfirmModal from './ConfirmModal.svelte'
   import ContainerStrip from './ContainerStrip.svelte'
-  import LogPanel from './LogPanel.svelte'
   import { formatBytes, formatCores, formatPercent, formatRate } from './format'
   import Meter from './Meter.svelte'
   import { ActionKind, actionLabels } from './store.svelte'
-  import type { LogView, ServiceUsageView } from './store.svelte'
+  import type { ServiceUsageView } from './store.svelte'
 
   let {
     project,
@@ -28,9 +27,7 @@
     onsettings,
     onprofiles,
     groups,
-    logs,
     onopenlogs,
-    oncloselogs,
     unavailable = false,
     usage,
   }: {
@@ -49,11 +46,8 @@
     onprofiles: (project: string, profiles: string[]) => void
     /** The existing Groups. */
     groups: string[]
-    /** The open log stream, null when closed. */
-    logs: LogView | null
-    /** Opens the log stream of the Project, restricted to a Service ('' for all). */
+    /** Opens the log stream of the Project in the drawer, restricted to a Service ('' for all). */
     onopenlogs: (project: string, service: string) => void
-    oncloselogs: () => void
     /** Docker does not answer: Actions are disabled. */
     unavailable?: boolean
     /** Utilizzo risorse by Service name: measures and rates. A Service without running Containers is absent. null until the first sample. */
@@ -414,19 +408,8 @@
 
   <div class="section-head">
     <h3 class="section-title">Servizi <span class="section-count mono">{services.length}</span></h3>
-    {#if !(logs && logs.project === project.name)}
-      <button class="quiet" onclick={() => onopenlogs(project.name, '')}>Mostra log</button>
-    {/if}
+    <button class="quiet" onclick={() => onopenlogs(project.name, '')}>Mostra log</button>
   </div>
-
-  {#if logs && logs.project === project.name}
-    <LogPanel
-      {logs}
-      services={services.map((s) => s.name)}
-      onservice={(service) => onopenlogs(project.name, service)}
-      onclose={oncloselogs}
-    />
-  {/if}
 
   {#if services.length === 0}
     <p class="empty">

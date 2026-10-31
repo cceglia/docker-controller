@@ -4,7 +4,7 @@
   import ProjectList from './lib/ProjectList.svelte'
   import ProjectDetail from './lib/ProjectDetail.svelte'
   import ProjectSummary from './lib/ProjectSummary.svelte'
-  import ActivityPanel from './lib/ActivityPanel.svelte'
+  import ActivityDrawer from './lib/ActivityDrawer.svelte'
   import ErrorToast from './lib/ErrorToast.svelte'
   import AddProjectDialog from './lib/AddProjectDialog.svelte'
   import SettingsView from './lib/SettingsView.svelte'
@@ -12,6 +12,7 @@
   import {
     addProject,
     cancelClose,
+    closeDrawer,
     closeLogs,
     openFolder,
     openLogs,
@@ -25,6 +26,7 @@
     saveSettings,
     selectProject,
     setAdding,
+    setDrawerTab,
     setShowingSettings,
     start,
     store,
@@ -52,11 +54,34 @@
   {/if}
 {/snippet}
 
+<!-- The drawer belongs to the guscio: it sits under the content of the canvas.
+     Lines of a stream of another Project are never shown. -->
+{#snippet drawer()}
+  {#if store.drawerOpen}
+    {@const logs = store.selectedProject && store.logs?.project === store.selectedProject.name ? store.logs : null}
+    <ActivityDrawer
+      tab={store.drawerTab}
+      activities={store.activities}
+      selected={store.selectedActivity}
+      {logs}
+      services={store.selectedProject?.services?.map((s) => s.name) ?? []}
+      ontab={setDrawerTab}
+      onclose={closeDrawer}
+      onservice={(service) => {
+        const project = store.selectedProject
+        if (project) openLogs(project.name, service)
+      }}
+      oncloselogs={closeLogs}
+    />
+  {/if}
+{/snippet}
+
 <AppShell
   usage={store.usage}
   onaddproject={() => setAdding(true)}
   onsettings={() => setShowingSettings(true)}
   {navigation}
+  {drawer}
 >
   {#if store.loaded && !store.dockerReachable}
     <p class="banner">Docker non raggiungibile</p>
@@ -75,16 +100,13 @@
         onsettings={updateSettings}
         onprofiles={setProfiles}
         groups={store.groups}
-        logs={store.logs}
         onopenlogs={openLogs}
-        oncloselogs={closeLogs}
         unavailable={!store.dockerReachable}
         usage={usageOfProject(store.selectedProject.name)}
       />
     {:else}
       <ProjectSummary projects={store.projects} />
     {/if}
-    <ActivityPanel activities={store.activities} selected={store.selectedActivity} />
   {:else}
     <p class="loading">Caricamento…</p>
   {/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import { dismissToast, selectActivity } from './store.svelte'
   import type { Toast } from './store.svelte'
 
@@ -34,10 +35,13 @@
     return stopTimer
   })
 
-  function showOutput() {
+  // The drawer opens on the Activity of the message; the element is then in
+  // the page and can be brought into view.
+  async function showOutput() {
     if (toast.activityId) selectActivity(toast.activityId)
-    document.getElementById('attivita')?.scrollIntoView({ behavior: 'smooth' })
     dismissToast()
+    await tick()
+    document.getElementById('attivita')?.scrollIntoView({ behavior: 'smooth' })
   }
 </script>
 

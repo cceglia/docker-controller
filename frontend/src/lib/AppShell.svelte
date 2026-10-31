@@ -14,6 +14,7 @@
     onaddproject,
     onsettings,
     navigation,
+    drawer,
     children,
   }: {
     /** The latest global sample; null until the stream delivers one. */
@@ -22,6 +23,8 @@
     onsettings: () => void
     /** The Progetti of the column. */
     navigation: Snippet
+    /** The bottom drawer: Activities and Log, under the scrolling content. */
+    drawer: Snippet
     /** The screen shown in the canvas. */
     children: Snippet
   } = $props()
@@ -80,6 +83,7 @@
     <div class="content">
       {@render children()}
     </div>
+    {@render drawer()}
   </div>
 </div>
 

@@ -37,9 +37,8 @@
   }
 </script>
 
-<section class="logs">
+<section class="logs" aria-label="Log">
   <div class="bar">
-    <h3>Log</h3>
     <label>
       Servizio
       <select value={logs.service} onchange={(e) => onservice(e.currentTarget.value)}>
@@ -53,6 +52,7 @@
     <label><input type="checkbox" bind:checked={showTimestamps} /> Timestamp</label>
     <button class:on={paused} onclick={() => (paused = !paused)}>{paused ? 'Riprendi scorrimento' : 'Pausa scorrimento'}</button>
     <button onclick={onclose}>Chiudi log</button>
+    <p class="count">{visible.length} righe{term !== '' ? ` su ${logs.lines.length}` : ''} (massimo 5000)</p>
   </div>
   <div class="body" {@attach follow}>
     {#each visible as line (line.seq)}
@@ -71,26 +71,110 @@
       <p class="ended">{logs.error ? `Flusso interrotto: ${logs.error}` : 'Il flusso dei log è terminato.'}</p>
     {/if}
   </div>
-  <p class="count">{visible.length} righe{term !== '' ? ` su ${logs.lines.length}` : ''} (massimo 5000)</p>
 </section>
 
 <style>
-  .logs { margin-top: 0.75rem; padding: 0.6rem 0.9rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); }
-  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.5rem; font-size: 0.85rem; }
-  h3 { font-size: 0.95rem; margin: 0; flex: 1; }
-  .bar label { display: flex; align-items: center; gap: 0.3rem; }
-  .bar input[type='search'], .bar select { font: inherit; padding: 0.2rem 0.4rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
-  button {
-    font: inherit; font-size: 0.8rem; padding: 0.2rem 0.55rem; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+  /* The drawer gives the room: the bar takes what it needs, the lines fill the rest. */
+  .logs {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 8px;
+    height: 100%;
+    min-height: 0;
   }
-  button.on { border-color: var(--warn); color: var(--warn); }
-  .body { height: 20rem; overflow: auto; padding: 0.4rem; border-radius: 6px; border: 1px solid var(--border); font: 0.76rem/1.35 ui-monospace, monospace; }
-  .line { display: flex; gap: 0.6rem; white-space: pre-wrap; word-break: break-all; }
-  .ts { color: var(--muted); flex: none; }
-  .svc { flex: none; font-weight: 600; }
-  .text { flex: 1; }
-  .err .text { color: var(--warn); }
-  .empty, .count { color: var(--muted); font-size: 0.78rem; margin: 0.3rem 0 0; }
-  .ended { color: var(--warn); font-weight: 600; }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px var(--space-1);
+    font-size: var(--fs-small);
+  }
+  .bar label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .bar input[type='search'],
+  .bar select {
+    min-height: var(--control-height);
+    padding: 0 8px;
+    border: 1px solid var(--control);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-text);
+    font-size: var(--fs-body);
+  }
+  .bar input[type='search'] {
+    flex: 1 1 12rem;
+    min-width: 0;
+  }
+  button {
+    height: var(--control-height);
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-text);
+    font-size: var(--fs-body);
+    line-height: 1;
+    cursor: pointer;
+  }
+  button:hover {
+    background: var(--raised);
+  }
+  button.on {
+    border-color: var(--warning);
+    color: var(--warning);
+  }
+  .count {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: var(--fs-small);
+  }
+  .body {
+    min-height: 0;
+    padding: 8px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-control);
+    background: var(--ground);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    line-height: 1.4;
+    overflow: auto;
+  }
+  .line {
+    display: flex;
+    gap: var(--space-1);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .ts {
+    flex: none;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .svc {
+    flex: none;
+    font-weight: 600;
+  }
+  .text {
+    flex: 1;
+  }
+  .err .text {
+    color: var(--warning);
+  }
+  .empty,
+  .ended {
+    margin: 0;
+    font-family: var(--font-text);
+  }
+  .empty {
+    color: var(--muted);
+  }
+  .ended {
+    color: var(--warning);
+    font-weight: 600;
+  }
 </style>

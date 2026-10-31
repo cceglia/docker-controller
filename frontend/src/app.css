@@ -83,6 +83,8 @@
   --sidebar-width: 248px;
   --sidebar-narrow-width: 64px;
   --strip-height: 88px;
+  /* the bottom drawer: Activities and Log, separated from the Servizi */
+  --drawer-height: 220px;
   --meter-width: 48px;
   --meter-max-width: 160px;
   --meter-height: 4px;

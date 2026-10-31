@@ -15,8 +15,7 @@
   const stateLabel = { running: '⏳', ok: '✓', error: '✗' }
 </script>
 
-<section class="panel" id="attivita">
-  <h2>Attività</h2>
+<section class="panel" id="attivita" aria-label="Attività">
   {#if activities.length === 0}
     <p class="empty">Nessuna Attività in questa sessione.</p>
   {:else}
@@ -31,7 +30,7 @@
         {/each}
       </ul>
       {#if selected}
-        <pre class="output" bind:this={output}>{#each selected.lines as line}<span class:err={line.stderr}>{line.text}
+        <pre class="output" bind:this={output}>{#each selected.lines as line (line)}<span class:err={line.stderr}>{line.text}
 </span>{/each}{#if selected.state === 'error'}<span class="fail">{selected.error}
 </span>{/if}</pre>
       {/if}
@@ -40,20 +39,73 @@
 </section>
 
 <style>
-  .panel { margin-top: 1.5rem; }
-  h2 { font-size: 1rem; margin: 0 0 0.5rem; }
-  .body { display: grid; grid-template-columns: 14rem 1fr; gap: 0.75rem; }
-  .history { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; align-content: start; max-height: 16rem; overflow: auto; }
+  /* The drawer gives the room: the history keeps its column, the output takes the rest. */
+  .panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+  .body {
+    display: grid;
+    flex: 1;
+    grid-template-columns: 14rem minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: var(--space-1);
+    min-height: 0;
+  }
+  .history {
+    display: grid;
+    gap: 4px;
+    align-content: start;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+  }
   .history button {
-    width: 100%; text-align: left; font: inherit; font-size: 0.8rem; padding: 0.3rem 0.5rem;
-    border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-text);
+    font-size: var(--fs-small);
+    line-height: 1.4;
+    text-align: left;
+    cursor: pointer;
   }
-  .history button.current { border-color: var(--ok); }
+  .history button:hover {
+    background: var(--raised);
+  }
+  .history button.current {
+    border-color: var(--positive);
+  }
   .output {
-    margin: 0; height: 16rem; overflow: auto; padding: 0.6rem; border-radius: 8px; font-size: 0.78rem;
-    background: var(--surface); border: 1px solid var(--border); white-space: pre-wrap; word-break: break-all;
+    min-height: 0;
+    margin: 0;
+    padding: 8px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-control);
+    background: var(--ground);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    line-height: 1.4;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
   }
-  .err { color: var(--warn); }
-  .fail { color: var(--danger); font-weight: 600; }
-  .empty { color: var(--muted); }
+  .err {
+    color: var(--warning);
+  }
+  .fail {
+    color: var(--negative);
+    font-weight: 600;
+  }
+  .empty {
+    color: var(--muted);
+    font-size: var(--fs-body);
+  }
 </style>
