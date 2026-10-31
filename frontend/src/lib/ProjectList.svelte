@@ -6,10 +6,11 @@
      Below 900px the column keeps the dot and the strips; the row keeps its
      accessible name, count and warning through aria-label and its tooltip. -->
 <script lang="ts">
-  import { Status } from '../../bindings/dockercontroller/internal/compose/models'
   import type { Project } from '../../bindings/dockercontroller/internal/compose/models'
   import { SvelteMap } from 'svelte/reactivity'
   import ContainerStrip from './ContainerStrip.svelte'
+  import { projectLabel, projectTone } from './status'
+  import StatusDot from './StatusDot.svelte'
 
   let {
     projects,
@@ -22,13 +23,6 @@
     /** Opens the detail of a Project. */
     onselect: (project: string) => void
   } = $props()
-
-  const statusLabels: Record<string, string> = {
-    [Status.StatusActive]: 'Attivo',
-    [Status.StatusPartial]: 'Parziale',
-    [Status.StatusStopped]: 'Fermo',
-    [Status.StatusRemoved]: 'Rimosso',
-  }
 
   // Projects by Group (Groups sorted), then those without a Group in a section of their own.
   const sections = $derived.by(() => {
@@ -58,7 +52,7 @@
   // the names, the count and the warning pill.
   const labelOf = (project: Project) => {
     const name = project.displayName || project.name
-    const status = statusLabels[project.status] ?? project.status
+    const status = projectLabel(project.status)
     const count = `${project.running} Container in esecuzione su ${project.total}`
     return `${name}, ${status}, ${count}${project.composeMissing ? ', File compose mancante' : ''}`
   }
@@ -84,7 +78,7 @@
                 title={titleOf(project)}
                 onclick={() => onselect(project.name)}
               >
-                <span class="dot {project.status}" aria-hidden="true"></span>
+                <span class="dot-cell"><StatusDot tone={projectTone(project.status)} /></span>
                 <span class="name-cell">
                   <span class="name">{name}</span>
                   {#if project.composeMissing}
@@ -96,7 +90,7 @@
                 </span>
                 <span class="count mono" aria-hidden="true">{project.running}/{project.total}</span>
                 <span class="compose mono">{project.name}</span>
-                <span class="strip-cell"><ContainerStrip containers={containersOf(project)} /></span>
+                <span class="strip-cell"><ContainerStrip containers={containersOf(project)} compact /></span>
               </button>
             </li>
           {/each}
@@ -163,25 +157,9 @@
   .row.open .name {
     font-weight: 600;
   }
-  .dot {
+  .dot-cell {
     grid-area: dot;
-    box-sizing: border-box;
-    width: var(--dot-size);
-    height: var(--dot-size);
-    border-radius: var(--dot-size);
-  }
-  .dot.active {
-    background: var(--positive);
-  }
-  .dot.partial {
-    background: var(--warning);
-  }
-  .dot.stopped {
-    background: var(--muted);
-  }
-  .dot.removed {
-    border: 1px solid var(--control);
-    background: transparent;
+    display: flex;
   }
   .name-cell {
     grid-area: name;

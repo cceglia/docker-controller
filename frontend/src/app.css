@@ -89,11 +89,16 @@
   --meter-max-width: 160px;
   --meter-height: 4px;
 
-  /* status dot and Container strip: one tack per Container */
+  /* status dot and Container strip: one tack per Container, wide enough to
+     read as a tick and not as a figure, even when a Project has one. The
+     compact pair keeps the strip in the narrow column, where the name of the
+     Project must stay whole. */
   --dot-size: 6px;
-  --strip-tack-width: 3px;
-  --strip-tack-height: 9px;
-  --strip-gap: 2px;
+  --strip-tack-width: 6px;
+  --strip-tack-height: 10px;
+  --strip-gap: 4px;
+  --strip-tack-width-compact: 3px;
+  --strip-gap-compact: 2px;
 
   /* per-Service log hue lightness (LogPanel colours services by name) */
   --log-lightness: 38%;

@@ -29,7 +29,10 @@
     {:else if total === 0}
       <p class="lead">Nessun Container in esecuzione. Scegli un Progetto dalla colonna.</p>
     {:else}
-      <p class="lead">{running} Container in esecuzione su {total}. Scegli un Progetto dalla colonna.</p>
+      <p class="lead">
+        <span class="mono">{running}</span> Container in esecuzione su <span class="mono">{total}</span>. Scegli un Progetto
+        dalla colonna.
+      </p>
     {/if}
   </header>
 
@@ -38,7 +41,7 @@
       {#each counts as count (count.key)}
         <div class="cell">
           <span class="label">{count.label}</span>
-          <span class="value num">{count.value}</span>
+          <span class="value num mono">{count.value}</span>
         </div>
       {/each}
     </div>

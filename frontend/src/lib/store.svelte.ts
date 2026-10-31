@@ -18,9 +18,8 @@ import {
 } from '../../bindings/dockercontroller/internal/compose/models'
 import type {
   ActivityEvent,
-  Measures,
   Project,
-  Rates,
+  ServiceUsage,
   Snapshot,
   UsageSample,
 } from '../../bindings/dockercontroller/internal/compose/models'
@@ -118,9 +117,9 @@ let usage = $state<UsageSample | null>(null)
 // Utilizzo risorse of the Services that have running Containers, by
 // "project/service": the instant measures and the rates together.
 const serviceUsage = $derived(
-  new Map<string, ServiceUsageView>(
+  new Map<string, ServiceUsage>(
     (usage?.dockerReachable ? (usage.services ?? []) : []).map(
-      (u): [string, ServiceUsageView] => [`${u.project}/${u.service}`, { measures: u.measures, rate: u.rate }],
+      (u): [string, ServiceUsage] => [`${u.project}/${u.service}`, u],
     ),
   ),
 )
@@ -343,10 +342,16 @@ export function selectProject(name: string | null) {
 
 /**
  * Opens the log stream of a Project, or of one of its Services ('' for all);
- * a stream already open is closed first. The last 500 lines arrive, then the
- * live ones; the panel keeps at most LOG_LIMIT.
+ * a stream already open is closed first. A stream of the same Project and the
+ * same Service is only shown again: it is not restarted. The last 500 lines
+ * arrive, then the live ones; the panel keeps at most LOG_LIMIT.
  */
 export async function openLogs(project: string, service = '') {
+  if (logView !== null && logView.project === project && logView.service === service) {
+    drawerTab = 'log'
+    drawerOpen = true
+    return
+  }
   stopLogs()
   const id = crypto.randomUUID()
   logId = id
@@ -421,23 +426,15 @@ export function dismissToast() {
 }
 
 /**
- * The Utilizzo risorse of one Service: the instant measures and the rates
- * together.
+ * The Utilizzo risorse of the Services of a Project: Service name -> the
+ * generated ServiceUsage (measures, rates and its own names). A Service
+ * without running Containers is absent (the UI shows "—"), which is not the
+ * same as zero. null while no sample has arrived yet: the UI shows a loading
+ * placeholder, not "—".
  */
-export interface ServiceUsageView {
-  measures: Measures
-  rate: Rates
-}
-
-/**
- * The Utilizzo risorse of the Services of a Project: Service name -> measures
- * and rates. A Service without running Containers is absent (the UI shows
- * "—"), which is not the same as zero. null while no sample has arrived yet:
- * the UI shows a loading placeholder, not "—".
- */
-export function usageOfProject(project: string): Record<string, ServiceUsageView> | null {
+export function usageOfProject(project: string): Record<string, ServiceUsage> | null {
   if (usage === null) return null
-  const out: Record<string, ServiceUsageView> = {}
+  const out: Record<string, ServiceUsage> = {}
   for (const [key, entry] of serviceUsage) {
     if (key.startsWith(`${project}/`)) out[key.slice(project.length + 1)] = entry
   }

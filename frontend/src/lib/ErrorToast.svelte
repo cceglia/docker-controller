@@ -36,12 +36,14 @@
   })
 
   // The drawer opens on the Activity of the message; the element is then in
-  // the page and can be brought into view.
+  // the page and can be brought into view. The scroll is smooth only when the
+  // user did not ask for reduced motion.
   async function showOutput() {
     if (toast.activityId) selectActivity(toast.activityId)
     dismissToast()
     await tick()
-    document.getElementById('attivita')?.scrollIntoView({ behavior: 'smooth' })
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    document.getElementById('attivita')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' })
   }
 </script>
 

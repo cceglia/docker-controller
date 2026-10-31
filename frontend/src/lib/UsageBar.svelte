@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { UsageSample } from '../../bindings/dockercontroller/internal/compose/models'
-  import { formatBytes, formatCores, formatPercent, formatRate } from './format'
+  import { formatBytes, formatCores, formatPercent } from './format'
   import Meter from './Meter.svelte'
+  import RatePair from './RatePair.svelte'
 
   let { usage }: {
     /** The latest sample; null while none has arrived (streaming just started). */
@@ -34,33 +35,40 @@
       <div class="metric">
         <span class="label">CPU</span>
         <span class="value num">{formatCores(usage.total.cpuPercent)}</span>
-        <span class="note num">{formatPercent(usage.cpuMachinePercent)} della macchina</span>
-        <Meter value={usage.cpuMachinePercent} label="CPU" tone="accent" wide />
+        <span class="note">
+          <span class="mono">{formatPercent(usage.cpuMachinePercent)}</span> della macchina
+        </span>
+        <Meter value={usage.cpuMachinePercent} label="CPU della macchina" tone="accent" wide />
       </div>
 
       <div class="metric">
         <span class="label">Memoria</span>
         <span class="value num">{formatBytes(usage.total.memoryBytes)}</span>
-        <span class="note num">
-          {formatPercent(usage.memoryMachinePercent)} di {formatBytes(usage.memoryTotalBytes)}
+        <span class="note">
+          <span class="mono">{formatPercent(usage.memoryMachinePercent)}</span> di
+          <span class="mono">{formatBytes(usage.memoryTotalBytes)}</span>
         </span>
         <Meter value={usage.memoryMachinePercent} label="Memoria" wide />
       </div>
 
       <div class="metric">
         <span class="label">Rete</span>
-        <span class="pair">
-          <span class="reading"><span class="dir">in</span><span class="value num">{formatRate(usage.rate.netInBytesPerSec)}</span></span>
-          <span class="reading"><span class="dir">out</span><span class="value num">{formatRate(usage.rate.netOutBytesPerSec)}</span></span>
-        </span>
+        <RatePair
+          readings={[
+            { label: 'in', bytesPerSec: usage.rate.netInBytesPerSec },
+            { label: 'out', bytesPerSec: usage.rate.netOutBytesPerSec },
+          ]}
+        />
       </div>
 
       <div class="metric">
         <span class="label">Disco</span>
-        <span class="pair">
-          <span class="reading"><span class="dir">lettura</span><span class="value num">{formatRate(usage.rate.blockReadBytesPerSec)}</span></span>
-          <span class="reading"><span class="dir">scrittura</span><span class="value num">{formatRate(usage.rate.blockWriteBytesPerSec)}</span></span>
-        </span>
+        <RatePair
+          readings={[
+            { label: 'lettura', bytesPerSec: usage.rate.blockReadBytesPerSec },
+            { label: 'scrittura', bytesPerSec: usage.rate.blockWriteBytesPerSec },
+          ]}
+        />
       </div>
     </div>
   {/if}
@@ -156,27 +164,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .pair {
-    display: grid;
-    gap: 1px;
-    min-width: 0;
-  }
-  .reading {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    min-width: 0;
-  }
-  .dir {
-    flex: none;
-    min-width: 5ch;
-    color: var(--muted);
-    font-size: var(--fs-small);
-    line-height: 1.3;
-  }
-  .reading .value {
-    font-size: var(--fs-small);
   }
 
   /* the window can be made narrower: the strip folds to two rows instead of

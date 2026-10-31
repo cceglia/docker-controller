@@ -8,14 +8,16 @@
      Below: one flat block per Servizio and one row per Container. The log
      panel lives in the bottom drawer of the guscio, not here. -->
 <script lang="ts">
-  import type { Container, Project } from '../../bindings/dockercontroller/internal/compose/models'
+  import type { Project } from '../../bindings/dockercontroller/internal/compose/models'
+  import type { ServiceUsage } from '../../bindings/dockercontroller/internal/compose/models'
   import { Status } from '../../bindings/dockercontroller/internal/compose/models'
   import ConfirmModal from './ConfirmModal.svelte'
   import ContainerStrip from './ContainerStrip.svelte'
-  import { formatBytes, formatCores, formatPercent, formatRate } from './format'
-  import Meter from './Meter.svelte'
+  import ProjectMenu from './ProjectMenu.svelte'
+  import ServiceBlock from './ServiceBlock.svelte'
+  import { projectLabel, projectTone } from './status'
+  import StatusDot from './StatusDot.svelte'
   import { ActionKind, actionLabels } from './store.svelte'
-  import type { ServiceUsageView } from './store.svelte'
 
   let {
     project,
@@ -51,11 +53,10 @@
     /** Docker does not answer: Actions are disabled. */
     unavailable?: boolean
     /** Utilizzo risorse by Service name: measures and rates. A Service without running Containers is absent. null until the first sample. */
-    usage: Record<string, ServiceUsageView> | null
+    usage: Record<string, ServiceUsage> | null
   } = $props()
 
-  // The Actions of a Service stay on its own block; these are the Actions of the Project.
-  const kinds = [ActionKind.ActionStart, ActionKind.ActionStop, ActionKind.ActionRestart]
+  // The Actions of the Project. The Actions of a Servizio live in ServiceBlock.
   const projectKinds = [
     ActionKind.ActionUp,
     ActionKind.ActionStop,
@@ -64,26 +65,6 @@
     ActionKind.ActionBuild,
   ]
 
-  // Only these health states are a problem: they alone wear a pill.
-  const isProblemHealth = (health: string) => health === 'unhealthy' || health === 'starting'
-
-  // The dot of a Container follows the same grammar as the Project status.
-  function dotTone(container: Container): 'positive' | 'warning' | 'negative' | 'stopped' {
-    if (container.health === 'unhealthy' || container.state === 'dead') return 'negative'
-    if (container.health === 'starting' || container.state === 'restarting' || container.state === 'paused') {
-      return 'warning'
-    }
-    if (container.state === 'running') return 'positive'
-    return 'stopped'
-  }
-
-  const statusLabels: Record<string, string> = {
-    [Status.StatusActive]: 'Attivo',
-    [Status.StatusPartial]: 'Parziale',
-    [Status.StatusStopped]: 'Fermo',
-    [Status.StatusRemoved]: 'Rimosso',
-  }
-
   // Generated bindings type arrays as nullable; the backend never sends null.
   const services = $derived(project.services ?? [])
   const profiles = $derived(project.profiles ?? [])
@@ -91,7 +72,7 @@
   const containers = $derived(services.flatMap((s) => s.containers ?? []))
   const busy = $derived(project.activity !== null)
   const removable = $derived(project.status === Status.StatusRemoved && project.total === 0)
-  const statusLabel = $derived(statusLabels[project.status] ?? project.status)
+  const statusLabel = $derived(projectLabel(project.status))
 
   // One Action leads; which one follows the status. The others stay available.
   const primary = $derived(
@@ -109,85 +90,10 @@
   let pendingService: string | null = $state(null)
   const name = $derived(project.displayName || project.name)
 
-  // The "…" menu: open state, its trigger, its panel and the box around both.
-  let menuOpen = $state(false)
-  let menuWrap = $state<HTMLElement | null>(null)
-  let menuTrigger = $state<HTMLButtonElement | null>(null)
-  let menuPanel = $state<HTMLElement | null>(null)
-
-  function toggleMenu() {
-    menuOpen = !menuOpen
-  }
-
-  // The menu items that can take the focus, in order.
-  function menuItems(): HTMLButtonElement[] {
-    return [...(menuPanel?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [])]
-  }
-
-  // Escape closes and returns the focus to the trigger; the arrows move between items.
-  // It is bound to the trigger and to every item, so the focus is always on an
-  // interactive element while the menu is open.
-  function onMenuKeydown(event: KeyboardEvent) {
-    if (!menuOpen) return
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      closeMenu()
-      return
-    }
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return
-    const items = menuItems()
-    if (items.length === 0) return
-    const current = items.indexOf(document.activeElement as HTMLButtonElement)
-    let next = 0
-    if (event.key === 'ArrowDown') next = current < 0 ? 0 : (current + 1) % items.length
-    else if (event.key === 'ArrowUp') next = current <= 0 ? items.length - 1 : current - 1
-    else if (event.key === 'End') next = items.length - 1
-    event.preventDefault()
-    items[next].focus()
-  }
-
-  // ArrowDown on the closed trigger opens the menu on its first item.
-  function onTriggerKeydown(event: KeyboardEvent) {
-    if (event.key === 'ArrowDown' && !menuOpen) {
-      event.preventDefault()
-      menuOpen = true
-      return
-    }
-    onMenuKeydown(event)
-  }
-
-  function closeMenu() {
-    if (!menuOpen) return
-    menuOpen = false
-    menuTrigger?.focus()
-  }
-
-  // Choosing an item closes the menu; the confirmation, if any, then opens on its own.
+  // Choosing a menu item opens its confirmation on its own; the menu closes itself.
   function choose(what: 'down' | 'downVolumes' | 'remove') {
-    menuOpen = false
-    menuTrigger?.focus()
     pending = what
   }
-
-  // The focus that leaves the menu closes it: Tab then goes on from the trigger.
-  function onMenuFocusOut(event: FocusEvent) {
-    const next = event.relatedTarget as Node | null
-    if (!next || menuWrap?.contains(next)) return
-    menuOpen = false
-  }
-
-  // While the menu is open the first item takes the focus, and a click outside closes it.
-  $effect(() => {
-    if (!menuOpen) return
-    menuItems()[0]?.focus()
-    const outside = (event: MouseEvent) => {
-      const target = event.target as Node | null
-      if (target && menuWrap?.contains(target)) return
-      menuOpen = false
-    }
-    document.addEventListener('click', outside)
-    return () => document.removeEventListener('click', outside)
-  })
 
   // Settings form: edited values, reset whenever another Project is opened.
   const NEW_GROUP = '\u0000new'
@@ -238,7 +144,7 @@
       </div>
 
       <p class="status-line">
-        <span class="dot {project.status}" aria-hidden="true"></span>
+        <StatusDot tone={projectTone(project.status)} />
         <span>{statusLabel}</span>
         <span class="count mono" title="Container in esecuzione sul totale">{project.running}/{project.total} in esecuzione</span>
       </p>
@@ -259,43 +165,7 @@
         </button>
       {/each}
 
-      <div class="menu-wrap" bind:this={menuWrap} onfocusout={onMenuFocusOut}>
-        <button
-          class="menu-trigger"
-          bind:this={menuTrigger}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          aria-controls={menuOpen ? 'project-menu' : undefined}
-          aria-label="Altre azioni sul Progetto"
-          title="Altre azioni sul Progetto"
-          onclick={toggleMenu}
-          onkeydown={onTriggerKeydown}
-        >…</button>
-        {#if menuOpen}
-          <div class="menu" id="project-menu" role="menu" aria-label="Altre azioni sul Progetto" bind:this={menuPanel}>
-            <button role="menuitem" class="menu-item" disabled={unavailable || busy} onkeydown={onMenuKeydown} onclick={() => choose('down')}>Down</button>
-            <button
-              role="menuitem"
-              class="menu-item danger"
-              disabled={unavailable || busy}
-              onkeydown={onMenuKeydown}
-              onclick={() => choose('downVolumes')}
-            >
-              Down con volumi
-            </button>
-            <button
-              role="menuitem"
-              class="menu-item"
-              disabled={unavailable || busy || !removable}
-              title={removable ? 'Toglie il Progetto dalla lista senza toccare Docker' : 'Disponibile solo per un Progetto Rimosso'}
-              onkeydown={onMenuKeydown}
-              onclick={() => choose('remove')}
-            >
-              Rimuovi dalla lista
-            </button>
-          </div>
-        {/if}
-      </div>
+      <ProjectMenu {unavailable} {busy} {removable} onchoose={choose} />
     </div>
   </header>
 
@@ -423,87 +293,16 @@
     </p>
   {/if}
   {#each services as service (service.name)}
-    {@const serviceContainers = service.containers ?? []}
-    <article class="service">
-      <div class="service-head">
-        <div class="service-title">
-          <h4>{service.name}</h4>
-          <ContainerStrip containers={serviceContainers} />
-        </div>
-        <div class="service-actions">
-          {#each kinds as kind (kind)}
-            <button class="quiet" disabled={unavailable || busy} onclick={() => onaction(project.name, kind, service.name)}>
-              {actionLabels[kind]}
-            </button>
-          {/each}
-          <button class="quiet danger" disabled={unavailable || busy} onclick={() => (pendingService = service.name)}>
-            {actionLabels[ActionKind.ActionDownService]}
-          </button>
-        </div>
-      </div>
-      {#if usage?.[service.name]}
-        {@const u = usage[service.name]}
-        <div class="usage" aria-label="Utilizzo risorse di {service.name}">
-          <div class="measure">
-            <span class="measure-label">CPU</span>
-            <span class="measure-value num">{formatPercent(u.measures.cpuPercent)}</span>
-            <span class="measure-note num">{formatCores(u.measures.cpuPercent)}</span>
-            <Meter value={u.measures.cpuPercent} label="CPU" tone="accent" wide />
-          </div>
-          <div class="measure">
-            <span class="measure-label">Memoria</span>
-            <span class="measure-value num">{formatBytes(u.measures.memoryBytes)}</span>
-          </div>
-          <div class="measure">
-            <span class="measure-label">Rete</span>
-            <span class="pair">
-              <span class="reading"><span class="dir">in</span><span class="value num">{formatRate(u.rate.netInBytesPerSec)}</span></span>
-              <span class="reading"><span class="dir">out</span><span class="value num">{formatRate(u.rate.netOutBytesPerSec)}</span></span>
-            </span>
-          </div>
-          <div class="measure">
-            <span class="measure-label">Disco</span>
-            <span class="pair">
-              <span class="reading"><span class="dir">lettura</span><span class="value num">{formatRate(u.rate.blockReadBytesPerSec)}</span></span>
-              <span class="reading"><span class="dir">scrittura</span><span class="value num">{formatRate(u.rate.blockWriteBytesPerSec)}</span></span>
-            </span>
-          </div>
-        </div>
-      {:else if usage === null && serviceContainers.some((c) => c.state === 'running')}
-        <p class="usage-none" aria-label="Utilizzo risorse di {service.name}" title="In attesa della prima misura">In attesa della prima misura…</p>
-      {:else}
-        <p class="usage-none" aria-label="Utilizzo risorse di {service.name}" title="Nessun Container in esecuzione">Utilizzo risorse: —</p>
-      {/if}
-      <ul class="containers">
-        {#each serviceContainers as c (c.name)}
-          <li class="container">
-            <span class="dot {dotTone(c)}" aria-hidden="true"></span>
-            <span class="cname mono" title={c.name}>{c.name}</span>
-            <span class="image mono" title={c.image}>{c.image}</span>
-            <span class="state">{c.state}</span>
-            {#if c.health}
-              {#if isProblemHealth(c.health)}
-                <span class="pill {c.health === 'unhealthy' ? 'negative' : 'warning'}">{c.health}</span>
-              {:else}
-                <span class="health">{c.health}</span>
-              {/if}
-            {/if}
-            {#if (c.ports ?? []).length > 0}
-              <span class="ports">
-                {#each (c.ports ?? []) as port (`${port.published}/${port.protocol}`)}
-                  <button
-                    class="port"
-                    title="Apri http://localhost:{port.published}"
-                    aria-label="Apri http://localhost:{port.published} nel browser: porta {port.target}/{port.protocol}"
-                    onclick={() => onopenport(port.published)}
-                  >{port.published}→{port.target}/{port.protocol}</button>
-                {/each}
-              </span>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    </article>
+    <ServiceBlock
+      {service}
+      usage={usage?.[service.name] ?? null}
+      waiting={usage === null}
+      {unavailable}
+      {busy}
+      onaction={(kind) => onaction(project.name, kind, service.name)}
+      ondown={() => (pendingService = service.name)}
+      {onopenport}
+    />
   {/each}
 </section>
 
@@ -587,26 +386,6 @@
     gap: 6px;
     font-size: var(--fs-body);
   }
-  .dot {
-    flex: none;
-    box-sizing: border-box;
-    width: var(--dot-size);
-    height: var(--dot-size);
-    border-radius: var(--dot-size);
-  }
-  .dot.active {
-    background: var(--positive);
-  }
-  .dot.partial {
-    background: var(--warning);
-  }
-  .dot.stopped {
-    background: var(--muted);
-  }
-  .dot.removed {
-    border: 1px solid var(--control);
-    background: transparent;
-  }
   .count {
     color: var(--muted);
     font-size: var(--fs-small);
@@ -670,63 +449,6 @@
   }
   .quiet:not(:disabled):active {
     background: var(--active);
-  }
-
-  /* the "…" menu: flat, one tone step above the surface, closed by choice or by a click outside */
-  .menu-wrap {
-    position: relative;
-    display: flex;
-  }
-  .menu-trigger {
-    width: var(--control-height);
-    height: var(--control-height);
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: transparent;
-    color: var(--muted);
-    font-family: var(--font-text);
-    font-size: var(--fs-body);
-    line-height: 1;
-    cursor: pointer;
-    transition: background-color 120ms ease, color 120ms ease;
-  }
-  .menu-trigger:hover,
-  .menu-trigger[aria-expanded='true'] {
-    background: var(--raised);
-    color: var(--text);
-  }
-  .menu {
-    position: absolute;
-    top: calc(var(--control-height) + 4px);
-    right: 0;
-    z-index: 10;
-    display: grid;
-    min-width: 12rem;
-    padding: 4px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-card);
-    background: var(--raised);
-  }
-  .menu-item {
-    display: flex;
-    align-items: center;
-    min-height: var(--control-height);
-    padding: 0 var(--space-1);
-    border: 0;
-    border-radius: var(--radius-control);
-    background: transparent;
-    color: var(--text);
-    font-family: var(--font-text);
-    font-size: var(--fs-body);
-    text-align: left;
-    cursor: pointer;
-  }
-  .menu-item:not(:disabled):hover {
-    background: var(--active);
-  }
-  .menu-item.danger {
-    color: var(--negative);
   }
 
   /* ---------- Activity and the missing compose files ---------- */
@@ -905,208 +627,6 @@
     font-size: var(--fs-small);
     font-weight: 400;
   }
-  .service {
-    display: grid;
-    gap: 8px;
-    padding: var(--space-1) 0 0;
-    border-top: 1px solid var(--border);
-  }
-  .service-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 4px var(--space-1);
-  }
-  .service-title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px var(--space-1);
-    min-width: 0;
-  }
-  .service-title h4 {
-    font-size: var(--fs-section);
-    font-weight: 600;
-    overflow-wrap: anywhere;
-  }
-  .service-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .service-actions .danger {
-    color: var(--negative);
-  }
-  .service-actions .danger:not(:disabled):hover {
-    color: var(--negative);
-  }
-
-  /* Utilizzo risorse: one cell per measure, an instant value or a rate. */
-  .usage {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-    gap: var(--space-1);
-    padding: var(--space-1) 0;
-    border-top: 1px solid var(--rule);
-  }
-  .measure {
-    display: grid;
-    align-content: start;
-    gap: 2px;
-    min-width: 0;
-    padding-left: var(--space-1);
-    border-left: 1px solid var(--rule);
-  }
-  .measure:first-child {
-    padding-left: 0;
-    border-left: 0;
-  }
-  .measure-label {
-    color: var(--muted);
-    font-size: var(--fs-small);
-    line-height: 1.3;
-  }
-  .measure-value,
-  .measure-note,
-  .reading .value {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    line-height: 1.4;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .measure-value {
-    font-size: var(--fs-body);
-    font-weight: 500;
-  }
-  .measure-note {
-    color: var(--muted);
-    font-size: var(--fs-small);
-    line-height: 1.3;
-  }
-  .pair {
-    display: grid;
-    gap: 1px;
-    min-width: 0;
-  }
-  .reading {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    min-width: 0;
-  }
-  .dir {
-    flex: none;
-    min-width: 5ch;
-    color: var(--muted);
-    font-size: var(--fs-small);
-    line-height: 1.3;
-  }
-  .reading .value {
-    font-size: var(--fs-small);
-  }
-  .usage-none {
-    margin: 0;
-    padding: var(--space-1) 0;
-    border-top: 1px solid var(--rule);
-    color: var(--muted);
-    font-size: var(--fs-body);
-  }
-
-  /* Container rows: dot, name, image, state, health, published ports. */
-  .containers {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-  }
-  .container {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px var(--space-1);
-    min-height: var(--row-height);
-    padding: 6px 0;
-    border-top: 1px solid var(--rule);
-    font-size: var(--fs-small);
-  }
-  .cname {
-    max-width: 100%;
-    font-size: var(--fs-body);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .image {
-    flex: 1 1 10rem;
-    min-width: 0;
-    color: var(--muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .state,
-  .health {
-    color: var(--muted);
-  }
-  /* A pill marks a problem only: unhealthy, or a healthcheck still starting. */
-  .pill {
-    flex: none;
-    padding: 1px 4px;
-    border-radius: var(--radius-control);
-    font-size: var(--fs-small);
-    font-weight: 500;
-    line-height: 1.2;
-    white-space: nowrap;
-  }
-  .pill.negative {
-    background: var(--pill-negative-bg);
-    color: var(--pill-negative-ink);
-  }
-  .pill.warning {
-    background: var(--pill-warning-bg);
-    color: var(--pill-warning-ink);
-  }
-  .ports {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-left: auto;
-  }
-  .port {
-    height: var(--control-height);
-    padding: 0 8px;
-    border: 1px solid var(--control);
-    border-radius: var(--radius-control);
-    background: transparent;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: var(--fs-small);
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    cursor: pointer;
-    transition: background-color 120ms ease;
-  }
-  .port:hover {
-    background: var(--raised);
-  }
-  .port:active {
-    background: var(--active);
-  }
-
-  /* The dots of the Container rows share the grammar of the Project status. */
-  .dot.positive {
-    background: var(--positive);
-  }
-  .dot.warning {
-    background: var(--warning);
-  }
-  .dot.negative {
-    background: var(--negative);
-  }
-
   /* The shared control: the Settings form buttons use it; the rest sets its own. */
   button {
     height: var(--control-height);

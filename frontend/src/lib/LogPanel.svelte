@@ -52,7 +52,10 @@
     <label><input type="checkbox" bind:checked={showTimestamps} /> Timestamp</label>
     <button class:on={paused} onclick={() => (paused = !paused)}>{paused ? 'Riprendi scorrimento' : 'Pausa scorrimento'}</button>
     <button onclick={onclose}>Chiudi log</button>
-    <p class="count">{visible.length} righe{term !== '' ? ` su ${logs.lines.length}` : ''} (massimo 5000)</p>
+    <p class="count">
+      <span class="mono">{visible.length}</span> righe{#if term !== ''} su <span class="mono">{logs.lines.length}</span>{/if}
+      (massimo <span class="mono">5000</span>)
+    </p>
   </div>
   <div class="body" {@attach follow}>
     {#each visible as line (line.seq)}
