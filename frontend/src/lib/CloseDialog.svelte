@@ -21,14 +21,14 @@
 
 <dialog {@attach showModal} {oncancel} aria-labelledby="close-title">
   <h3 id="close-title">Chiudere la finestra?</h3>
-  <p>Puoi nascondere la finestra nel tray (i Progetti restano sotto controllo) oppure chiudere l'app.</p>
+  <p>Puoi chiudere la finestra e restare nel tray (i Progetti restano sotto controllo) oppure chiudere l'app. La cronologia delle Attività va persa.</p>
   <label class="remember">
     <input type="checkbox" bind:checked={remember} />
     Ricorda la scelta
   </label>
   <div class="buttons">
     <button class="quiet" onclick={oncancel}>Annulla</button>
-    <button class="primary" onclick={() => onchoose(CloseBehavior.CloseHide, remember)}>Nascondi nel tray</button>
+    <button class="primary" onclick={() => onchoose(CloseBehavior.CloseHide, remember)}>Chiudi nel tray</button>
     <button class="quiet danger" onclick={() => onchoose(CloseBehavior.CloseQuit, remember)}>Esci</button>
   </div>
 </dialog>

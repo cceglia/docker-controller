@@ -4,8 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/wailsapp/wails/v3/pkg/application"
-
 	"dockercontroller/internal/compose"
 )
 
@@ -13,15 +11,15 @@ const (
 	// usageEvent carries a compose.UsageSample to the frontend.
 	usageEvent = "usage"
 	// usageStoppedEvent tells the frontend the usage stream stopped (window
-	// hidden), so it drops the figures instead of showing stale ones.
+	// closed), so it drops the figures instead of showing stale ones.
 	usageStoppedEvent = "usage-stopped"
 )
 
 // usageStreamer is the thin Wails adapter that runs compose.Manager.Usage
 // while the window is visible. Start and Stop are idempotent and never block
-// the caller (they run on the window's thread): a stream that is stopping
-// finishes in the background, a new one waits for it, and the frontend is told
-// about the stop only once no sample can follow.
+// the caller: a stream that is stopping finishes in the background, a new one
+// waits for it, and the frontend is told about the stop only once no sample can
+// follow.
 type usageStreamer struct {
 	manager *compose.Manager
 	ctx     context.Context // the application: ends the stream on quit
@@ -77,27 +75,4 @@ func (u *usageStreamer) Stop() {
 			u.emit(usageStoppedEvent, nil)
 		}
 	}()
-}
-
-// visibleWindow reports to the usageStreamer every time the window is shown or
-// hidden through it. Wails v3 (beta.34) emits no show/hide event on Linux, so
-// the two places that show or hide the window (the tray entry and the
-// closing hook) go through this wrapper instead.
-type visibleWindow struct {
-	application.Window
-	usage *usageStreamer
-}
-
-// Show shows the window and starts the usage stream.
-func (w visibleWindow) Show() application.Window {
-	w.Window.Show()
-	w.usage.Start()
-	return w
-}
-
-// Hide hides the window in the tray and stops the usage stream.
-func (w visibleWindow) Hide() application.Window {
-	w.Window.Hide()
-	w.usage.Stop()
-	return w
 }

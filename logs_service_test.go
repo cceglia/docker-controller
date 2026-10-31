@@ -39,6 +39,38 @@ func TestLogStreams_StopBeforeAddCancelsTheStreamOnceItRegisters(t *testing.T) {
 	}
 }
 
+func TestLogStreams_StopAllCancelsEveryOpenStream(t *testing.T) {
+	var l logStreams
+	ctxA, cancelA := context.WithCancel(context.Background())
+	ctxB, cancelB := context.WithCancel(context.Background())
+	if err := l.add("a", cancelA); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.add("b", cancelB); err != nil {
+		t.Fatal(err)
+	}
+	l.stopAll()
+	if ctxA.Err() == nil || ctxB.Err() == nil {
+		t.Error("stopAll left a stream running")
+	}
+	if len(l.cancels) != 0 {
+		t.Errorf("%d streams still registered, want none", len(l.cancels))
+	}
+	// A StartLogs still in flight after the window is destroyed must not start.
+	ctxC, cancelC := context.WithCancel(context.Background())
+	if err := l.add("c", cancelC); !errors.Is(err, errLogsClosed) {
+		t.Errorf("err = %v, want errLogsClosed", err)
+	}
+	if ctxC.Err() == nil {
+		t.Error("a stream added after stopAll must be cancelled")
+	}
+	// The window is created again: streams are accepted.
+	l.resume()
+	if err := l.add("c", func() {}); err != nil {
+		t.Errorf("add after resume: %v", err)
+	}
+}
+
 func TestLogStreams_AddRefusesADuplicateID(t *testing.T) {
 	var l logStreams
 	if err := l.add("a", func() {}); err != nil {

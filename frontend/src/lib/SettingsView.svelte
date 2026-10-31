@@ -13,8 +13,8 @@
   } = $props()
 
   const closeOptions = [
-    { value: CloseBehavior.CloseHide, label: 'Nascondi nel tray' },
-    { value: CloseBehavior.CloseQuit, label: 'Esci' },
+    { value: CloseBehavior.CloseHide, label: 'Chiudi la finestra e resta nel tray' },
+    { value: CloseBehavior.CloseQuit, label: "Esci dall'app" },
     { value: CloseBehavior.CloseAsk, label: 'Chiedi ogni volta' },
   ]
 
@@ -39,7 +39,7 @@
     <div class="row" role="radiogroup" aria-labelledby="close-title">
       <div class="label">
         <span class="title" id="close-title">Alla chiusura della finestra</span>
-        <p class="description">Scegli cosa fa l'app quando chiudi la finestra.</p>
+        <p class="description">Scegli cosa fa l'app quando chiudi la finestra. Con «Chiudi la finestra e resta nel tray» la finestra si chiude, l'app resta nel tray e la riapri dal tray. La cronologia delle Attività va persa.</p>
       </div>
       <div class="panel">
         {#each closeOptions as option (option.value)}

@@ -41,6 +41,10 @@ var errLogStopped = errors.New("log stream already stopped")
 // errLogOpen reports a stream id that is already in use.
 var errLogOpen = errors.New("log stream already open")
 
+// errLogsClosed reports that StopAllLogs ran: the window is gone and no
+// stream may start until resume.
+var errLogsClosed = errors.New("log streams stopped with the window")
+
 // maxStoppedLogIDs bounds the ids remembered by logStreams.stop.
 const maxStoppedLogIDs = 64
 
@@ -48,6 +52,9 @@ const maxStoppedLogIDs = 64
 type logStreams struct {
 	mu      sync.Mutex
 	cancels map[string]context.CancelFunc
+	// closed is set by stopAll: no stream starts until the window is created
+	// again and resume runs.
+	closed bool
 	// stopped holds the latest ids stopped while not registered (oldest first),
 	// so a StopLogs that overtakes its StartLogs is not lost. Bounded: the
 	// frontend also stops streams that already ended on their own.
@@ -56,9 +63,15 @@ type logStreams struct {
 
 // add registers id; it fails when id is already in use. When id was stopped
 // before it registered, cancel is called at once and errLogStopped returned.
+// When every stream was stopped with the window, cancel is called at once and
+// errLogsClosed returned.
 func (l *logStreams) add(id string, cancel context.CancelFunc) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.closed {
+		cancel()
+		return errLogsClosed
+	}
 	if i := slices.Index(l.stopped, id); i >= 0 {
 		l.stopped = slices.Delete(l.stopped, i, i+1)
 		cancel()
@@ -103,6 +116,27 @@ func (l *logStreams) release(id string) {
 	}
 }
 
+// stopAll cancels every open stream and forgets it. The ids are not remembered:
+// they belong to the window that is going away. Until resume, no new stream
+// starts, so a StartLogs still in flight cannot outlive the window.
+func (l *logStreams) stopAll() {
+	l.mu.Lock()
+	l.closed = true
+	cancels := l.cancels
+	l.cancels = nil
+	l.mu.Unlock()
+	for _, cancel := range cancels {
+		cancel()
+	}
+}
+
+// resume allows new streams after the window is created again.
+func (l *logStreams) resume() {
+	l.mu.Lock()
+	l.closed = false
+	l.mu.Unlock()
+}
+
 // StartLogs opens the log stream id (chosen by the frontend, so it can listen
 // before the first line arrives) of a Project, or of one of its Services when
 // service is not empty. Lines and the end arrive through the "log" event
@@ -112,7 +146,7 @@ func (s *ProjectsService) StartLogs(id, project, service string) error {
 	ctx, cancel := context.WithCancel(s.ctx)
 	if err := s.logs.add(id, cancel); err != nil {
 		cancel()
-		if errors.Is(err, errLogStopped) {
+		if errors.Is(err, errLogStopped) || errors.Is(err, errLogsClosed) {
 			return nil // stopped before it started: nothing to run
 		}
 		return userError(err)
@@ -164,4 +198,15 @@ func streamLogs(ctx context.Context, id string, req compose.LogRequest, logs log
 // An unknown id (already ended) is ignored.
 func (s *ProjectsService) StopLogs(id string) {
 	s.logs.stop(id)
+}
+
+// StopAllLogs stops every open log stream and terminates its `compose logs`
+// process. It runs before the window is destroyed.
+func (s *ProjectsService) StopAllLogs() {
+	s.logs.stopAll()
+}
+
+// resumeLogs allows log streams again after the window is created again.
+func (s *ProjectsService) resumeLogs() {
+	s.logs.resume()
 }

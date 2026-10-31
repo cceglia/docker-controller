@@ -19,7 +19,7 @@ import (
 type trayAdapter struct {
 	app           *application.App
 	manager       *compose.Manager
-	window        application.Window
+	window        *mainWindow
 	notifications *notifications.NotificationService
 	ctx           context.Context // bounds the Activities and the Watch
 
@@ -34,7 +34,7 @@ type trayAdapter struct {
 
 // newTrayAdapter creates the tray with an empty menu. The tray starts
 // following the manager once the application is running.
-func newTrayAdapter(ctx context.Context, app *application.App, manager *compose.Manager, window application.Window, notifs *notifications.NotificationService) *trayAdapter {
+func newTrayAdapter(ctx context.Context, app *application.App, manager *compose.Manager, window *mainWindow, notifs *notifications.NotificationService) *trayAdapter {
 	t := &trayAdapter{app: app, manager: manager, window: window, notifications: notifs, ctx: ctx}
 	t.systemTray = app.SystemTray.New()
 	t.systemTray.SetTooltip("Docker Controller")
@@ -99,11 +99,10 @@ func (t *trayAdapter) fill(menu *application.Menu, items []tray.Item) {
 	}
 }
 
-// showWindow brings the application window to the front.
+// showWindow brings the application window to the front, creating it again
+// when it was destroyed.
 func (t *trayAdapter) showWindow() {
-	t.window.Show()
-	t.window.UnMinimise()
-	t.window.Focus()
+	t.window.show()
 }
 
 // run executes the click on an entry.

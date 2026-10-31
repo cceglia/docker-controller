@@ -15,7 +15,8 @@ import (
 type CloseBehavior string
 
 const (
-	// CloseHide hides the window in the tray (the default).
+	// CloseHide destroys the window and leaves the application in the tray
+	// (the default). The next click on the tray creates a new window.
 	CloseHide CloseBehavior = "hide"
 	// CloseQuit quits the application.
 	CloseQuit CloseBehavior = "quit"

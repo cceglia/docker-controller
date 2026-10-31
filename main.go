@@ -78,7 +78,13 @@ func run() error {
 
 	notifs := notifications.New()
 	settingsStore := settings.New(conn)
-	closer := &windowCloser{settings: settingsStore}
+	projects := &ProjectsService{
+		manager:  manager,
+		settings: settingsStore,
+		ctx:      ctx,
+		emit:     func(name string, data any) { app.Event.Emit(name, data) },
+	}
+	settingsService := &SettingsService{store: settingsStore, ctx: ctx}
 	app = application.New(application.Options{
 		Name: "Docker Controller",
 		Icon: appIcon,
@@ -86,11 +92,13 @@ func run() error {
 			// The window's app id: it must match docker-controller.desktop so the
 			// taskbar and title bar use its icon, whatever the executable is called.
 			ProgramName: "docker-controller",
+			// The application stays in the tray when the last window is destroyed.
+			DisableQuitOnLastWindowClosed: true,
 		},
 		Description: "Gestione dei Progetti docker-compose",
 		Services: []application.Service{
-			application.NewService(&ProjectsService{manager: manager, settings: settingsStore, ctx: ctx, emit: func(name string, data any) { app.Event.Emit(name, data) }}),
-			application.NewService(&SettingsService{store: settingsStore, ctx: ctx, closer: closer}),
+			application.NewService(projects),
+			application.NewService(settingsService),
 			application.NewService(notifs),
 		},
 		Assets: application.AssetOptions{
@@ -98,32 +106,23 @@ func run() error {
 		},
 	})
 
-	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:  "Docker Controller",
-		Width:  1120,
-		Height: 760,
-		URL:    "/",
-	})
-
 	// The usage stream runs while the window is visible: it starts with the
-	// application (the window is always created shown; IsVisible() can still
-	// answer false at that point, while GTK is creating it) and follows Show and
-	// Hide.
+	// application (the window is created shown) and follows the window life
+	// cycle.
 	usage := &usageStreamer{
 		manager: manager,
 		ctx:     ctx,
 		emit:    func(name string, data any) { app.Event.Emit(name, data) },
 		onError: func(err error) { app.Logger.Error("usage stream", "error", err) },
 	}
-	shown := visibleWindow{Window: window, usage: usage}
+	window := newMainWindow(app, settingsStore, usage, projects)
+	settingsService.closer = window
+	window.install()
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		usage.Start()
 	})
 
-	closer.app, closer.window = app, shown
-	closer.install()
-
-	systemTray = newTrayAdapter(ctx, app, manager, shown, notifs)
+	systemTray = newTrayAdapter(ctx, app, manager, window, notifs)
 
 	// Snapshot -> frontend event. The first value is the current snapshot.
 	go func() {
