@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { UsageSample } from '../../bindings/dockercontroller/internal/compose/models'
   import { formatBytes, formatCores, formatPercent } from './format'
+  import Meter from './Meter.svelte'
 
   let { usage }: {
     /** The latest sample; null while none has arrived (streaming just started). */
@@ -10,60 +11,193 @@
   const rate = (bytesPerSec: number) => `${formatBytes(bytesPerSec, 'decimal')}/s`
 </script>
 
-<div class="usage-bar" class:error={usage !== null && !usage.dockerReachable} aria-label="Utilizzo risorse di Docker">
+<!-- The global Utilizzo risorse: it says whose numbers these are. -->
+<section class="usage" aria-label="Utilizzo risorse di Docker">
+  <div class="owner">
+    <span class="owner-name">Docker</span>
+    <span class="owner-scope">Utilizzo risorse</span>
+  </div>
+
   {#if usage === null}
-    <span class="waiting">Utilizzo risorse: lettura in corso…</span>
+    <p class="state">In attesa della prima misura…</p>
   {:else if !usage.dockerReachable}
-    <span class="failure" title={usage.error}>Utilizzo risorse non disponibile: Docker non raggiungibile</span>
+    <p class="state" title={usage.error}>
+      Non disponibile
+      <span class="state-detail">Docker non raggiungibile</span>
+    </p>
   {:else}
-    <div class="cell c4" title="{usage.cpus} CPU">
-      <span class="label">CPU</span>
-      <span class="main"><b>{formatCores(usage.total.cpuPercent)}</b><span class="sub">{formatPercent(usage.cpuMachinePercent)} della macchina</span></span>
-    </div>
-    <div class="cell c5" title="Memoria totale della macchina: {formatBytes(usage.memoryTotalBytes)}">
-      <span class="label">Memoria</span>
-      <span class="main"><b>{formatBytes(usage.total.memoryBytes)}</b><span class="sub">{formatPercent(usage.memoryMachinePercent)} di {formatBytes(usage.memoryTotalBytes)}</span></span>
-    </div>
-    <div class="cell c3">
-      <span class="label">Container</span>
-      <span class="main"><b>{usage.containers}</b><span class="sub">in esecuzione</span></span>
-    </div>
-    <div class="cell c6" title="Traffico istantaneo">
-      <span class="label">Rete</span>
-      <span class="pair">
-        <span class="stat"><span class="dir">↓ in</span><b>{rate(usage.rate.netInBytesPerSec)}</b></span>
-        <span class="stat"><span class="dir">↑ out</span><b>{rate(usage.rate.netOutBytesPerSec)}</b></span>
-      </span>
-    </div>
-    <div class="cell c6" title="I/O istantaneo">
-      <span class="label">Disco</span>
-      <span class="pair">
-        <span class="stat"><span class="dir">lettura</span><b>{rate(usage.rate.blockReadBytesPerSec)}</b></span>
-        <span class="stat"><span class="dir">scrittura</span><b>{rate(usage.rate.blockWriteBytesPerSec)}</b></span>
-      </span>
+    <div class="metrics">
+      <div class="metric">
+        <span class="label">Container</span>
+        <span class="value num">{usage.containers}</span>
+        <span class="note">in esecuzione</span>
+      </div>
+
+      <div class="metric">
+        <span class="label">CPU</span>
+        <span class="value num">{formatCores(usage.total.cpuPercent)}</span>
+        <span class="note num">{formatPercent(usage.cpuMachinePercent)} della macchina</span>
+        <Meter value={usage.cpuMachinePercent} label="CPU" tone="accent" wide />
+      </div>
+
+      <div class="metric">
+        <span class="label">Memoria</span>
+        <span class="value num">{formatBytes(usage.total.memoryBytes)}</span>
+        <span class="note num">
+          {formatPercent(usage.memoryMachinePercent)} di {formatBytes(usage.memoryTotalBytes)}
+        </span>
+        <Meter value={usage.memoryMachinePercent} label="Memoria" wide />
+      </div>
+
+      <div class="metric">
+        <span class="label">Rete</span>
+        <span class="pair">
+          <span class="reading"><span class="dir">in</span><span class="value num">{rate(usage.rate.netInBytesPerSec)}</span></span>
+          <span class="reading"><span class="dir">out</span><span class="value num">{rate(usage.rate.netOutBytesPerSec)}</span></span>
+        </span>
+      </div>
+
+      <div class="metric">
+        <span class="label">Disco</span>
+        <span class="pair">
+          <span class="reading"><span class="dir">lettura</span><span class="value num">{rate(usage.rate.blockReadBytesPerSec)}</span></span>
+          <span class="reading"><span class="dir">scrittura</span><span class="value num">{rate(usage.rate.blockWriteBytesPerSec)}</span></span>
+        </span>
+      </div>
     </div>
   {/if}
-</div>
+</section>
 
 <style>
-  .usage-bar {
-    display: grid; grid-template-columns: repeat(12, 1fr); margin: 0 0 1.25rem;
-    border-radius: 10px; font-size: 0.85rem; overflow: hidden;
-    background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+  .usage {
+    flex: none;
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-2);
+    box-sizing: border-box;
+    min-height: var(--strip-height);
+    padding: var(--space-1) var(--space-2);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
   }
-  .usage-bar.error { display: block; background: var(--warn-bg); color: var(--warn); border-color: transparent; padding: 0.6rem 1rem; }
-  .waiting { display: block; padding: 0.6rem 1rem; color: var(--muted); }
-  .cell { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.6rem 1rem; min-width: 0; border-bottom: 1px solid var(--border); }
-  .cell:nth-child(n + 4) { border-bottom: none; }
-  .cell:not(:nth-child(3n + 1)):not(:nth-child(n + 4)) { border-left: 1px solid var(--border); }
-  .cell:nth-child(5) { border-left: 1px solid var(--border); }
-  .c3 { grid-column: span 3; } .c4 { grid-column: span 4; } .c5 { grid-column: span 5; } .c6 { grid-column: span 6; }
-  .label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-  .main { display: flex; align-items: baseline; gap: 0.5rem; white-space: nowrap; }
-  .main b { font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .sub { color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; }
-  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-  .stat { display: flex; align-items: baseline; gap: 0.5rem; white-space: nowrap; }
-  .stat b { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 6.5ch; }
-  .dir { color: var(--muted); font-size: 0.8rem; min-width: 4.2rem; }
+
+  .owner {
+    flex: none;
+    display: grid;
+    align-content: center;
+    gap: 2px;
+    padding-right: var(--space-2);
+    border-right: 1px solid var(--rule);
+  }
+  .owner-name {
+    font-size: var(--fs-body);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+  .owner-scope {
+    font-size: var(--fs-small);
+    line-height: 1.3;
+    color: var(--muted);
+  }
+
+  .state {
+    align-self: center;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    color: var(--muted);
+    font-size: var(--fs-body);
+  }
+  .state-detail {
+    color: var(--faint);
+    font-size: var(--fs-small);
+  }
+
+  .metrics {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 0.9fr 1.35fr 1.45fr 1.15fr 1.16fr;
+    gap: var(--space-1);
+    align-content: center;
+  }
+
+  /* one cell per measure; the hairline lives on the cell's left edge */
+  .metric {
+    min-width: 0;
+    display: grid;
+    align-content: center;
+    gap: 2px;
+    padding-left: var(--space-1);
+    border-left: 1px solid var(--rule);
+  }
+  .metric:first-child {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .label {
+    font-size: var(--fs-small);
+    line-height: 1.3;
+    color: var(--muted);
+  }
+  .value {
+    font-family: var(--font-mono);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .note {
+    font-size: var(--fs-small);
+    line-height: 1.3;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pair {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+  }
+  .reading {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+  }
+  .dir {
+    flex: none;
+    min-width: 5ch;
+    color: var(--muted);
+    font-size: var(--fs-small);
+    line-height: 1.3;
+  }
+  .reading .value {
+    font-size: var(--fs-small);
+  }
+
+  /* the window can be made narrower: the strip folds to two rows instead of
+     truncating its notes */
+  @media (max-width: 1100px) {
+    .metrics {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      row-gap: var(--space-1);
+    }
+    .metric {
+      grid-column: span 2;
+    }
+    .metric:nth-child(4),
+    .metric:nth-child(5) {
+      grid-column: span 3;
+    }
+    .metric:nth-child(4) {
+      border-left: 0;
+      padding-left: 0;
+    }
+  }
 </style>

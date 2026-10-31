@@ -1,41 +1,209 @@
-/* Light/dark follows the system (KDE) theme through prefers-color-scheme. */
+/* Docker Controller — the one place where visual values live.
+   Direction "Achromatic ledger": the chrome has no colour, surfaces are flat and
+   separated by a hairline or a tone step, colour stays on the data with one hue.
+   The dark theme is the reference (BreezeDark on the desktop); the light theme
+   is derived from the same roles. No component declares a colour, a radius, a
+   control height or a type size of its own: it reads these tokens. */
+
+/* ---------- fonts: bundled with the app (public/fonts, next to the OFL licence),
+   never requested from the network ---------- */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist-mono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+/* ---------- tokens ---------- */
 :root {
   color-scheme: light dark;
-  --bg: #f6f7f9;
+
+  /* surfaces and ink (light) */
+  --ground: #f8f8f8;
   --surface: #ffffff;
-  --border: #dcdfe4;
-  --text: #1c1e21;
-  --muted: #6b7280;
-  --ok: #15803d;
-  --warn: #b45309;
-  --warn-bg: #fef3c7;
-  --danger: #b91c1c;
-  --accent: #1769e0;
-  --hover: #eef1f5;
-  --shadow: 0 1px 2px rgb(16 24 40 / 6%);
+  --raised: #f1f1f1;
+  --active: #ececec;
+  --border: #e6e6e6;
+  --rule: #efefef;
+  --control: #d4d4d4;
+  --text: #0a0a0a;
+  --muted: #5c5c5c;
+  --faint: #6f6f6f;
+
+  /* the one action fill, and the one hue the data may use */
+  --primary: #0a0a0a;
+  --primary-ink: #ffffff;
+  --accent: #1d5fbf;
+
+  /* status */
+  --positive: #1f6b3f;
+  --negative: #b3261e;
+  --warning: #8a5a00;
+  --pill-positive-bg: #e4f4ea;
+  --pill-positive-ink: #0d3b21;
+  --pill-negative-bg: #fce9e7;
+  --pill-negative-ink: #6e1712;
+  --pill-warning-bg: #fdf3e0;
+  --pill-warning-ink: #5c3b00;
+  --pill-neutral-bg: #eeeeee;
+  --pill-neutral-ink: #2b2b2b;
+
+  /* geometry: radii 8/6, a 44px row, a 32px control, spacing 12/24 */
+  --radius-card: 8px;
+  --radius-control: 6px;
+  --row-height: 44px;
+  --control-height: 32px;
+  --space-1: 12px;
+  --space-2: 24px;
+
+  /* type scale 24/16/30/14/12 */
+  --fs-title: 24px;
+  --fs-section: 16px;
+  --fs-figure: 30px;
+  --fs-body: 14px;
+  --fs-small: 12px;
+  --font-text: 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+  /* shell */
+  --sidebar-width: 248px;
+  --strip-height: 88px;
+  --meter-width: 48px;
+  --meter-max-width: 160px;
+  --meter-height: 4px;
+
+  /* per-Service log hue lightness (LogPanel colours services by name) */
   --log-lightness: 38%;
-  font-family: system-ui, sans-serif;
 }
+
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1b1d21;
-    --surface: #25282d;
-    --border: #3a3e45;
-    --text: #e6e8eb;
-    --muted: #9aa1ab;
-    --ok: #4ade80;
-    --warn: #fbbf24;
-    --warn-bg: #3a2f10;
-    --danger: #f87171;
-    --accent: #4d94ff;
-    --hover: #2e3238;
-    --shadow: 0 1px 2px rgb(0 0 0 / 30%);
+    --ground: #17181a;
+    --surface: #1e2023;
+    --raised: #26292d;
+    --active: #2c2f33;
+    --border: #2c2f33;
+    --rule: #26292c;
+    --control: #4a4e54;
+    --text: #e8e9ea;
+    --muted: #a3a8af;
+    --faint: #8f949b;
+
+    --primary: #e8e9ea;
+    --primary-ink: #17181a;
+    --accent: #5b9dff;
+
+    --positive: #62c98a;
+    --negative: #f08d83;
+    --warning: #e2b45e;
+    --pill-positive-bg: #1b2e22;
+    --pill-positive-ink: #62c98a;
+    --pill-negative-bg: #33221f;
+    --pill-negative-ink: #f08d83;
+    --pill-warning-bg: #332a18;
+    --pill-warning-ink: #e2b45e;
+    --pill-neutral-bg: #2a2d31;
+    --pill-neutral-ink: #d7dadd;
+
     --log-lightness: 68%;
   }
 }
-body { margin: 0; background: var(--bg); color: var(--text); }
 
-button { transition: background-color 0.12s, border-color 0.12s; }
-button:not(:disabled):hover { background: var(--hover); border-color: var(--muted); }
-button:not(:disabled):active { transform: translateY(1px); }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* ---------- base ---------- */
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font: var(--fs-body) / 20px var(--font-text);
+  -webkit-font-smoothing: antialiased;
+}
+html,
+body,
+#app {
+  height: 100%;
+}
+h1,
+h2,
+h3,
+h4,
+p,
+figure,
+ul,
+ol,
+dl,
+dd {
+  margin: 0;
+}
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* keyboard focus is visible on every control */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+
+/* figures that update, and identifiers, have one class each */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* reduced motion: no transition, no animation */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- legacy aliases ----------
+   Components still restyled by later tickets reference the old names. They are
+   aliases, not values: the value lives in one of the roles above. */
+:root {
+  --bg: var(--ground);
+  --ok: var(--positive);
+  --warn: var(--warning);
+  --warn-bg: var(--pill-warning-bg);
+  --danger: var(--negative);
+  --hover: var(--raised);
+  --shadow: none;
+}

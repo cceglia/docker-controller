@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import AppShell from './lib/AppShell.svelte'
   import ProjectList from './lib/ProjectList.svelte'
   import ProjectDetail from './lib/ProjectDetail.svelte'
   import ActivityPanel from './lib/ActivityPanel.svelte'
@@ -7,7 +8,6 @@
   import AddProjectDialog from './lib/AddProjectDialog.svelte'
   import SettingsView from './lib/SettingsView.svelte'
   import CloseDialog from './lib/CloseDialog.svelte'
-  import UsageBar from './lib/UsageBar.svelte'
   import {
     addProject,
     cancelClose,
@@ -41,15 +41,11 @@
   })
 </script>
 
-<main>
-  <UsageBar usage={store.usage} />
-  <header>
-    <h1>Docker Controller</h1>
-    <div class="header-actions">
-      <button onclick={() => setShowingSettings(true)}>Impostazioni</button>
-      <button onclick={() => setAdding(true)}>Aggiungi Progetto</button>
-    </div>
-  </header>
+<AppShell
+  usage={store.usage}
+  onaddproject={() => setAdding(true)}
+  onsettings={() => setShowingSettings(true)}
+>
   {#if store.loaded && !store.dockerReachable}
     <p class="banner">Docker non raggiungibile</p>
   {/if}
@@ -81,7 +77,7 @@
   {:else}
     <p class="loading">Caricamento…</p>
   {/if}
-</main>
+</AppShell>
 
 {#if store.adding}
   <AddProjectDialog onpick={pickComposeFile} onpropose={proposeName} onadd={addProject} oncancel={() => setAdding(false)} />
@@ -96,14 +92,15 @@
 {/if}
 
 <style>
-  main { max-width: 56rem; margin: 0 auto; padding: 1.25rem; }
-  header { display: flex; align-items: center; justify-content: space-between; margin: 0 0 1rem; }
-  h1 { font-size: 1.35rem; font-weight: 700; margin: 0; }
-  .header-actions { display: flex; gap: 0.5rem; }
-  header button {
-    font: inherit; font-size: 0.85rem; padding: 0.3rem 0.8rem; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+  .banner {
+    margin: 0 0 var(--space-2);
+    padding: var(--space-1);
+    border-radius: var(--radius-card);
+    background: var(--pill-warning-bg);
+    color: var(--pill-warning-ink);
+    font-size: var(--fs-body);
   }
-  .banner { padding: 0.6rem 0.9rem; border-radius: 8px; background: var(--warn-bg); color: var(--warn); }
-  .loading { color: var(--muted); }
+  .loading {
+    color: var(--muted);
+  }
 </style>

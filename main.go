@@ -100,8 +100,8 @@ func run() error {
 
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "Docker Controller",
-		Width:  1000,
-		Height: 700,
+		Width:  1120,
+		Height: 760,
 		URL:    "/",
 	})
 
