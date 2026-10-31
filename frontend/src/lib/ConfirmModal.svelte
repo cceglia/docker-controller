@@ -33,31 +33,106 @@
   <p>{message}</p>
   {#if confirmText}
     <label>
-      Per confermare digita <code>{confirmText}</code>
+      <span>Per confermare digita <code>{confirmText}</code></span>
       <input type="text" bind:value={typed} autocomplete="off" spellcheck="false" />
     </label>
   {/if}
   <div class="buttons">
-    <button onclick={oncancel}>Annulla</button>
-    <button class:danger disabled={!confirmable} onclick={onconfirm}>{confirmLabel}</button>
+    <button class="quiet" onclick={oncancel}>Annulla</button>
+    <button class="primary" class:danger disabled={!confirmable} onclick={onconfirm}>{confirmLabel}</button>
   </div>
 </dialog>
 
 <style>
   dialog {
-    max-width: 28rem; border: 1px solid var(--border); border-radius: 10px;
-    background: var(--surface); color: var(--text); padding: 1.1rem 1.25rem;
+    width: min(28rem, 90vw);
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background: var(--surface);
+    color: var(--text);
   }
-  dialog::backdrop { background: rgb(0 0 0 / 0.5); }
-  h3 { margin: 0 0 0.5rem; font-size: 1rem; }
-  p { margin: 0 0 0.75rem; font-size: 0.9rem; }
-  label { display: grid; gap: 0.3rem; font-size: 0.85rem; margin-bottom: 0.75rem; }
-  input { font: inherit; padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
-  .buttons { display: flex; justify-content: flex-end; gap: 0.5rem; }
+  dialog::backdrop {
+    background: var(--backdrop);
+  }
+  h3 {
+    margin: 0 0 var(--space-1);
+    font-size: var(--fs-section);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  p {
+    margin: 0 0 var(--space-1);
+    color: var(--muted);
+    font-size: var(--fs-body);
+    line-height: 1.45;
+  }
+  label {
+    display: grid;
+    gap: 6px;
+    margin: 0 0 var(--space-1);
+    color: var(--muted);
+    font-size: var(--fs-small);
+  }
+  code {
+    padding: 1px 4px;
+    border-radius: var(--radius-control);
+    background: var(--raised);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--fs-body);
+  }
+  input {
+    height: var(--control-height);
+    padding: 0 var(--space-1);
+    border: 1px solid var(--control);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--fs-body);
+  }
+  .buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
   button {
-    font: inherit; font-size: 0.85rem; padding: 0.3rem 0.8rem; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+    height: var(--control-height);
+    padding: 0 var(--space-1);
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--fs-body);
+    line-height: 1;
+    cursor: pointer;
   }
-  button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
-  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .primary {
+    background: var(--primary);
+    color: var(--primary-ink);
+    font-weight: 500;
+  }
+  .primary:not(:disabled):hover {
+    opacity: 0.9;
+  }
+  .primary:not(:disabled):active {
+    opacity: 0.8;
+  }
+  .primary.danger {
+    background: var(--negative);
+  }
+  .quiet {
+    color: var(--muted);
+  }
+  .quiet:hover {
+    background: var(--raised);
+    color: var(--text);
+  }
+  .quiet:active {
+    background: var(--active);
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 </style>

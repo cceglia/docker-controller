@@ -65,24 +65,77 @@
     startTimer()
   }}
 >
+  <span class="dot" aria-hidden="true"></span>
   <span class="message">{toast.message}</span>
-  {#if toast.activityId}
-    <button class="link" type="button" onclick={showOutput}>Vedi output</button>
-  {/if}
-  <button class="close" type="button" aria-label="Chiudi" onclick={dismissToast}>Chiudi</button>
+  <span class="actions">
+    {#if toast.activityId}
+      <button class="link" type="button" onclick={showOutput}>Vedi output</button>
+    {/if}
+    <button class="close" type="button" onclick={dismissToast}>Chiudi</button>
+  </span>
 </div>
 
 <style>
   .toast {
-    position: fixed; right: 1rem; bottom: 1rem; max-width: 26rem; display: flex; align-items: center; gap: 0.75rem;
-    padding: 0.7rem 0.9rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--danger);
-    color: var(--text); box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+    position: fixed;
+    right: var(--space-2);
+    bottom: var(--space-2);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-1);
+    max-width: 26rem;
+    padding: var(--space-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background: var(--surface);
+    color: var(--text);
   }
-  .message { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-  button { font: inherit; border: none; cursor: pointer; }
-  .link { flex: none; padding: 0; background: none; color: var(--danger); text-decoration: underline; }
+  .dot {
+    flex: none;
+    width: var(--dot-size);
+    height: var(--dot-size);
+    margin-top: 7px;
+    border-radius: var(--dot-size);
+    background: var(--negative);
+  }
+  .message {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--fs-body);
+    line-height: 1.4;
+  }
+  .actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+  }
+  button {
+    border: 0;
+    background: none;
+    font-size: var(--fs-small);
+    cursor: pointer;
+  }
+  .link {
+    min-height: var(--control-height);
+    padding: 0 6px;
+    border-radius: var(--radius-control);
+    color: var(--text);
+    text-decoration: underline;
+  }
+  .link:hover {
+    background: var(--raised);
+  }
   .close {
-    flex: none; padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--bg); color: var(--text); font-size: 0.8rem;
+    height: var(--control-height);
+    padding: 0 var(--space-1);
+    border: 1px solid var(--control);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--text);
+  }
+  .close:hover {
+    background: var(--raised);
   }
 </style>

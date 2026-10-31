@@ -7,6 +7,7 @@
 **Status:** ready-for-agent
 
 - [ ] Le Impostazioni mostrano le stesse due impostazioni di oggi, con la stessa validazione e lo stesso salvataggio.
+- [ ] Una voce "Progetti" nella colonna riporta al riepilogo da qualunque schermata, anche con la lista vuota.
 - [ ] Salva, esito ed errore sono leggibili e vicini al comando che li produce.
 - [ ] I tre dialoghi usano i token comuni, hanno un solo primario e un backdrop leggibile sul contenuto sottostante.
 - [ ] La conferma testuale del Down con volumi resta identica.

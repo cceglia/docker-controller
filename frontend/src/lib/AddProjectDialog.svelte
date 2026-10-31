@@ -80,14 +80,14 @@
       <ol>
         {#each files as file, i (file)}
           <li>
-            <span class="path" title={file}>{file}</span>
+            <span class="path mono" title={file}>{file}</span>
             <span class="role">{i === 0 ? 'principale' : 'aggiuntivo'}</span>
-            <button type="button" aria-label="Rimuovi {file}" onclick={() => remove(i)}>×</button>
+            <button type="button" class="remove" aria-label="Rimuovi {file}" onclick={() => remove(i)}>×</button>
           </li>
         {/each}
       </ol>
     {/if}
-    <button type="button" onclick={pick}>
+    <button type="button" class="secondary" onclick={pick}>
       {files.length === 0 ? 'Scegli il File compose…' : 'Aggiungi un altro File compose…'}
     </button>
   </div>
@@ -107,33 +107,142 @@
   {#if error}<p class="error" role="alert">{error}</p>{/if}
 
   <div class="buttons">
-    <button type="button" onclick={oncancel}>Annulla</button>
+    <button type="button" class="secondary" onclick={oncancel}>Annulla</button>
     <button type="button" class="primary" disabled={!canAdd} onclick={add}>Aggiungi</button>
   </div>
 </dialog>
 
 <style>
   dialog {
-    width: min(36rem, 90vw); border: 1px solid var(--border); border-radius: 10px;
-    background: var(--surface); color: var(--text); padding: 1.1rem 1.25rem;
+    width: min(36rem, 90vw);
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background: var(--surface);
+    color: var(--text);
   }
-  dialog::backdrop { background: rgb(0 0 0 / 0.5); }
-  h3 { margin: 0 0 0.75rem; font-size: 1rem; }
-  .files { display: grid; gap: 0.4rem; justify-items: start; margin-bottom: 0.75rem; }
-  .label { font-size: 0.85rem; }
-  .hint { margin: 0; color: var(--muted); font-size: 0.85rem; }
-  ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; width: 100%; }
-  li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
-  .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .role { color: var(--muted); font-size: 0.75rem; }
-  label { display: grid; gap: 0.3rem; font-size: 0.85rem; margin-bottom: 0.75rem; }
-  input { font: inherit; padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
-  .error { color: var(--danger); font-size: 0.85rem; margin: 0 0 0.75rem; }
-  .buttons { display: flex; justify-content: flex-end; gap: 0.5rem; }
+  dialog::backdrop {
+    background: var(--backdrop);
+  }
+  h3 {
+    margin: 0 0 var(--space-1);
+    font-size: var(--fs-section);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .files {
+    display: grid;
+    justify-items: start;
+    gap: 4px;
+    margin: 0 0 var(--space-1);
+  }
+  .label {
+    color: var(--muted);
+    font-size: var(--fs-small);
+  }
+  .hint {
+    color: var(--muted);
+    font-size: var(--fs-body);
+  }
+  ol {
+    display: grid;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    gap: 2px;
+    list-style: none;
+  }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--fs-body);
+  }
+  .path {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .role {
+    flex: none;
+    color: var(--muted);
+    font-size: var(--fs-small);
+  }
+
+  label {
+    display: grid;
+    gap: 6px;
+    margin: 0 0 var(--space-1);
+    color: var(--muted);
+    font-size: var(--fs-small);
+  }
+  input {
+    height: var(--control-height);
+    padding: 0 var(--space-1);
+    border: 1px solid var(--control);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--fs-body);
+  }
+
+  .error {
+    margin: 0 0 var(--space-1);
+    color: var(--negative);
+    font-size: var(--fs-body);
+  }
+
+  .buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
   button {
-    font: inherit; font-size: 0.85rem; padding: 0.3rem 0.8rem; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+    height: var(--control-height);
+    padding: 0 var(--space-1);
+    border: 1px solid var(--control);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--fs-body);
+    cursor: pointer;
   }
-  button.primary { border-color: var(--ok); color: var(--ok); }
-  button:disabled, input:disabled { opacity: 0.45; cursor: not-allowed; }
+  button:hover:not(:disabled) {
+    background: var(--raised);
+  }
+  .secondary {
+    justify-self: start;
+  }
+  .remove {
+    flex: none;
+    width: var(--control-height);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: var(--fs-section);
+    line-height: 1;
+  }
+  .remove:hover {
+    background: var(--raised);
+    color: var(--text);
+  }
+  .primary {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: var(--primary-ink);
+    font-weight: 500;
+  }
+  .primary:hover:not(:disabled) {
+    background: var(--primary);
+    opacity: 0.9;
+  }
+  button:disabled,
+  input:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 </style>

@@ -97,6 +97,9 @@
 
   /* per-Service log hue lightness (LogPanel colours services by name) */
   --log-lightness: 38%;
+
+  /* the scrim of a modal dialog: dense enough that the content below recedes */
+  --backdrop: rgb(0 0 0 / 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -129,6 +132,7 @@
     --pill-neutral-ink: #d7dadd;
 
     --log-lightness: 68%;
+    --backdrop: rgb(0 0 0 / 0.72);
   }
 }
 
@@ -215,17 +219,4 @@ a {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* ---------- legacy aliases ----------
-   Components still restyled by later tickets reference the old names. They are
-   aliases, not values: the value lives in one of the roles above. */
-:root {
-  --bg: var(--ground);
-  --ok: var(--positive);
-  --warn: var(--warning);
-  --warn-bg: var(--pill-warning-bg);
-  --danger: var(--negative);
-  --hover: var(--raised);
-  --shadow: none;
 }

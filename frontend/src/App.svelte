@@ -42,6 +42,9 @@
   $effect(() => {
     if (store.logs !== null && (store.showingSettings || store.selectedProject === null)) closeLogs()
   })
+
+  // The column's Progetti entry is current when the canvas shows the summary.
+  const projectsCurrent = $derived(!store.showingSettings && store.selectedProject === null)
 </script>
 
 {#snippet navigation()}
@@ -79,6 +82,8 @@
 <AppShell
   usage={store.usage}
   onaddproject={() => setAdding(true)}
+  onprojects={() => selectProject(null)}
+  projectsCurrent={projectsCurrent}
   onsettings={() => setShowingSettings(true)}
   {navigation}
   {drawer}
@@ -88,7 +93,7 @@
   {/if}
   {#if store.loaded}
     {#if store.showingSettings && store.settings}
-      <SettingsView settings={store.settings} onsave={saveSettings} onback={() => setShowingSettings(false)} />
+      <SettingsView settings={store.settings} onsave={saveSettings} />
     {:else if store.selectedProject}
       <ProjectDetail
         project={store.selectedProject}

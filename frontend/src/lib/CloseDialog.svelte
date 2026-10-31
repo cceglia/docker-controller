@@ -27,25 +27,87 @@
     Ricorda la scelta
   </label>
   <div class="buttons">
-    <button onclick={oncancel}>Annulla</button>
-    <button onclick={() => onchoose(CloseBehavior.CloseHide, remember)}>Nascondi nel tray</button>
-    <button class="danger" onclick={() => onchoose(CloseBehavior.CloseQuit, remember)}>Esci</button>
+    <button class="quiet" onclick={oncancel}>Annulla</button>
+    <button class="primary" onclick={() => onchoose(CloseBehavior.CloseHide, remember)}>Nascondi nel tray</button>
+    <button class="quiet danger" onclick={() => onchoose(CloseBehavior.CloseQuit, remember)}>Esci</button>
   </div>
 </dialog>
 
 <style>
   dialog {
-    max-width: 30rem; border: 1px solid var(--border); border-radius: 10px;
-    background: var(--surface); color: var(--text); padding: 1.1rem 1.25rem;
+    width: min(30rem, 90vw);
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background: var(--surface);
+    color: var(--text);
   }
-  dialog::backdrop { background: rgb(0 0 0 / 0.5); }
-  h3 { margin: 0 0 0.5rem; font-size: 1rem; }
-  p { margin: 0 0 0.75rem; font-size: 0.9rem; }
-  .remember { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; margin-bottom: 0.75rem; }
-  .buttons { display: flex; justify-content: flex-end; gap: 0.5rem; }
+  dialog::backdrop {
+    background: var(--backdrop);
+  }
+  h3 {
+    margin: 0 0 var(--space-1);
+    font-size: var(--fs-section);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  p {
+    margin: 0 0 var(--space-1);
+    color: var(--muted);
+    font-size: var(--fs-body);
+    line-height: 1.45;
+  }
+  .remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--control-height);
+    margin: 0 0 var(--space-1);
+    font-size: var(--fs-body);
+    cursor: pointer;
+  }
+  .buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
   button {
-    font: inherit; font-size: 0.85rem; padding: 0.3rem 0.8rem; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+    height: var(--control-height);
+    padding: 0 var(--space-1);
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--fs-body);
+    line-height: 1;
+    cursor: pointer;
   }
-  button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+  button.primary {
+    background: var(--primary);
+    color: var(--primary-ink);
+    font-weight: 500;
+  }
+  button.primary:hover {
+    opacity: 0.9;
+  }
+  button.primary:active {
+    opacity: 0.8;
+  }
+  button.quiet {
+    color: var(--muted);
+  }
+  button.quiet:hover {
+    background: var(--raised);
+    color: var(--text);
+  }
+  button.quiet:active {
+    background: var(--active);
+  }
+  button.danger {
+    color: var(--negative);
+  }
+  button.danger:hover {
+    background: var(--raised);
+    color: var(--negative);
+  }
 </style>

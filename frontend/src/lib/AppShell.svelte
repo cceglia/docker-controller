@@ -1,4 +1,4 @@
-<!-- The two-panel guscio: the column with the mark, the two commands and the
+<!-- The two-panel guscio: the column with the mark, the commands and the
      navigation, the canvas with the global Utilizzo risorse on top and the
      current screen below. It is presentational: App.svelte owns the store and
      passes the content in. Below 900px the column keeps only the mark and the
@@ -12,6 +12,8 @@
   let {
     usage,
     onaddproject,
+    onprojects,
+    projectsCurrent,
     onsettings,
     navigation,
     drawer,
@@ -20,6 +22,10 @@
     /** The latest global sample; null until the stream delivers one. */
     usage: UsageSample | null
     onaddproject: () => void
+    /** Shows the summary: no Project open and the Impostazioni screen closed. */
+    onprojects: () => void
+    /** The canvas shows the summary. */
+    projectsCurrent: boolean
     onsettings: () => void
     /** The Progetti of the column. */
     navigation: Snippet
@@ -52,6 +58,30 @@
         <path d="M8 3v10M3 8h10" />
       </svg>
       <span class="command-label">Aggiungi progetto</span>
+    </button>
+
+    <!-- The way to the summary: always there, with no saved Progetto and on the
+         Impostazioni screen too. It sits under the command and above the list. -->
+    <button
+      class="command"
+      aria-current={projectsCurrent ? 'page' : undefined}
+      aria-label="Progetti"
+      onclick={onprojects}
+    >
+      <svg
+        class="icon"
+        viewBox="0 0 16 16"
+        width="16"
+        height="16"
+        aria-hidden="true"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+      >
+        <path d="M2.5 4h1M6 4h7.5M2.5 8h1M6 8h7.5M2.5 12h1M6 12h7.5" />
+      </svg>
+      <span class="command-label">Progetti</span>
     </button>
 
     <div class="nav">
@@ -148,6 +178,13 @@
   }
   .command.bottom {
     margin-top: 4px;
+  }
+  /* The Progetti entry of the summary: a tone step and a heavier name, the same
+     grammar as the open row of the list, never colour alone. */
+  .command[aria-current='page'] {
+    background: var(--active);
+    color: var(--text);
+    font-weight: 600;
   }
   .icon {
     flex: none;
