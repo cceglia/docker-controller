@@ -44,6 +44,13 @@ type Rates struct {
 	BlockWriteBytesPerSec float64 `json:"blockWriteBytesPerSec"`
 }
 
+func (r *Rates) add(o Rates) {
+	r.NetInBytesPerSec += o.NetInBytesPerSec
+	r.NetOutBytesPerSec += o.NetOutBytesPerSec
+	r.BlockReadBytesPerSec += o.BlockReadBytesPerSec
+	r.BlockWriteBytesPerSec += o.BlockWriteBytesPerSec
+}
+
 // rateTracker turns the cumulative counters of docker stats into Rates. It
 // works per Container, so a Container that starts, stops or restarts (its
 // counters drop) never makes the rate negative or spikes it.
@@ -52,22 +59,29 @@ type rateTracker struct {
 	prev map[string]Measures // by Container id
 }
 
-// observe returns the Rates of the frame taken at now; zero for the first frame.
-func (r *rateTracker) observe(now time.Time, rows []statsRow) Rates {
-	var d Rates
+// observe returns the Rates of each Container of the frame taken at now, by
+// Container id. A Container absent from the previous frame is absent from the
+// map: it has no rate, which is not zero. A Container whose counters dropped
+// (a restart) has a zero rate. The first frame has no rate at all.
+func (r *rateTracker) observe(now time.Time, rows []statsRow) map[string]Rates {
+	out := make(map[string]Rates, len(rows))
 	if dt := now.Sub(r.at).Seconds(); r.prev != nil && dt > 0 {
-		delta := func(cur, old uint64) float64 {
-			if cur < old {
-				return 0
-			}
-			return float64(cur-old) / dt
-		}
 		for _, row := range rows {
-			if old, ok := r.prev[row.id]; ok {
-				d.NetInBytesPerSec += delta(row.measures.NetInBytes, old.NetInBytes)
-				d.NetOutBytesPerSec += delta(row.measures.NetOutBytes, old.NetOutBytes)
-				d.BlockReadBytesPerSec += delta(row.measures.BlockReadBytes, old.BlockReadBytes)
-				d.BlockWriteBytesPerSec += delta(row.measures.BlockWriteBytes, old.BlockWriteBytes)
+			old, ok := r.prev[row.id]
+			if !ok {
+				continue
+			}
+			delta := func(cur, old uint64) float64 {
+				if cur < old {
+					return 0
+				}
+				return float64(cur-old) / dt
+			}
+			out[row.id] = Rates{
+				NetInBytesPerSec:      delta(row.measures.NetInBytes, old.NetInBytes),
+				NetOutBytesPerSec:     delta(row.measures.NetOutBytes, old.NetOutBytes),
+				BlockReadBytesPerSec:  delta(row.measures.BlockReadBytes, old.BlockReadBytes),
+				BlockWriteBytesPerSec: delta(row.measures.BlockWriteBytes, old.BlockWriteBytes),
 			}
 		}
 	}
@@ -75,15 +89,16 @@ func (r *rateTracker) observe(now time.Time, rows []statsRow) Rates {
 	for _, row := range rows {
 		r.prev[row.id] = row.measures
 	}
-	return d
+	return out
 }
 
 // ServiceUsage is the Utilizzo risorse of one Service: the sum over its
-// running Containers.
+// running Containers, as instant measures and rates.
 type ServiceUsage struct {
 	Project  string   `json:"project"`
 	Service  string   `json:"service"`
 	Measures Measures `json:"measures"`
+	Rate     Rates    `json:"rate"`
 }
 
 // UsageSample is the Utilizzo risorse at one instant. It is not part of the
@@ -153,8 +168,7 @@ func (m *Manager) streamUsage(ctx context.Context, onSample func(UsageSample)) e
 
 	var rates rateTracker // per stream: a new stream has no previous frame
 	frames := statsFrames{emit: func(rows []statsRow) {
-		s := m.sampleOf(rows, size)
-		s.Rate = rates.observe(time.Now(), rows)
+		s := m.sampleOf(rows, size, rates.observe(time.Now(), rows))
 		onSample(s)
 	}}
 	var lastStderr string
@@ -179,8 +193,9 @@ func (m *Manager) streamUsage(ctx context.Context, onSample func(UsageSample)) e
 
 type serviceKey struct{ project, service string }
 
-// sampleOf sums the rows of a frame, globally and per Service.
-func (m *Manager) sampleOf(rows []statsRow, size machine) UsageSample {
+// sampleOf sums the rows of a frame, globally and per Service: measures and
+// rates. rates holds the rate of each Container by id.
+func (m *Manager) sampleOf(rows []statsRow, size machine, rates map[string]Rates) UsageSample {
 	owners := map[string]serviceKey{} // Container name -> Service
 	for _, p := range m.Snapshot().Projects {
 		for _, s := range p.Services {
@@ -191,22 +206,27 @@ func (m *Manager) sampleOf(rows []statsRow, size machine) UsageSample {
 	}
 
 	s := UsageSample{DockerReachable: true, Containers: len(rows), CPUs: size.cpus, MemoryTotalBytes: size.memBytes}
-	perService := map[serviceKey]*Measures{}
+	perService := map[serviceKey]*ServiceUsage{}
 	for _, r := range rows {
+		rate := rates[r.id]
 		s.Total.add(r.measures)
+		s.Rate.add(rate)
 		if k, ok := owners[r.name]; ok {
-			if perService[k] == nil {
-				perService[k] = &Measures{}
+			u := perService[k]
+			if u == nil {
+				u = &ServiceUsage{Project: k.project, Service: k.service}
+				perService[k] = u
 			}
-			perService[k].add(r.measures)
+			u.Measures.add(r.measures)
+			u.Rate.add(rate)
 		}
 	}
 	s.CPUMachinePercent = s.Total.CPUPercent / float64(size.cpus)
 	s.MemoryMachinePercent = float64(s.Total.MemoryBytes) / float64(size.memBytes) * 100
 
 	s.Services = make([]ServiceUsage, 0, len(perService))
-	for k, v := range perService {
-		s.Services = append(s.Services, ServiceUsage{Project: k.project, Service: k.service, Measures: *v})
+	for _, u := range perService {
+		s.Services = append(s.Services, *u)
 	}
 	sort.Slice(s.Services, func(i, j int) bool {
 		a, b := s.Services[i], s.Services[j]

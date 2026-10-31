@@ -29,6 +29,14 @@ export function formatPercent(value: number): string {
   return `${number(value, 1)}%`
 }
 
+/**
+ * A rate in bytes per second, in decimal units like `docker stats`: the same
+ * form as the global strip, in and out.
+ */
+export function formatRate(bytesPerSec: number): string {
+  return `${formatBytes(bytesPerSec, 'decimal')}/s`
+}
+
 /** CPU in cores: docker reports 100 for one fully used core. */
 export function formatCores(cpuPercent: number): string {
   return `${number(cpuPercent / 100, 2)} core`

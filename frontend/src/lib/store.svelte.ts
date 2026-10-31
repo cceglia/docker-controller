@@ -20,6 +20,7 @@ import type {
   ActivityEvent,
   Measures,
   Project,
+  Rates,
   Snapshot,
   UsageSample,
 } from '../../bindings/dockercontroller/internal/compose/models'
@@ -106,9 +107,14 @@ let closeAsked = $state(false)
 // Utilizzo risorse: separate from the snapshot. null while the stream is
 // stopped (window hidden) or no sample has arrived yet.
 let usage = $state<UsageSample | null>(null)
-// Measures of the Services that have running Containers, by "project/service".
+// Utilizzo risorse of the Services that have running Containers, by
+// "project/service": the instant measures and the rates together.
 const serviceUsage = $derived(
-  new Map((usage?.dockerReachable ? (usage.services ?? []) : []).map((u) => [`${u.project}/${u.service}`, u.measures])),
+  new Map<string, ServiceUsageView>(
+    (usage?.dockerReachable ? (usage.services ?? []) : []).map(
+      (u): [string, ServiceUsageView] => [`${u.project}/${u.service}`, { measures: u.measures, rate: u.rate }],
+    ),
+  ),
 )
 
 function applyActivity(e: ActivityEvent) {
@@ -378,16 +384,25 @@ export function dismissToast() {
 }
 
 /**
- * The Utilizzo risorse of the Services of a Project: Service name -> measures.
- * A Service without running Containers is absent (the UI shows "—"), which is
- * not the same as zero. null while no sample has arrived yet: the UI shows a
- * loading placeholder, not "—".
+ * The Utilizzo risorse of one Service: the instant measures and the rates
+ * together.
  */
-export function usageOfProject(project: string): Record<string, Measures> | null {
+export interface ServiceUsageView {
+  measures: Measures
+  rate: Rates
+}
+
+/**
+ * The Utilizzo risorse of the Services of a Project: Service name -> measures
+ * and rates. A Service without running Containers is absent (the UI shows
+ * "—"), which is not the same as zero. null while no sample has arrived yet:
+ * the UI shows a loading placeholder, not "—".
+ */
+export function usageOfProject(project: string): Record<string, ServiceUsageView> | null {
   if (usage === null) return null
-  const out: Record<string, Measures> = {}
-  for (const [key, measures] of serviceUsage) {
-    if (key.startsWith(`${project}/`)) out[key.slice(project.length + 1)] = measures
+  const out: Record<string, ServiceUsageView> = {}
+  for (const [key, entry] of serviceUsage) {
+    if (key.startsWith(`${project}/`)) out[key.slice(project.length + 1)] = entry
   }
   return out
 }

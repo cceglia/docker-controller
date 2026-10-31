@@ -8,14 +8,15 @@
      Below: one flat block per Servizio, one row per Container, and the log
      panel inline until the drawer of ticket 06. -->
 <script lang="ts">
-  import type { Container, Measures, Project } from '../../bindings/dockercontroller/internal/compose/models'
+  import type { Container, Project } from '../../bindings/dockercontroller/internal/compose/models'
   import { Status } from '../../bindings/dockercontroller/internal/compose/models'
   import ConfirmModal from './ConfirmModal.svelte'
   import ContainerStrip from './ContainerStrip.svelte'
   import LogPanel from './LogPanel.svelte'
-  import { formatBytes, formatCores, formatPercent } from './format'
+  import { formatBytes, formatCores, formatPercent, formatRate } from './format'
+  import Meter from './Meter.svelte'
   import { ActionKind, actionLabels } from './store.svelte'
-  import type { LogView } from './store.svelte'
+  import type { LogView, ServiceUsageView } from './store.svelte'
 
   let {
     project,
@@ -55,8 +56,8 @@
     oncloselogs: () => void
     /** Docker does not answer: Actions are disabled. */
     unavailable?: boolean
-    /** Utilizzo risorse by Service name; a Service without running Containers is absent. null until the first sample. */
-    usage: Record<string, Measures> | null
+    /** Utilizzo risorse by Service name: measures and rates. A Service without running Containers is absent. null until the first sample. */
+    usage: Record<string, ServiceUsageView> | null
   } = $props()
 
   // The Actions of a Service stay on its own block; these are the Actions of the Project.
@@ -460,13 +461,33 @@
       {#if usage?.[service.name]}
         {@const u = usage[service.name]}
         <div class="usage" aria-label="Utilizzo risorse di {service.name}">
-          <span><i>CPU</i><b>{formatPercent(u.cpuPercent)}</b> <small>{formatCores(u.cpuPercent)}</small></span>
-          <span><i>Memoria</i><b>{formatBytes(u.memoryBytes)}</b></span>
-          <span title="Totale dall'avvio dei Container"><i>Rete</i><b>↓ {formatBytes(u.netInBytes, 'decimal')}</b> <b>↑ {formatBytes(u.netOutBytes, 'decimal')}</b></span>
-          <span title="Totale dall'avvio dei Container"><i>Disco</i><b>R {formatBytes(u.blockReadBytes, 'decimal')}</b> <b>W {formatBytes(u.blockWriteBytes, 'decimal')}</b></span>
+          <div class="measure">
+            <span class="measure-label">CPU</span>
+            <span class="measure-value num">{formatPercent(u.measures.cpuPercent)}</span>
+            <span class="measure-note num">{formatCores(u.measures.cpuPercent)}</span>
+            <Meter value={u.measures.cpuPercent} label="CPU" tone="accent" wide />
+          </div>
+          <div class="measure">
+            <span class="measure-label">Memoria</span>
+            <span class="measure-value num">{formatBytes(u.measures.memoryBytes)}</span>
+          </div>
+          <div class="measure">
+            <span class="measure-label">Rete</span>
+            <span class="pair">
+              <span class="reading"><span class="dir">in</span><span class="value num">{formatRate(u.rate.netInBytesPerSec)}</span></span>
+              <span class="reading"><span class="dir">out</span><span class="value num">{formatRate(u.rate.netOutBytesPerSec)}</span></span>
+            </span>
+          </div>
+          <div class="measure">
+            <span class="measure-label">Disco</span>
+            <span class="pair">
+              <span class="reading"><span class="dir">lettura</span><span class="value num">{formatRate(u.rate.blockReadBytesPerSec)}</span></span>
+              <span class="reading"><span class="dir">scrittura</span><span class="value num">{formatRate(u.rate.blockWriteBytesPerSec)}</span></span>
+            </span>
+          </div>
         </div>
       {:else if usage === null && serviceContainers.some((c) => c.state === 'running')}
-        <p class="usage-none" aria-label="Utilizzo risorse di {service.name}" title="In attesa della prima misura">Utilizzo risorse: caricamento…</p>
+        <p class="usage-none" aria-label="Utilizzo risorse di {service.name}" title="In attesa della prima misura">In attesa della prima misura…</p>
       {:else}
         <p class="usage-none" aria-label="Utilizzo risorse di {service.name}" title="Nessun Container in esecuzione">Utilizzo risorse: —</p>
       {/if}
@@ -938,40 +959,77 @@
     color: var(--negative);
   }
 
-  /* Utilizzo risorse: left as it is until ticket 05. */
+  /* Utilizzo risorse: one cell per measure, an instant value or a rate. */
   .usage {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-    gap: 0.4rem 1rem;
-    padding: 0.5rem 0.7rem;
-    border-radius: 8px;
-    background: var(--bg);
-    font-size: 0.82rem;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: var(--space-1);
+    padding: var(--space-1) 0;
+    border-top: 1px solid var(--rule);
   }
-  .usage span {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
+  .measure {
+    display: grid;
+    align-content: start;
+    gap: 2px;
+    min-width: 0;
+    padding-left: var(--space-1);
+    border-left: 1px solid var(--rule);
   }
-  .usage i {
-    font-style: normal;
-    font-size: 0.68rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+  .measure:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .measure-label {
     color: var(--muted);
+    font-size: var(--fs-small);
+    line-height: 1.3;
   }
-  .usage b {
-    font-weight: 600;
+  .measure-value,
+  .measure-note,
+  .reading .value {
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .usage small {
+  .measure-value {
+    font-size: var(--fs-body);
+    font-weight: 500;
+  }
+  .measure-note {
     color: var(--muted);
+    font-size: var(--fs-small);
+    line-height: 1.3;
+  }
+  .pair {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+  }
+  .reading {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+  }
+  .dir {
+    flex: none;
+    min-width: 5ch;
+    color: var(--muted);
+    font-size: var(--fs-small);
+    line-height: 1.3;
+  }
+  .reading .value {
+    font-size: var(--fs-small);
   }
   .usage-none {
     margin: 0;
+    padding: var(--space-1) 0;
+    border-top: 1px solid var(--rule);
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--fs-body);
   }
 
   /* Container rows: dot, name, image, state, health, published ports. */

@@ -1,14 +1,12 @@
 <script lang="ts">
   import type { UsageSample } from '../../bindings/dockercontroller/internal/compose/models'
-  import { formatBytes, formatCores, formatPercent } from './format'
+  import { formatBytes, formatCores, formatPercent, formatRate } from './format'
   import Meter from './Meter.svelte'
 
   let { usage }: {
     /** The latest sample; null while none has arrived (streaming just started). */
     usage: UsageSample | null
   } = $props()
-
-  const rate = (bytesPerSec: number) => `${formatBytes(bytesPerSec, 'decimal')}/s`
 </script>
 
 <!-- The global Utilizzo risorse: it says whose numbers these are. -->
@@ -52,16 +50,16 @@
       <div class="metric">
         <span class="label">Rete</span>
         <span class="pair">
-          <span class="reading"><span class="dir">in</span><span class="value num">{rate(usage.rate.netInBytesPerSec)}</span></span>
-          <span class="reading"><span class="dir">out</span><span class="value num">{rate(usage.rate.netOutBytesPerSec)}</span></span>
+          <span class="reading"><span class="dir">in</span><span class="value num">{formatRate(usage.rate.netInBytesPerSec)}</span></span>
+          <span class="reading"><span class="dir">out</span><span class="value num">{formatRate(usage.rate.netOutBytesPerSec)}</span></span>
         </span>
       </div>
 
       <div class="metric">
         <span class="label">Disco</span>
         <span class="pair">
-          <span class="reading"><span class="dir">lettura</span><span class="value num">{rate(usage.rate.blockReadBytesPerSec)}</span></span>
-          <span class="reading"><span class="dir">scrittura</span><span class="value num">{rate(usage.rate.blockWriteBytesPerSec)}</span></span>
+          <span class="reading"><span class="dir">lettura</span><span class="value num">{formatRate(usage.rate.blockReadBytesPerSec)}</span></span>
+          <span class="reading"><span class="dir">scrittura</span><span class="value num">{formatRate(usage.rate.blockWriteBytesPerSec)}</span></span>
         </span>
       </div>
     </div>

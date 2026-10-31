@@ -339,13 +339,13 @@ func TestUsage_ARowWithAnUnknownUnitIsLeftOut(t *testing.T) {
 }
 
 // usageOf finds the usage of a Service of a Project.
-func usageOf(s compose.UsageSample, project, name string) (compose.Measures, bool) {
+func usageOf(s compose.UsageSample, project, name string) (compose.ServiceUsage, bool) {
 	for _, u := range s.Services {
 		if u.Project == project && u.Service == name {
-			return u.Measures, true
+			return u, true
 		}
 	}
-	return compose.Measures{}, false
+	return compose.ServiceUsage{}, false
 }
 
 func TestUsage_AServiceIsTheSumOfItsReplicas_AttributedByContainerName(t *testing.T) {
@@ -377,14 +377,14 @@ func TestUsage_AServiceIsTheSumOfItsReplicas_AttributedByContainerName(t *testin
 		CPUPercent: 1.18, MemoryBytes: 124465971 + 104857600, // 118.7MiB + 100MiB
 		NetInBytes: 227000000, NetOutBytes: 376000000, BlockReadBytes: 301000000, BlockWriteBytes: 2434000000,
 	}
-	if !near(db.CPUPercent, want.CPUPercent) {
-		t.Errorf("db CPU = %.2f, want 1.18", db.CPUPercent)
+	if !near(db.Measures.CPUPercent, want.CPUPercent) {
+		t.Errorf("db CPU = %.2f, want 1.18", db.Measures.CPUPercent)
 	}
-	db.CPUPercent, want.CPUPercent = 0, 0
-	if db != want {
-		t.Errorf("db = %+v, want %+v", db, want)
+	db.Measures.CPUPercent, want.CPUPercent = 0, 0
+	if db.Measures != want {
+		t.Errorf("db = %+v, want %+v", db.Measures, want)
 	}
-	if odoo, ok := usageOf(s, "sunlinkdocker", "odoo"); !ok || !near(odoo.CPUPercent, 6.98) {
+	if odoo, ok := usageOf(s, "sunlinkdocker", "odoo"); !ok || !near(odoo.Measures.CPUPercent, 6.98) {
 		t.Errorf("odoo = %+v (%v), want its own Container only", odoo, ok)
 	}
 	// The Container of a Project that is not saved is in the global figures only.
@@ -393,6 +393,63 @@ func TestUsage_AServiceIsTheSumOfItsReplicas_AttributedByContainerName(t *testin
 	}
 	if s.Containers != 4 {
 		t.Errorf("containers = %d, want 4", s.Containers)
+	}
+}
+
+func TestUsage_RateIsTheSumOfTheServiceReplicas_AndTheGlobalRateHasEveryRow(t *testing.T) {
+	// Two frames with counters chosen so that every delta is known: db-2 is a
+	// second replica of db, and sunlink-vpn belongs to a Project that is not
+	// saved. The elapsed time between the two replayed frames is not fixed, so
+	// the test compares each Service's share of the global rate, which does not
+	// depend on it.
+	var ps []string
+	for _, line := range strings.Split(strings.TrimSpace(string(fixture(t, "ps-sunlinkdocker.json"))), "\n") {
+		ps = append(ps, line)
+		if strings.Contains(line, `"Name":"sunlinkdocker-db-1"`) {
+			ps = append(ps, strings.ReplaceAll(line, "sunlinkdocker-db-1", "sunlinkdocker-db-2"))
+		}
+	}
+	f := usageDocker(t, []byte(oneFrame(
+		usageRow("sunlinkdocker-db-1", "0.10%", "100MiB / 31.03GiB", "1000B / 2000B", "3000B / 4000B"),
+		usageRow("sunlinkdocker-db-2", "0.10%", "50MiB / 31.03GiB", "100B / 200B", "300B / 400B"),
+		usageRow("sunlinkdocker-odoo-1", "0.10%", "60MiB / 31.03GiB", "10B / 20B", "30B / 40B"),
+		usageRow("sunlink-vpn", "0.10%", "40MiB / 31.03GiB", "0B / 0B", "0B / 0B"),
+	)+oneFrame(
+		usageRow("sunlinkdocker-db-1", "0.10%", "100MiB / 31.03GiB", "11000B / 12000B", "13000B / 14000B"),
+		usageRow("sunlinkdocker-db-2", "0.10%", "50MiB / 31.03GiB", "1100B / 1200B", "1300B / 1400B"),
+		usageRow("sunlinkdocker-odoo-1", "0.10%", "60MiB / 31.03GiB", "1010B / 1020B", "1030B / 1040B"),
+		usageRow("sunlink-vpn", "0.10%", "40MiB / 31.03GiB", "200000B / 400000B", "600000B / 800000B"),
+	)), nil, true)
+	f.Respond([]byte(strings.Join(ps, "\n")), psArgs("sunlinkdocker")...)
+	m := usageManager(t, f)
+	c, _ := startUsage(t, m)
+
+	samples := c.wait(t, 2)
+	first := samples[0]
+	if first.Rate != (compose.Rates{}) {
+		t.Errorf("first frame rate = %+v, want zero (there is no previous frame)", first.Rate)
+	}
+	for _, u := range first.Services {
+		if u.Rate != (compose.Rates{}) {
+			t.Errorf("first frame Service %s rate = %+v, want zero", u.Service, u.Rate)
+		}
+	}
+
+	s := samples[1]
+	db, ok := usageOf(s, "sunlinkdocker", "db")
+	if !ok {
+		t.Fatalf("no usage for sunlinkdocker/db: %+v", s.Services)
+	}
+	if s.Rate.NetInBytesPerSec <= 0 {
+		t.Fatalf("global net in rate = %v, want above zero", s.Rate.NetInBytesPerSec)
+	}
+	// Deltas: db-1 10000, db-2 1000, odoo 1000, sunlink-vpn 200000 bytes in.
+	if want, got := 11000.0/(11000.0+1000.0+200000.0), db.Rate.NetInBytesPerSec/s.Rate.NetInBytesPerSec; math.Abs(got-want) > 1e-9 {
+		t.Errorf("db share of the net in rate = %.9f, want %.9f (its two replicas over every row)", got, want)
+	}
+	// Block writes: db-1 10000, db-2 1000, odoo 1000, sunlink-vpn 800000.
+	if want, got := 11000.0/(11000.0+1000.0+800000.0), db.Rate.BlockWriteBytesPerSec/s.Rate.BlockWriteBytesPerSec; math.Abs(got-want) > 1e-9 {
+		t.Errorf("db share of the block write rate = %.9f, want %.9f", got, want)
 	}
 }
 
