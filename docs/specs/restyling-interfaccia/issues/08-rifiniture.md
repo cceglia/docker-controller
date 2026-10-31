@@ -4,19 +4,29 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Etichette e toni di stato hanno una sola definizione, usata da colonna e dettaglio.
-- [ ] Le regole del punto dei Container e della health stanno in un solo posto.
-- [ ] L'utilizzo per Servizio usa il tipo generato dai binding, non un tipo locale che lo ripete.
-- [ ] La coppia di rate (in/out, lettura/scrittura) è un componente condiviso dalla striscia e dai Servizi.
-- [ ] `ProjectDetail` è diviso: menu del Progetto, blocco del Servizio e riga del Container sono componenti separati.
-- [ ] "Mostra log" riapre il cassetto sul Log già aperto senza riavviare lo stream.
-- [ ] Ogni cifra che si aggiorna usa Geist Mono.
-- [ ] Lo `scrollIntoView` del messaggio d'errore rispetta `prefers-reduced-motion`.
-- [ ] La striscia dei Container si legge come tacche, non come una cifra, anche con una o due tacche.
-- [ ] La CPU della striscia globale mostra i core come cifra principale e la percentuale della macchina come nota; la barra misura la stessa percentuale.
-- [ ] Il Down di Servizio è discreto a riposo e diventa d'errore su hover e focus.
-- [ ] Le celle Rete e Disco della striscia globale allineano etichetta e valore su una riga ciascuna.
-- [ ] L'icona dell'app e del tray usa il marchio a tre blocchi, non la vecchia immagine.
-- [ ] `svelte-check` e la build sono verdi; `make check` verde.
+- [x] Etichette e toni di stato hanno una sola definizione, usata da colonna e dettaglio.
+- [x] Le regole del punto dei Container e della health stanno in un solo posto.
+- [x] L'utilizzo per Servizio usa il tipo generato dai binding, non un tipo locale che lo ripete.
+- [x] La coppia di rate (in/out, lettura/scrittura) è un componente condiviso dalla striscia e dai Servizi.
+- [x] `ProjectDetail` è diviso: menu del Progetto, blocco del Servizio e riga del Container sono componenti separati.
+- [x] "Mostra log" riapre il cassetto sul Log già aperto senza riavviare lo stream.
+- [x] Ogni cifra che si aggiorna usa Geist Mono.
+- [x] Lo `scrollIntoView` del messaggio d'errore rispetta `prefers-reduced-motion`.
+- [x] La striscia dei Container si legge come tacche, non come una cifra, anche con una o due tacche.
+- [x] La CPU della striscia globale mostra i core come cifra principale e la percentuale della macchina come nota; la barra misura la stessa percentuale.
+- [x] Il Down di Servizio è discreto a riposo e diventa d'errore su hover e focus.
+- [x] Le celle Rete e Disco della striscia globale allineano etichetta e valore su una riga ciascuna.
+- [x] L'icona dell'app e del tray usa il marchio a tre blocchi, non la vecchia immagine.
+- [x] `svelte-check` e la build sono verdi; `make check` verde.
+
+## Comments
+
+Implementato nel commit `bdc69ea`.
+
+Verifica sull'app vera con Docker reale, su Xvfb, a 1120x760: guscio, dettaglio
+e cassetto con log, tema scuro e chiaro. `make check` verde.
+
+La divisione di `ProjectDetail` porta il file a 647 righe: il taglio ulteriore
+dell'intestazione resta possibile e non e richiesto.
