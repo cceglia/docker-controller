@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/golang-migrate/migrate/v4 v4.20.1
-	github.com/wailsapp/wails/v3 v3.0.0-beta.34
+	github.com/wailsapp/wails/v3 v3.0.0
 	modernc.org/sqlite v1.61.0
 )
 

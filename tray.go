@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"runtime"
 	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -37,6 +38,15 @@ func newTrayAdapter(ctx context.Context, app *application.App, manager *compose.
 	t := &trayAdapter{app: app, manager: manager, window: window, notifications: notifs, ctx: ctx}
 	t.systemTray = app.SystemTray.New()
 	t.systemTray.SetTooltip("Docker Controller")
+	// On Linux the hover text is the tray label: SetTooltip is a no-op there and
+	// an unset label reads "Wails". The label is Linux-only because macOS draws
+	// it next to the icon, and macOS has no tooltip either.
+	if runtime.GOOS == "linux" {
+		t.systemTray.SetLabel("Docker Controller")
+		// A StatusNotifierItem reports single clicks only: on Linux a click is
+		// what brings the window back from the tray.
+		t.systemTray.OnClick(t.showWindow)
+	}
 	t.systemTray.OnDoubleClick(t.showWindow)
 	t.apply(manager.Snapshot())
 
