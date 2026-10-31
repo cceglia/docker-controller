@@ -1,7 +1,16 @@
+<!-- The open Project. The identity block carries the name, the status as a dot
+     plus text, the strip of its Container, its compose name and its folder, and
+     the Project Actions: one primary that follows the status (Up while Fermo or
+     Rimosso, Stop while Attivo, Restart while Parziale) and the others quiet.
+     Down, Down con volumi and Rimuovi dalla lista sit behind the "…" menu with
+     the same confirmations as before. Below: the cells of Cartella, Nome
+     compose and Gruppo with their commands, then the Profili as boxes.
+     The Servizi and the log panel are not part of this block yet. -->
 <script lang="ts">
   import type { Measures, Project } from '../../bindings/dockercontroller/internal/compose/models'
   import { Status } from '../../bindings/dockercontroller/internal/compose/models'
   import ConfirmModal from './ConfirmModal.svelte'
+  import ContainerStrip from './ContainerStrip.svelte'
   import LogPanel from './LogPanel.svelte'
   import { formatBytes, formatCores, formatPercent } from './format'
   import { ActionKind, actionLabels } from './store.svelte'
@@ -49,19 +58,127 @@
     usage: Record<string, Measures> | null
   } = $props()
 
+  // The Actions of a Service stay on its own card; these are the Actions of the Project.
   const kinds = [ActionKind.ActionStart, ActionKind.ActionStop, ActionKind.ActionRestart]
+  const projectKinds = [
+    ActionKind.ActionUp,
+    ActionKind.ActionStop,
+    ActionKind.ActionRestart,
+    ActionKind.ActionPull,
+    ActionKind.ActionBuild,
+  ]
+
+  const statusLabels: Record<string, string> = {
+    [Status.StatusActive]: 'Attivo',
+    [Status.StatusPartial]: 'Parziale',
+    [Status.StatusStopped]: 'Fermo',
+    [Status.StatusRemoved]: 'Rimosso',
+  }
+
   // Generated bindings type arrays as nullable; the backend never sends null.
   const services = $derived(project.services ?? [])
   const profiles = $derived(project.profiles ?? [])
   const activeProfiles = $derived(project.activeProfiles ?? [])
+  const containers = $derived(services.flatMap((s) => s.containers ?? []))
   const busy = $derived(project.activity !== null)
   const removable = $derived(project.status === Status.StatusRemoved && project.total === 0)
+  const statusLabel = $derived(statusLabels[project.status] ?? project.status)
+
+  // One Action leads; which one follows the status. The others stay available.
+  const primary = $derived(
+    project.status === Status.StatusActive
+      ? ActionKind.ActionStop
+      : project.status === Status.StatusPartial
+        ? ActionKind.ActionRestart
+        : ActionKind.ActionUp,
+  )
+  const others = $derived(projectKinds.filter((kind) => kind !== primary))
 
   // The destructive Action waiting for a confirmation, if any.
   let pending: 'down' | 'downVolumes' | 'remove' | null = $state(null)
   // The Service whose Down is waiting for a confirmation, if any.
   let pendingService: string | null = $state(null)
   const name = $derived(project.displayName || project.name)
+
+  // The "…" menu: open state, its trigger, its panel and the box around both.
+  let menuOpen = $state(false)
+  let menuWrap = $state<HTMLElement | null>(null)
+  let menuTrigger = $state<HTMLButtonElement | null>(null)
+  let menuPanel = $state<HTMLElement | null>(null)
+
+  function toggleMenu() {
+    menuOpen = !menuOpen
+  }
+
+  // The menu items that can take the focus, in order.
+  function menuItems(): HTMLButtonElement[] {
+    return [...(menuPanel?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [])]
+  }
+
+  // Escape closes and returns the focus to the trigger; the arrows move between items.
+  // It is bound to the trigger and to every item, so the focus is always on an
+  // interactive element while the menu is open.
+  function onMenuKeydown(event: KeyboardEvent) {
+    if (!menuOpen) return
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeMenu()
+      return
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return
+    const items = menuItems()
+    if (items.length === 0) return
+    const current = items.indexOf(document.activeElement as HTMLButtonElement)
+    let next = 0
+    if (event.key === 'ArrowDown') next = current < 0 ? 0 : (current + 1) % items.length
+    else if (event.key === 'ArrowUp') next = current <= 0 ? items.length - 1 : current - 1
+    else if (event.key === 'End') next = items.length - 1
+    event.preventDefault()
+    items[next].focus()
+  }
+
+  // ArrowDown on the closed trigger opens the menu on its first item.
+  function onTriggerKeydown(event: KeyboardEvent) {
+    if (event.key === 'ArrowDown' && !menuOpen) {
+      event.preventDefault()
+      menuOpen = true
+      return
+    }
+    onMenuKeydown(event)
+  }
+
+  function closeMenu() {
+    if (!menuOpen) return
+    menuOpen = false
+    menuTrigger?.focus()
+  }
+
+  // Choosing an item closes the menu; the confirmation, if any, then opens on its own.
+  function choose(what: 'down' | 'downVolumes' | 'remove') {
+    menuOpen = false
+    menuTrigger?.focus()
+    pending = what
+  }
+
+  // The focus that leaves the menu closes it: Tab then goes on from the trigger.
+  function onMenuFocusOut(event: FocusEvent) {
+    const next = event.relatedTarget as Node | null
+    if (!next || menuWrap?.contains(next)) return
+    menuOpen = false
+  }
+
+  // While the menu is open the first item takes the focus, and a click outside closes it.
+  $effect(() => {
+    if (!menuOpen) return
+    menuItems()[0]?.focus()
+    const outside = (event: MouseEvent) => {
+      const target = event.target as Node | null
+      if (target && menuWrap?.contains(target)) return
+      menuOpen = false
+    }
+    document.addEventListener('click', outside)
+    return () => document.removeEventListener('click', outside)
+  })
 
   // Settings form: edited values, reset whenever another Project is opened.
   const NEW_GROUP = '\u0000new'
@@ -104,26 +221,100 @@
 </script>
 
 <section class="detail">
-  <header>
-    <h2>{name}</h2>
-    <span class="count" title="Container in esecuzione sul totale">{project.running}/{project.total} in esecuzione</span>
-    <div class="header-actions">
-      <button onclick={() => onopenfolder(project.name)} title={project.folder}>Apri cartella</button>
-      <button onclick={() => onopenterminal(project.name)} title="Apri un terminale in {project.folder}">Apri terminale</button>
+  <header class="identity">
+    <div class="head-main">
+      <div class="title-cell">
+        <h2>{name}</h2>
+        <ContainerStrip {containers} />
+      </div>
+
+      <p class="status-line">
+        <span class="dot {project.status}" aria-hidden="true"></span>
+        <span>{statusLabel}</span>
+        <span class="count mono" title="Container in esecuzione sul totale">{project.running}/{project.total} in esecuzione</span>
+      </p>
+
+      <p class="ids">
+        <span class="mono">{project.name}</span>
+        <span class="mono path" title={project.folder}>{project.folder}</span>
+      </p>
+    </div>
+
+    <div class="commands">
+      <button class="primary" disabled={unavailable || busy} onclick={() => onaction(project.name, primary, '')}>
+        {actionLabels[primary]}
+      </button>
+      {#each others as kind (kind)}
+        <button class="quiet" disabled={unavailable || busy} onclick={() => onaction(project.name, kind, '')}>
+          {actionLabels[kind]}
+        </button>
+      {/each}
+
+      <div class="menu-wrap" bind:this={menuWrap} onfocusout={onMenuFocusOut}>
+        <button
+          class="menu-trigger"
+          bind:this={menuTrigger}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-controls={menuOpen ? 'project-menu' : undefined}
+          aria-label="Altre azioni sul Progetto"
+          title="Altre azioni sul Progetto"
+          onclick={toggleMenu}
+          onkeydown={onTriggerKeydown}
+        >…</button>
+        {#if menuOpen}
+          <div class="menu" id="project-menu" role="menu" aria-label="Altre azioni sul Progetto" bind:this={menuPanel}>
+            <button role="menuitem" class="menu-item" disabled={unavailable || busy} onkeydown={onMenuKeydown} onclick={() => choose('down')}>Down</button>
+            <button
+              role="menuitem"
+              class="menu-item danger"
+              disabled={unavailable || busy}
+              onkeydown={onMenuKeydown}
+              onclick={() => choose('downVolumes')}
+            >
+              Down con volumi
+            </button>
+            <button
+              role="menuitem"
+              class="menu-item"
+              disabled={unavailable || busy || !removable}
+              title={removable ? 'Toglie il Progetto dalla lista senza toccare Docker' : 'Disponibile solo per un Progetto Rimosso'}
+              onkeydown={onMenuKeydown}
+              onclick={() => choose('remove')}
+            >
+              Rimuovi dalla lista
+            </button>
+          </div>
+        {/if}
+      </div>
     </div>
   </header>
 
-  {#if project.composeMissing}
-    <p class="missing">File compose mancante: i file del Progetto non esistono più. Puoi toglierlo dalla lista.</p>
-  {/if}
   {#if project.activity}
-    <p class="busy">
-      ⏳ {actionLabels[project.activity.kind] ?? project.activity.kind}
-      {project.activity.service ? `su ${project.activity.service} ` : ''}in corso
+    <p class="activity">
+      <span class="activity-dot" aria-hidden="true"></span>
+      <span>
+        {actionLabels[project.activity.kind] ?? project.activity.kind}{project.activity.service
+          ? ` su ${project.activity.service}`
+          : ''} in corso
+      </span>
     </p>
   {/if}
 
-  <div class="card info">
+  {#if project.composeMissing}
+    <div class="notice">
+      <p>
+        File compose mancante: i file del Progetto non esistono più.{removable ? ' Puoi toglierlo dalla lista.' : ''}
+      </p>
+      {#if removable}
+        <button class="notice-action" disabled={unavailable || busy} onclick={() => (pending = 'remove')}>
+          Rimuovi dalla lista
+        </button>
+      {/if}
+    </div>
+  {/if}
+
+  <section class="data" aria-label="Dati del Progetto">
     {#if editing}
       <form class="settings" onsubmit={(e) => { e.preventDefault(); saveSettings() }}>
         <label>
@@ -152,30 +343,58 @@
         </div>
       </form>
     {:else}
-      <dl>
-        <dt>Cartella</dt><dd class="path">{project.folder}</dd>
-        <dt>Nome compose</dt><dd>{project.name}</dd>
-        <dt>Gruppo</dt><dd>{project.group || 'Nessun Gruppo'}</dd>
+      <dl class="grid">
+        <div class="cell wide">
+          <dt>Cartella</dt>
+          <dd class="mono" title={project.folder}>{project.folder}</dd>
+        </div>
+        <div class="cell">
+          <dt>Nome compose</dt>
+          <dd class="mono">{project.name}</dd>
+        </div>
+        <div class="cell">
+          <dt>Gruppo</dt>
+          <dd>{project.group || 'Nessun Gruppo'}</dd>
+        </div>
       </dl>
-      <button class="edit" onclick={startEditing}>Modifica nome e Gruppo</button>
     {/if}
-  </div>
+
+    <div class="cell-commands">
+      <button
+        class="quiet"
+        aria-label="Apri la cartella nel gestore file"
+        title="Apri la cartella nel gestore file"
+        onclick={() => onopenfolder(project.name)}
+      >Cartella</button>
+      <button
+        class="quiet"
+        aria-label="Apri un terminale in {project.folder}"
+        title="Apri un terminale in {project.folder}"
+        onclick={() => onopenterminal(project.name)}
+      >Terminale</button>
+      {#if !editing}
+        <button class="quiet" aria-label="Modifica nome e Gruppo" title="Modifica nome e Gruppo" onclick={startEditing}>Modifica</button>
+      {/if}
+    </div>
+  </section>
 
   {#if profiles.length > 0}
-    <fieldset class="card profiles">
-      <legend>Profili</legend>
-      {#each profiles as profile (profile)}
-        <label>
-          <input
-            type="checkbox"
-            checked={activeProfiles.includes(profile)}
-            onchange={(e) => toggleProfile(profile, e.currentTarget.checked)}
-          />
-          {profile}
-        </label>
-      {/each}
+    <section class="profiles">
+      <h3 class="label">Profili</h3>
+      <div class="boxes">
+        {#each profiles as profile (profile)}
+          <label class="box">
+            <input
+              type="checkbox"
+              checked={activeProfiles.includes(profile)}
+              onchange={(e) => toggleProfile(profile, e.currentTarget.checked)}
+            />
+            <span>{profile}</span>
+          </label>
+        {/each}
+      </div>
       <p class="hint">Vengono usati da Up, Stop, Restart, Pull e Build. Cambiarli non avvia né ferma nulla. Down agisce su tutti i Profili.</p>
-    </fieldset>
+    </section>
   {/if}
 
   <div class="section-head">
@@ -244,25 +463,6 @@
       </ul>
     </article>
   {/each}
-
-  <div class="card destructive">
-    <div>
-      <h3 class="section-title">Azioni sul Progetto</h3>
-      <p class="hint">Chiedono sempre conferma.</p>
-    </div>
-    <div class="buttons">
-      <button disabled={unavailable || busy} onclick={() => (pending = 'down')}>Down</button>
-      <button class="danger" disabled={unavailable || busy} onclick={() => (pending = 'downVolumes')}>Down con volumi</button>
-      <button
-        class:highlight={project.composeMissing && removable}
-        disabled={unavailable || busy || !removable}
-        title={removable ? 'Toglie il Progetto dalla lista senza toccare Docker' : 'Disponibile solo per un Progetto Rimosso'}
-        onclick={() => (pending = 'remove')}
-      >
-        Rimuovi dalla lista
-      </button>
-    </div>
-  </div>
 </section>
 
 {#if pendingService}
@@ -304,59 +504,478 @@
 {/if}
 
 <style>
-  .detail { display: grid; gap: 0.9rem; }
-  header { display: flex; align-items: center; gap: 0.75rem; }
-  h2 { font-size: 1.15rem; margin: 0; }
-  .count { color: var(--muted); font-size: 0.85rem; flex: 1; }
-  .header-actions { display: flex; gap: 0.4rem; }
-  h3 { font-size: 0.95rem; margin: 0; }
-  .card { margin: 0; padding: 0.8rem 1rem; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }
-  .info { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-  dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1rem; margin: 0; font-size: 0.85rem; min-width: 0; }
-  dt { color: var(--muted); }
-  dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-  .path { font-family: ui-monospace, monospace; font-size: 0.8rem; }
-  .settings { display: grid; gap: 0.5rem; width: min(24rem, 100%); }
-  .settings label { display: grid; gap: 0.2rem; font-size: 0.85rem; }
-  .settings input, .settings select { font: inherit; padding: 0.25rem 0.4rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
-  .form-actions { display: flex; gap: 0.4rem; }
-  .profiles { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; }
-  .profiles legend { padding: 0 0.3rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-  .profiles label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
-  .hint { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 0.75rem; }
-  .busy { margin: 0; color: var(--warn); font-size: 0.85rem; }
-  .empty { color: var(--muted); margin: 0; }
-  .missing { margin: 0; padding: 0.5rem 0.8rem; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: 0.85rem; }
-  .section-head { display: flex; align-items: center; justify-content: space-between; margin-top: 0.4rem; }
-  .section-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-  .muted { font-weight: 400; }
-  .service { display: grid; gap: 0.6rem; }
-  .head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
-  .actions { display: flex; gap: 0.3rem; }
-  .usage { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.4rem 1rem; padding: 0.5rem 0.7rem; border-radius: 8px; background: var(--bg); font-size: 0.82rem; }
-  .usage span { display: flex; flex-direction: column; gap: 0.1rem; }
-  .usage i { font-style: normal; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-  .usage b { font-weight: 600; font-variant-numeric: tabular-nums; }
-  .usage small { color: var(--muted); }
-  .usage-none { margin: 0; color: var(--muted); font-size: 0.8rem; }
-  .containers { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
-  .containers li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; padding-top: 0.4rem; border-top: 1px solid var(--border); font-size: 0.82rem; }
-  .cname { font-weight: 600; }
-  .image { color: var(--muted); }
-  .state.running, .health.healthy { color: var(--ok); }
-  .state.exited, .state.dead, .health.unhealthy { color: var(--danger); }
-  .health.starting, .state.restarting, .state.paused { color: var(--warn); }
-  .ports { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-left: auto; }
-  .destructive { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-  .destructive .hint { margin-top: 0.15rem; }
-  .buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-  button {
-    font: inherit; font-size: 0.8rem; padding: 0.2rem 0.55rem; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+  .detail {
+    display: grid;
+    gap: var(--space-2);
   }
-  button:disabled { opacity: 0.45; cursor: not-allowed; }
-  .port { font-variant-numeric: tabular-nums; }
-  button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
-  button.danger:not(:disabled):hover { background: var(--danger); filter: brightness(1.1); }
-  button.highlight { border-color: var(--warn); color: var(--warn); font-weight: 600; box-shadow: 0 0 0 2px var(--warn-bg); }
+
+  /* ---------- identity: name, strip, status, compose name and folder, Actions ---------- */
+  .identity {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-1);
+    padding-bottom: var(--space-1);
+    border-bottom: 1px solid var(--border);
+  }
+  .head-main {
+    display: grid;
+    flex: 1 1 18rem;
+    gap: 4px;
+    min-width: 0;
+  }
+  .title-cell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px var(--space-1);
+    min-width: 0;
+  }
+  h2 {
+    font-size: var(--fs-title);
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+  }
+  .status-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--fs-body);
+  }
+  .dot {
+    flex: none;
+    box-sizing: border-box;
+    width: var(--dot-size);
+    height: var(--dot-size);
+    border-radius: var(--dot-size);
+  }
+  .dot.active {
+    background: var(--positive);
+  }
+  .dot.partial {
+    background: var(--warning);
+  }
+  .dot.stopped {
+    background: var(--muted);
+  }
+  .dot.removed {
+    border: 1px solid var(--control);
+    background: transparent;
+  }
+  .count {
+    color: var(--muted);
+    font-size: var(--fs-small);
+  }
+  .ids {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-1);
+    min-width: 0;
+    color: var(--muted);
+    font-size: var(--fs-small);
+  }
+  .path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .commands {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* one Action leads; the others are text, so their weight stays low */
+  .primary {
+    height: var(--control-height);
+    padding: 0 var(--space-1);
+    border: 0;
+    border-radius: var(--radius-control);
+    background: var(--primary);
+    color: var(--primary-ink);
+    font-family: var(--font-text);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .primary:not(:disabled):hover {
+    opacity: 0.9;
+  }
+  .primary:not(:disabled):active {
+    opacity: 0.8;
+  }
+  .quiet {
+    height: var(--control-height);
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-text);
+    font-size: var(--fs-body);
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .quiet:not(:disabled):hover {
+    background: var(--raised);
+    color: var(--text);
+  }
+  .quiet:not(:disabled):active {
+    background: var(--active);
+  }
+
+  /* the "…" menu: flat, one tone step above the surface, closed by choice or by a click outside */
+  .menu-wrap {
+    position: relative;
+    display: flex;
+  }
+  .menu-trigger {
+    width: var(--control-height);
+    height: var(--control-height);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-text);
+    font-size: var(--fs-body);
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .menu-trigger:hover,
+  .menu-trigger[aria-expanded='true'] {
+    background: var(--raised);
+    color: var(--text);
+  }
+  .menu {
+    position: absolute;
+    top: calc(var(--control-height) + 4px);
+    right: 0;
+    z-index: 10;
+    display: grid;
+    min-width: 12rem;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background: var(--raised);
+  }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    min-height: var(--control-height);
+    padding: 0 var(--space-1);
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-text);
+    font-size: var(--fs-body);
+    text-align: left;
+    cursor: pointer;
+  }
+  .menu-item:not(:disabled):hover {
+    background: var(--active);
+  }
+  .menu-item.danger {
+    color: var(--negative);
+  }
+
+  /* ---------- Activity and the missing compose files ---------- */
+  .activity {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--fs-body);
+  }
+  .activity-dot {
+    flex: none;
+    box-sizing: border-box;
+    width: var(--dot-size);
+    height: var(--dot-size);
+    border-radius: var(--dot-size);
+    background: var(--accent);
+  }
+  .notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1);
+    padding: var(--space-1);
+    border-radius: var(--radius-card);
+    background: var(--pill-warning-bg);
+    color: var(--pill-warning-ink);
+    font-size: var(--fs-body);
+  }
+  /* the text takes the room and wraps; the button keeps its place on the right */
+  .notice p {
+    flex: 1 1 20rem;
+    min-width: 0;
+  }
+  .notice-action {
+    height: var(--control-height);
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-control);
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    font-family: var(--font-text);
+    font-size: var(--fs-body);
+    cursor: pointer;
+  }
+
+  /* ---------- the cells: Cartella, Nome compose, Gruppo ---------- */
+  .data {
+    display: grid;
+    gap: 4px;
+  }
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background: var(--border);
+    overflow: hidden;
+  }
+  .cell {
+    display: grid;
+    flex: 1 1 10rem;
+    gap: 4px;
+    min-width: 0;
+    padding: var(--space-1);
+    background: var(--surface);
+  }
+  /* a folder is the longest value: it takes twice the room of the others */
+  .cell.wide {
+    flex: 2 1 18rem;
+  }
+  dt {
+    color: var(--muted);
+    font-size: var(--fs-small);
+  }
+  dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--fs-body);
+  }
+  .cell-commands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .settings {
+    display: grid;
+    gap: 8px;
+    width: min(24rem, 100%);
+  }
+  .settings label {
+    display: grid;
+    gap: 4px;
+    font-size: var(--fs-small);
+    color: var(--muted);
+  }
+  .settings input,
+  .settings select {
+    min-height: var(--control-height);
+    padding: 0 8px;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--control);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-text);
+    font-size: var(--fs-body);
+  }
+  .form-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* ---------- Profili: boxes that change nothing until an Action runs ---------- */
+  .profiles {
+    display: grid;
+    gap: 8px;
+  }
+  .label {
+    font-size: var(--fs-small);
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .boxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .box {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--control-height);
+    padding: 0 var(--space-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    font-size: var(--fs-body);
+    cursor: pointer;
+  }
+  .box input {
+    margin: 0;
+    accent-color: var(--accent);
+  }
+  .hint {
+    color: var(--muted);
+    font-size: var(--fs-small);
+  }
+
+  /* ---------- Servizi and the log panel: unchanged until ticket 04 and 06 ---------- */
+  h3 {
+    font-size: 0.95rem;
+    margin: 0;
+  }
+  .card {
+    margin: 0;
+    padding: 0.8rem 1rem;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .empty {
+    color: var(--muted);
+    margin: 0;
+  }
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.4rem;
+  }
+  .section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .muted {
+    font-weight: 400;
+  }
+  .service {
+    display: grid;
+    gap: 0.6rem;
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .actions {
+    display: flex;
+    gap: 0.3rem;
+  }
+  .usage {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.4rem 1rem;
+    padding: 0.5rem 0.7rem;
+    border-radius: 8px;
+    background: var(--bg);
+    font-size: 0.82rem;
+  }
+  .usage span {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+  .usage i {
+    font-style: normal;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .usage b {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .usage small {
+    color: var(--muted);
+  }
+  .usage-none {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .containers {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.3rem;
+  }
+  .containers li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.82rem;
+  }
+  .cname {
+    font-weight: 600;
+  }
+  .image {
+    color: var(--muted);
+  }
+  .state.running,
+  .health.healthy {
+    color: var(--ok);
+  }
+  .state.exited,
+  .state.dead,
+  .health.unhealthy {
+    color: var(--danger);
+  }
+  .health.starting,
+  .state.restarting,
+  .state.paused {
+    color: var(--warn);
+  }
+  .ports {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+  .port {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* the one shared button rule still dresses the Serve cards' buttons */
+  button {
+    font: inherit;
+    font-size: 0.8rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 </style>
