@@ -4,15 +4,22 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] L'intestazione mostra nome, stato (punto e testo), striscia dei Container, nome compose e cartella.
-- [ ] Le cinque azioni di Progetto sono nell'intestazione e una sola è primaria, secondo lo stato.
-- [ ] Le azioni non primarie sono raggiungibili ma discrete; tutte sono disabilitate durante un'Attività o con Docker irraggiungibile.
-- [ ] Down, Down con volumi e Rimuovi dalla lista stanno nel menu `…` e le conferme sono identiche a oggi, compresa la digitazione del nome per il Down con volumi.
-- [ ] Cartella, Nome compose e Gruppo sono leggibili in celle; Cartella e Terminale aprono il gestore file e il terminale come oggi.
-- [ ] Modifica apre gli stessi campi di oggi (Nome visualizzato, Gruppo esistente o nuovo) con la stessa validazione.
-- [ ] I Profili sono caselle con la spiegazione che cambiarli non avvia né ferma nulla, e il salvataggio resta quello di oggi.
-- [ ] Un'Attività in corso sul Progetto è visibile con la stessa informazione di oggi.
-- [ ] Con File compose mancante compare un avviso che, per un Progetto Rimosso, offre la rimozione dalla lista.
-- [ ] `svelte-check` e la build sono verdi.
+- [x] L'intestazione mostra nome, stato (punto e testo), striscia dei Container, nome compose e cartella.
+- [x] Le cinque azioni di Progetto sono nell'intestazione e una sola è primaria, secondo lo stato.
+- [x] Le azioni non primarie sono raggiungibili ma discrete; tutte sono disabilitate durante un'Attività o con Docker irraggiungibile.
+- [x] Down, Down con volumi e Rimuovi dalla lista stanno nel menu `…` e le conferme sono identiche a oggi, compresa la digitazione del nome per il Down con volumi.
+- [x] Cartella, Nome compose e Gruppo sono leggibili in celle; Cartella e Terminale aprono il gestore file e il terminale come oggi.
+- [x] Modifica apre gli stessi campi di oggi (Nome visualizzato, Gruppo esistente o nuovo) con la stessa validazione.
+- [x] I Profili sono caselle con la spiegazione che cambiarli non avvia né ferma nulla, e il salvataggio resta quello di oggi.
+- [x] Un'Attività in corso sul Progetto è visibile con la stessa informazione di oggi.
+- [x] Con File compose mancante compare un avviso che, per un Progetto Rimosso, offre la rimozione dalla lista.
+- [x] `svelte-check` e la build sono verdi.
+
+## Comments
+
+Implementato nel commit `6a8fdbe`.
+
+Revisione finale del 2026-10-31 con punto fisso `0ab9372`: nessun rilievo
+bloccante su standard o spec. I rilievi non bloccanti sono nel report del run.

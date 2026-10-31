@@ -1,6 +1,6 @@
 # Restyling dell'interfaccia
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## Problem Statement
 

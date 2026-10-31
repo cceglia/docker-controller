@@ -4,15 +4,22 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Si passa da un Progetto all'altro dalla colonna, senza tornare a una lista separata.
-- [ ] I Gruppi sono nello stesso ordine di oggi, con i Progetti senza Gruppo in una sezione propria; senza Gruppi la lista resta piatta.
-- [ ] Ogni riga mostra stato, nome visualizzato, nome compose e striscia dei Container.
-- [ ] La riga aperta si distingue senza ricorrere al colore e ha `aria-current` impostato.
-- [ ] "Aggiungi progetto" e "Impostazioni" sono raggiungibili da qualunque schermata.
-- [ ] A finestra stretta la colonna mostra le tacche e il resto dell'interfaccia resta usabile.
-- [ ] Scegliere un Progetto mentre sono aperte le Impostazioni mostra il dettaglio.
-- [ ] Senza selezione la tela mostra il riepilogo dei Progetti e come sceglierne uno, non una schermata vuota.
-- [ ] Il comando di ritorno alla lista non esiste più.
-- [ ] `svelte-check` e la build sono verdi.
+- [x] Si passa da un Progetto all'altro dalla colonna, senza tornare a una lista separata.
+- [x] I Gruppi sono nello stesso ordine di oggi, con i Progetti senza Gruppo in una sezione propria; senza Gruppi la lista resta piatta.
+- [x] Ogni riga mostra stato, nome visualizzato, nome compose e striscia dei Container.
+- [x] La riga aperta si distingue senza ricorrere al colore e ha `aria-current` impostato.
+- [x] "Aggiungi progetto" e "Impostazioni" sono raggiungibili da qualunque schermata.
+- [x] A finestra stretta la colonna mostra le tacche e il resto dell'interfaccia resta usabile.
+- [x] Scegliere un Progetto mentre sono aperte le Impostazioni mostra il dettaglio.
+- [x] Senza selezione la tela mostra il riepilogo dei Progetti e come sceglierne uno, non una schermata vuota.
+- [x] Il comando di ritorno alla lista non esiste più.
+- [x] `svelte-check` e la build sono verdi.
+
+## Comments
+
+Implementato nel commit `a3de8aa`.
+
+Revisione finale del 2026-10-31 con punto fisso `0ab9372`: nessun rilievo
+bloccante su standard o spec. I rilievi non bloccanti sono nel report del run.

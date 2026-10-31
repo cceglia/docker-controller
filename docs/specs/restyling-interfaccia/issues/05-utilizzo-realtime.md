@@ -4,13 +4,20 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Ogni Servizio con Container in esecuzione mostra CPU, memoria, rete e disco.
-- [ ] Rete e disco sono valori al secondo fra due fotogrammi, con la stessa formattazione della striscia globale.
-- [ ] Nessuna schermata mostra più un totale dall'avvio per rete o disco.
-- [ ] Un Servizio senza Container in esecuzione mostra un trattino, non zero; "in attesa della prima misura" resta uno stato distinto.
-- [ ] Il campione espone per ogni Servizio i rate accanto alle misure; il totale globale resta la somma di tutte le righe, comprese quelle di Progetti non salvati.
-- [ ] Un Container alla sua prima fotogramma non produce rate; un contatore che cala non produce un rate negativo.
-- [ ] I test sul seam esistente coprono: rate di un Servizio come somma delle repliche, Container riavviato, Container nuovo, Servizio senza Container, totale globale.
-- [ ] `go test ./...` e `svelte-check` sono verdi.
+- [x] Ogni Servizio con Container in esecuzione mostra CPU, memoria, rete e disco.
+- [x] Rete e disco sono valori al secondo fra due fotogrammi, con la stessa formattazione della striscia globale.
+- [x] Nessuna schermata mostra più un totale dall'avvio per rete o disco.
+- [x] Un Servizio senza Container in esecuzione mostra un trattino, non zero; "in attesa della prima misura" resta uno stato distinto.
+- [x] Il campione espone per ogni Servizio i rate accanto alle misure; il totale globale resta la somma di tutte le righe, comprese quelle di Progetti non salvati.
+- [x] Un Container alla sua prima fotogramma non produce rate; un contatore che cala non produce un rate negativo.
+- [x] I test sul seam esistente coprono: rate di un Servizio come somma delle repliche, Container riavviato, Container nuovo, Servizio senza Container, totale globale.
+- [x] `go test ./...` e `svelte-check` sono verdi.
+
+## Comments
+
+Implementato nel commit `e850d5a`.
+
+Revisione finale del 2026-10-31 con punto fisso `0ab9372`: nessun rilievo
+bloccante su standard o spec. I rilievi non bloccanti sono nel report del run.

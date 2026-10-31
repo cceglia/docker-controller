@@ -4,15 +4,22 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Le Impostazioni mostrano le stesse due impostazioni di oggi, con la stessa validazione e lo stesso salvataggio.
-- [ ] Una voce "Progetti" nella colonna riporta al riepilogo da qualunque schermata, anche con la lista vuota.
-- [ ] Salva, esito ed errore sono leggibili e vicini al comando che li produce.
-- [ ] I tre dialoghi usano i token comuni, hanno un solo primario e un backdrop leggibile sul contenuto sottostante.
-- [ ] La conferma testuale del Down con volumi resta identica.
-- [ ] Il messaggio d'errore mostra punto d'errore, testo e le azioni "Vedi output" e "Chiudi".
-- [ ] Il messaggio non sparisce mentre è letto o puntato, come già oggi.
-- [ ] Le stringhe sono in sentence case e dicono le stesse cose di prima.
-- [ ] Nessuno stile locale duplica colori, raggi o spaziature già dichiarati nei token.
-- [ ] `svelte-check` e la build sono verdi.
+- [x] Le Impostazioni mostrano le stesse due impostazioni di oggi, con la stessa validazione e lo stesso salvataggio.
+- [x] Una voce "Progetti" nella colonna riporta al riepilogo da qualunque schermata, anche con la lista vuota.
+- [x] Salva, esito ed errore sono leggibili e vicini al comando che li produce.
+- [x] I tre dialoghi usano i token comuni, hanno un solo primario e un backdrop leggibile sul contenuto sottostante.
+- [x] La conferma testuale del Down con volumi resta identica.
+- [x] Il messaggio d'errore mostra punto d'errore, testo e le azioni "Vedi output" e "Chiudi".
+- [x] Il messaggio non sparisce mentre è letto o puntato, come già oggi.
+- [x] Le stringhe sono in sentence case e dicono le stesse cose di prima.
+- [x] Nessuno stile locale duplica colori, raggi o spaziature già dichiarati nei token.
+- [x] `svelte-check` e la build sono verdi.
+
+## Comments
+
+Implementato nel commit `4385652`.
+
+Revisione finale del 2026-10-31 con punto fisso `0ab9372`: nessun rilievo
+bloccante su standard o spec. I rilievi non bloccanti sono nel report del run.
