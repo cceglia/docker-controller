@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync/atomic"
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/cairo"
@@ -75,6 +76,11 @@ type shell struct {
 	// the detail keeps it while no new snapshot arrives.
 	reachable bool
 	loading   bool
+	// usage runs `docker stats` while the window is visible. usageEpoch changes
+	// with every start and stop, so a sample still in flight is dropped and
+	// never puts old figures back on screen.
+	usage      *UsageStreamer
+	usageEpoch atomic.Uint64
 }
 
 // newShell builds the window: the list on the left, the content on the right,
@@ -127,8 +133,12 @@ func newShell(app *adw.Application, activities *ActivityLog) *shell {
 	s.window.AddBreakpoint(breakpoint)
 	s.window.SetContent(s.toasts)
 	s.detail.parent = &s.window.ApplicationWindow.Window
-	// A window that goes away must not leave `docker compose logs` running.
-	s.window.ConnectDestroy(func() { s.detail.panel.logs.StopAll() })
+	// A window that goes away must not leave `docker compose logs` or
+	// `docker stats` running.
+	s.window.ConnectDestroy(func() {
+		s.detail.panel.logs.StopAll()
+		s.stopUsage()
+	})
 	return s
 }
 
@@ -176,11 +186,70 @@ func (s *shell) watch(ctx context.Context, manager *compose.Manager) {
 	// The Log page streams through the Manager, and stops with the application.
 	s.detail.panel.logs.source = manager.Logs
 	s.detail.panel.logs.ctx = ctx
+	s.watchUsage(manager)
 	go func() {
 		for snapshot := range manager.Watch(ctx) {
 			glib.IdleAdd(func() { s.apply(snapshot) })
 		}
 	}()
+}
+
+// watchUsage wires the Utilizzo risorse: the stream runs while the window is
+// visible and stops when the window hides, so no `docker stats` outlives the
+// figures on screen.
+func (s *shell) watchUsage(manager *compose.Manager) {
+	s.usage = NewUsageStreamer(s.ctx, manager.Usage)
+	s.usage.OnSample = func(sample compose.UsageSample) {
+		epoch := s.usageEpoch.Load()
+		glib.IdleAdd(func() {
+			if s.usageEpoch.Load() != epoch {
+				return // a sample of a stream the window stopped
+			}
+			s.detail.setUsage(&sample)
+		})
+	}
+	s.usage.OnStop = func() {
+		epoch := s.usageEpoch.Load()
+		glib.IdleAdd(func() {
+			if s.usageEpoch.Load() == epoch {
+				s.detail.setUsage(nil)
+			}
+		})
+	}
+	s.usage.OnError = func(error) {
+		glib.IdleAdd(func() { s.detail.setUsage(nil) })
+	}
+	s.window.NotifyProperty("visible", s.visibilityChanged)
+}
+
+// visibilityChanged starts the stream when the window shows and stops it when
+// the window hides in the tray.
+func (s *shell) visibilityChanged() {
+	if s.window.Visible() {
+		s.startUsage()
+		return
+	}
+	s.stopUsage()
+}
+
+// startUsage begins the stream, once.
+func (s *shell) startUsage() {
+	if s.usage == nil {
+		return
+	}
+	s.usageEpoch.Add(1)
+	s.usage.Start()
+}
+
+// stopUsage ends the stream and clears the figures at once: a stopped stream
+// leaves no stale number on screen.
+func (s *shell) stopUsage() {
+	if s.usage == nil {
+		return
+	}
+	s.usageEpoch.Add(1)
+	s.usage.Stop()
+	s.detail.setUsage(nil)
 }
 
 // do launches an Action on the Manager and tells the user why it did not start.

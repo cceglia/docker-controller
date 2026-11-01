@@ -35,6 +35,12 @@ type detailView struct {
 	// paned splits the detail from the bottom panel; panel is the panel itself.
 	paned *gtk.Paned
 	panel *bottomPanel
+	// strip is the global Utilizzo risorse above the detail; blocks holds the
+	// Utilizzo risorse of each Service, by "project/service", and usage is the
+	// sample on screen, nil until one arrives and after a stop.
+	strip  *usageStrip
+	blocks map[string]*serviceUsageBlock
+	usage  *compose.UsageSample
 	// shown is the Project the detail is built from, shownDocker and
 	// shownLoading the state of Docker it was built for, and visible says
 	// whether the detail is on screen at all.
@@ -84,11 +90,19 @@ func newDetailView(activities *ActivityLog) *detailView {
 	d.paned.SetResizeStartChild(true)
 	d.paned.SetShrinkStartChild(true)
 	d.paned.SetShrinkEndChild(true)
+	d.paned.SetVExpand(true)
 	d.panel.paned = d.paned
+
+	// The global Utilizzo risorse stays one quiet row above the detail, under
+	// the header bar of the page.
+	d.strip = newUsageStrip()
+	body := gtk.NewBox(gtk.OrientationVertical, 0)
+	body.Append(d.strip.widget)
+	body.Append(d.paned)
 
 	view := adw.NewToolbarView()
 	view.AddTopBar(adw.NewHeaderBar())
-	view.SetContent(d.paned)
+	view.SetContent(body)
 
 	d.page = adw.NewNavigationPage(view, windowTitle)
 	return d
@@ -128,19 +142,51 @@ func (d *detailView) set(project compose.Project, dockerReachable, loading bool)
 	if len(project.Services) == 0 {
 		d.content.Append(emptyServices(project))
 	}
+	d.blocks = make(map[string]*serviceUsageBlock, len(project.Services))
 	for _, service := range project.Services {
-		d.content.Append(serviceGroup(project, service, dockerReachable, d.choose))
+		group, block := serviceGroup(project, service, dockerReachable, d.choose)
+		d.content.Append(group)
+		d.blocks[project.Name+"/"+service.Name] = block
 	}
+	d.applyUsage()
 	// The new rows are laid out after this call, so the scroll comes back
 	// when the main loop is idle.
 	scrolled := d.scrolled
 	glib.IdleAdd(func() { scrolled.VAdjustment().SetValue(offset) })
 }
 
+// setUsage shows a sample in the global bar and in the blocks of the Services.
+// A nil sample is a stopped stream: every figure goes away at once.
+func (d *detailView) setUsage(sample *compose.UsageSample) {
+	d.usage = sample
+	d.applyUsage()
+}
+
+// applyUsage puts the sample on screen: on the strip and on each Service block.
+// A Service the sample does not list shows the dash.
+func (d *detailView) applyUsage() {
+	d.strip.set(d.usage)
+	byService := map[string]compose.ServiceUsage{}
+	if d.usage != nil {
+		for _, usage := range d.usage.Services {
+			byService[usage.Project+"/"+usage.Service] = usage
+		}
+	}
+	for key, block := range d.blocks {
+		usage, ok := byService[key]
+		if !ok {
+			block.set(d.usage, nil)
+			continue
+		}
+		block.set(d.usage, &usage)
+	}
+}
+
 // clear goes back to the invitation, for when the open Project is gone.
 func (d *detailView) clear() {
 	d.visible = false
 	d.panel.closeLogs()
+	d.blocks = nil
 	removeAll(d.content)
 	d.page.SetTitle(windowTitle)
 	d.stack.SetVisibleChildName("empty")
@@ -341,17 +387,33 @@ func emptyServices(project compose.Project) *gtk.Label {
 	return label
 }
 
-// serviceGroup is one block of the detail: the Actions of a Service, its name
-// and one row per Container, in the order the Project reports them.
-func serviceGroup(project compose.Project, service compose.Service, dockerReachable bool, choose func(ActionView)) *adw.PreferencesGroup {
+// serviceGroup is one block of the detail: the Actions of a Service, its name,
+// its Utilizzo risorse and one row per Container, in the order the Project
+// reports them. It returns the block of the measures, so the detail updates it
+// without rebuilding the group.
+func serviceGroup(project compose.Project, service compose.Service, dockerReachable bool, choose func(ActionView)) (*adw.PreferencesGroup, *serviceUsageBlock) {
 	group := adw.NewPreferencesGroup()
 	group.SetTitle(service.Name)
 	reason := ActionDisabledReason(dockerReachable, project.Activity != nil)
 	group.SetHeaderSuffix(actionBar(ServiceActions(project, service, dockerReachable), reason, false, choose))
+
+	block := newServiceUsageBlock(ServiceRuns(service))
+	row := gtk.NewListBoxRow()
+	row.SetActivatable(false)
+	row.SetSelectable(false)
+	usageBox := gtk.NewBox(gtk.OrientationVertical, 0)
+	usageBox.SetMarginTop(6)
+	usageBox.SetMarginBottom(8)
+	usageBox.SetMarginStart(12)
+	usageBox.SetMarginEnd(12)
+	usageBox.Append(block.widget)
+	row.SetChild(usageBox)
+	group.Add(row)
+
 	for _, container := range service.Containers {
 		group.Add(containerRow(container))
 	}
-	return group
+	return group, block
 }
 
 // containerRow is one Container: the marker of its tone, its name, its image,
