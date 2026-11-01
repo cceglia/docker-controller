@@ -69,7 +69,7 @@ I Profili che l'utente ha scelto di usare per un Progetto salvato; valgono per t
 ## Azioni
 
 **Azione**:
-Un'operazione lanciata su un Progetto o su un suo Servizio: Up, Stop, Restart, Pull, Build, Down, Down con volumi.
+Un'operazione lanciata su un Progetto o su un suo Servizio: Up, Stop, Restart, Start, Pull, Build, Down, Down con volumi.
 _Avoid_: comando, operazione
 
 **Attività**:

@@ -1,6 +1,6 @@
 # GUI GTK4 con gotk4
 
-**Status:** resolved
+**Status:** superseded by `05-miqt`
 
 ## Problem Statement
 

@@ -37,6 +37,22 @@ Issue e spec sono file markdown locali in `docs/specs/`. See `docs/agents/issue-
 
 **REGOLA OBBLIGATORIA: ogni cartella dentro `docs/specs/` porta un ID numerico come prefisso, nel formato `<id>-<nome>`.** L'ID è di due cifre e cresce in ordine di creazione: `01-docker-controller-v1`, `02-restyling-interfaccia`, `03-wails-v3-stabile`, `04-gotk4`. Una cartella di spec senza prefisso non è ammessa, nemmeno per una spec appena creata, temporanea o di prova. Un ID già usato non si riusa. Se crei una spec, prima scegli il numero successivo e poi la cartella.
 
+### UI
+
+La vista usa Qt 6 Widgets tramite miqt. Ogni modifica a una finestra, un
+dialogo, un form, una card, un menu o l'icona di sistema carica prima la skill
+locale `.agents/skills/miqt-ui-design` e ne segue le regole: gerarchia di
+layout, scala tipografica, ruoli del foglio di stile, focus, nomi accessibili,
+tray e thread Qt.
+
+Le revisioni di layout e di navigazione, e le decisioni di UX, usano
+`.agents/skills/qt-ui-design`. La regola vale anche per ogni subagent a cui
+deleghi lavoro sulla UI.
+
+La verifica di una modifica alla UI passa da `make test-ui`: smoke test
+offscreen della finestra e test dei token di design. Il passaggio sugli
+screenshot resta manuale.
+
 ### Triage labels
 
 Le cinque etichette canoniche predefinite (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
