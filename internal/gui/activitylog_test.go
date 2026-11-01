@@ -2,6 +2,7 @@ package gui
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"dockercontroller/internal/compose"
@@ -322,6 +323,93 @@ func TestActivityLog_NotifiesAfterAChange(t *testing.T) {
 	log.Push(finished("act-1", "shop", "", compose.ActionUp, "", ""))
 	if calls != 3 {
 		t.Fatalf("calls after finished = %d, want 3", calls)
+	}
+}
+
+func TestActivityLog_Clear(t *testing.T) {
+	// The history of the window before: two Activities, one of them failed.
+	before := []compose.ActivityEvent{
+		started("act-1", "shop", "", compose.ActionUp),
+		output("act-1", "shop", "", compose.ActionUp, "one", false),
+		finished("act-1", "shop", "", compose.ActionUp, "boom", "boom"),
+		started("act-2", "blog", "db", compose.ActionStart),
+	}
+
+	for _, tc := range []struct {
+		name   string
+		before []compose.ActivityEvent
+		after  []compose.ActivityEvent
+		want   []compose.ActivityID
+	}{
+		{
+			name: "an empty log stays empty",
+		},
+		{
+			name:   "the history of the window before is gone",
+			before: before,
+		},
+		{
+			name:   "an Activity after the clear appears alone",
+			before: before,
+			after:  []compose.ActivityEvent{started("act-3", "shop", "", compose.ActionStop)},
+			want:   []compose.ActivityID{"act-3"},
+		},
+		{
+			name:   "the events of an Activity before the clear stay out",
+			before: before,
+			after: []compose.ActivityEvent{
+				output("act-2", "blog", "db", compose.ActionStart, "late", false),
+				finished("act-2", "blog", "db", compose.ActionStart, "", ""),
+				started("act-3", "shop", "", compose.ActionStop),
+			},
+			want: []compose.ActivityID{"act-3"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			log := NewActivityLog()
+			for _, e := range tc.before {
+				log.Push(e)
+			}
+			log.Clear()
+			for _, e := range tc.after {
+				log.Push(e)
+			}
+
+			var ids []compose.ActivityID
+			for _, a := range log.Activities() {
+				ids = append(ids, a.ID)
+			}
+			if !slices.Equal(ids, tc.want) {
+				t.Errorf("Activities() = %v, want %v", ids, tc.want)
+			}
+
+			// An Activity of the window before the clear is gone, even when
+			// the view asks for it by its ID.
+			for _, e := range tc.before {
+				if e.Type != compose.ActivityStarted || slices.Contains(tc.want, e.ID) {
+					continue
+				}
+				if _, ok := log.Activity(e.ID); ok {
+					t.Errorf("Activity(%q) found after the clear, want none", e.ID)
+				}
+			}
+		})
+	}
+}
+
+func TestActivityLog_ClearNotifiesTheSubscriber(t *testing.T) {
+	log := NewActivityLog()
+	calls := 0
+	log.OnChange(func() { calls++ })
+
+	log.Push(started("act-1", "shop", "", compose.ActionUp))
+	log.Clear()
+
+	if calls != 2 {
+		t.Fatalf("calls = %d, want 2: the clear must notify the subscriber", calls)
+	}
+	if got := log.Activities(); len(got) != 0 {
+		t.Errorf("Activities() = %v, want none", got)
 	}
 }
 

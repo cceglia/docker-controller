@@ -185,7 +185,7 @@ func (a *addDialog) fileRow(index int, file string) *adw.ActionRow {
 // accepts more than one file, so a Project with an override arrives in one go.
 // A picker the user closed changes nothing.
 func (a *addDialog) pick() {
-	pickComposeFiles(a.shell.ctx, &a.shell.window.ApplicationWindow.Window, func(paths []string) {
+	pickComposeFiles(a.shell.app.ctx, &a.shell.window.ApplicationWindow.Window, func(paths []string) {
 		if _, err := a.form.Pick(paths, compose.ProposeName); err != nil {
 			a.showError(UserError(err).Error())
 		}

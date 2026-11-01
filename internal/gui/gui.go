@@ -1,22 +1,16 @@
 package gui
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"sync/atomic"
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/cairo"
-	"github.com/diamondburned/gotk4/pkg/gio/v2"
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 	"github.com/diamondburned/gotk4/pkg/pango"
 
 	"dockercontroller/internal/compose"
-	"dockercontroller/internal/settings"
-	"dockercontroller/internal/tray"
-	"dockercontroller/internal/trayadapter"
 )
 
 const (
@@ -39,52 +33,28 @@ const (
 	showOutputText = "Vedi output"
 )
 
-// Run opens the window and blocks until the application quits. The snapshot of
-// the Manager is read through Watch, so a Project added or removed appears
-// without a restart. activities is the log of the session: the bottom panel
-// reads it and the Manager pushes its events into it. store holds the settings:
-// the terminal command of "Apri terminale" comes from it. notifier shows the
-// desktop notifications the Manager's events and the tray Actions deserve.
-func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog, store *settings.Store, notifier *Notifier) error {
-	app := adw.NewApplication(appID, gio.ApplicationDefaultFlags)
-	var window *shell
-	app.ConnectActivate(func() {
-		if window != nil {
-			window.window.Present()
-			return
-		}
-		window = newShell(app, activities, store, notifier)
-		window.watch(ctx, manager)
-		window.window.Present()
-	})
-	app.Run(os.Args)
-	return nil
-}
-
-// shell owns the window and the two sides of its split view.
+// shell is the window of the application. It owns the widgets, the lower panel,
+// the log streams and the usage stream; everything that outlives it belongs to
+// the application. A hidden window is destroyed, and the next one is built from
+// the latest snapshot.
 type shell struct {
-	// app is the application: "Esci" quits it, so the loop returns.
-	app     *adw.Application
-	window  *adw.ApplicationWindow
-	toasts  *adw.ToastOverlay
-	split   *adw.NavigationSplitView
-	list    *gtk.ListBox
+	// app is the application this window belongs to: its settings, log,
+	// notifier, tray and Manager.
+	app    *application
+	window *adw.ApplicationWindow
+	toasts *adw.ToastOverlay
+	split  *adw.NavigationSplitView
+	list   *gtk.ListBox
+	// content is the page of the detail in the split view.
 	content *adw.NavigationPage
 	detail  *detailView
-	// tray is the icon in the system tray, nil when it could not start.
-	tray *trayadapter.Tray
 	// confirmations are the questions of the tray that are on screen.
 	confirmations []*adw.MessageDialog
-	// manager runs the Actions and ctx stops them when the application quits.
-	manager *compose.Manager
-	ctx     context.Context
-	// store holds the settings: the terminal command of "Apri terminale".
-	store *settings.Store
-	// notifier shows the desktop notifications of the Activities and of the
-	// tray Actions the Manager refuses.
-	notifier *Notifier
-	// snapshot is the last one applied: the tray builds its menu from it.
-	snapshot compose.Snapshot
+	// ask is the dialog of "Chiedi ogni volta" while it is on screen.
+	ask *adw.MessageDialog
+	// closing is true once the window is about to be destroyed, so a second
+	// close request does nothing.
+	closing bool
 	// add is the dialog of a new Project while it is on screen, nil otherwise.
 	add *addDialog
 	// rows maps the index of a row of the list to its Project. GTK hands the
@@ -108,16 +78,13 @@ type shell struct {
 
 // newShell builds the window: the list on the left, the content on the right,
 // and the breakpoint that collapses the two into pages under 900 sp.
-func newShell(app *adw.Application, activities *ActivityLog, store *settings.Store, notifier *Notifier) *shell {
+func newShell(app *application) *shell {
 	// Until the first snapshot arrives Docker has not been asked yet, so the
-	// detail must not call it unreachable and the tray must not show the notice.
+	// detail must not call it unreachable.
 	s := &shell{
-		app:      app,
-		rows:     map[int]compose.Project{},
-		loading:  true,
-		store:    store,
-		notifier: notifier,
-		snapshot: compose.Snapshot{Loading: true},
+		app:     app,
+		rows:    map[int]compose.Project{},
+		loading: true,
 	}
 
 	s.list = gtk.NewListBox()
@@ -137,7 +104,7 @@ func newShell(app *adw.Application, activities *ActivityLog, store *settings.Sto
 	sidebar.SetContent(scrolled)
 	sidebar.AddBottomBar(s.sidebarActions())
 
-	s.detail = newDetailView(activities)
+	s.detail = newDetailView(app.activities)
 	s.detail.onAction = s.do
 	s.detail.onSave = s.saveSettings
 	s.detail.onFolder = s.openFolder
@@ -162,18 +129,19 @@ func newShell(app *adw.Application, activities *ActivityLog, store *settings.Sto
 	s.toasts = adw.NewToastOverlay()
 	s.toasts.SetChild(s.split)
 
-	s.window = adw.NewApplicationWindow(&app.Application)
+	s.window = adw.NewApplicationWindow(&app.gtk.Application)
 	s.window.SetTitle(windowTitle)
 	s.window.SetDefaultSize(windowWidth, windowHeight)
 	s.window.AddBreakpoint(breakpoint)
 	s.window.SetContent(s.toasts)
 	s.detail.parent = &s.window.ApplicationWindow.Window
-	// A window that goes away must not leave `docker compose logs` or
-	// `docker stats` running.
-	s.window.ConnectDestroy(func() {
-		s.detail.panel.logs.StopAll()
-		s.stopUsage()
-	})
+
+	// The Log page streams through the Manager, and stops with the window.
+	s.detail.panel.logs.source = app.manager.Logs
+	s.detail.panel.logs.ctx = app.ctx
+	s.watchUsage()
+
+	s.window.ConnectCloseRequest(s.onCloseRequest)
 	return s
 }
 
@@ -188,7 +156,7 @@ func sidebarBar() *adw.HeaderBar {
 }
 
 // sidebarActions is the bar under the list. The button of a new Project asks for
-// its File compose; Impostazioni stays insensitive until its ticket wires it.
+// its File compose; Impostazioni opens the settings window.
 func (s *shell) sidebarActions() *gtk.ActionBar {
 	bar := gtk.NewActionBar()
 
@@ -198,8 +166,8 @@ func (s *shell) sidebarActions() *gtk.ActionBar {
 	bar.PackStart(add)
 
 	prefs := gtk.NewButtonWithLabel("Impostazioni")
-	prefs.SetSensitive(false)
 	prefs.SetTooltipText("Apri le Impostazioni.")
+	prefs.ConnectClicked(s.app.openPreferences)
 	bar.PackEnd(prefs)
 
 	return bar
@@ -214,29 +182,11 @@ func contentPlaceholder() *adw.StatusPage {
 	return page
 }
 
-// watch follows the Manager and moves every snapshot onto the GTK loop.
-func (s *shell) watch(ctx context.Context, manager *compose.Manager) {
-	s.ctx = ctx
-	s.manager = manager
-	// The Log page streams through the Manager, and stops with the application.
-	s.detail.panel.logs.source = manager.Logs
-	s.detail.panel.logs.ctx = ctx
-	s.watchUsage(manager)
-	// The tray shows the state before the first snapshot, so the icon is on the
-	// panel as soon as the window is.
-	s.startTray()
-	go func() {
-		for snapshot := range manager.Watch(ctx) {
-			glib.IdleAdd(func() { s.apply(snapshot) })
-		}
-	}()
-}
-
 // watchUsage wires the Utilizzo risorse: the stream runs while the window is
 // visible and stops when the window hides, so no `docker stats` outlives the
 // figures on screen.
-func (s *shell) watchUsage(manager *compose.Manager) {
-	s.usage = NewUsageStreamer(s.ctx, manager.Usage)
+func (s *shell) watchUsage() {
+	s.usage = NewUsageStreamer(s.app.ctx, s.app.manager.Usage)
 	s.usage.OnSample = func(sample compose.UsageSample) {
 		epoch := s.usageEpoch.Load()
 		glib.IdleAdd(func() {
@@ -293,10 +243,10 @@ func (s *shell) stopUsage() {
 // do launches an Action on the Manager and tells the user why it did not start.
 // The outcome of the Activity belongs to a later ticket.
 func (s *shell) do(action compose.Action) {
-	if s.manager == nil {
+	if s.app.manager == nil {
 		return
 	}
-	if _, err := s.manager.Do(s.ctx, action); err != nil {
+	if _, err := s.app.manager.Do(s.app.ctx, action); err != nil {
 		s.toast(UserError(err).Error())
 	}
 }
@@ -306,11 +256,11 @@ func (s *shell) do(action compose.Action) {
 // loop; a refusal comes back as the Italian message. The form already went back
 // to rest, so a refusal leaves the saved values on screen.
 func (s *shell) saveSettings(name string, settings compose.Settings) {
-	if s.manager == nil {
+	if s.app.manager == nil {
 		return
 	}
 	go func() {
-		if err := s.manager.UpdateSettings(s.ctx, name, settings); err != nil {
+		if err := s.app.manager.UpdateSettings(s.app.ctx, name, settings); err != nil {
 			glib.IdleAdd(func() { s.toast(UserError(err).Error()) })
 		}
 	}()
@@ -336,13 +286,6 @@ func (s *shell) activityFailed(a Activity) {
 // apply rebuilds the list from a snapshot, keeping the open Project selected
 // and refreshing its detail in place.
 func (s *shell) apply(snapshot compose.Snapshot) {
-	s.snapshot = snapshot
-	// A notification names a Project as the list does, and the snapshot is the
-	// last place that tells the Display name.
-	s.notifier.SetProjects(snapshot.Projects)
-	if s.tray != nil {
-		s.tray.Show(tray.BuildMenu(snapshot), tray.IconFor(snapshot))
-	}
 	s.reachable = snapshot.DockerReachable
 	s.loading = snapshot.Loading
 	s.projects = snapshot.Projects

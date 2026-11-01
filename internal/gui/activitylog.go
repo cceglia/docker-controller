@@ -145,6 +145,8 @@ func ActivityOutput(a Activity) string {
 //
 // The log never stops an Activity and never waits for the view: Push holds the
 // lock only to change the history, and calls the subscriber after unlocking.
+// The application clears it when it builds a new window, so the history of a
+// destroyed window never comes back.
 type ActivityLog struct {
 	mu         sync.Mutex
 	activities []Activity // newest first
@@ -210,6 +212,22 @@ func (l *ActivityLog) Push(e compose.ActivityEvent) {
 	l.mu.Unlock()
 
 	if changed && notify != nil {
+		notify()
+	}
+}
+
+// Clear empties the history: a window opens with no Activity, as the dialog of
+// the close says. The subscriber, when set, runs after the clear, so a view
+// still on screen shows nothing. An Activity that ran before the clear stays
+// out: its later events name an ID the log no longer knows.
+func (l *ActivityLog) Clear() {
+	l.mu.Lock()
+	l.activities = nil
+	l.index = map[compose.ActivityID]int{}
+	notify := l.onChange
+	l.mu.Unlock()
+
+	if notify != nil {
 		notify()
 	}
 }

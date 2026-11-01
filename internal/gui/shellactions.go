@@ -12,11 +12,11 @@ import (
 // loop: onDone runs with the refusal of the Manager, nil when the Project is
 // saved. The write runs off the loop, so the window stays responsive.
 func (s *shell) addProject(name string, files []string, onDone func(error)) {
-	if s.manager == nil {
+	if s.app.manager == nil {
 		return
 	}
 	go func() {
-		err := s.manager.AddProject(s.ctx, name, files)
+		err := s.app.manager.AddProject(s.app.ctx, name, files)
 		glib.IdleAdd(func() { onDone(err) })
 	}()
 }
@@ -47,10 +47,10 @@ func (s *shell) selectProject(name string) {
 // form with them. The picker accepts more than one file, and a picker the user
 // closed opens nothing.
 func (s *shell) showAddDialog() {
-	if s.manager == nil || s.add != nil {
+	if s.app.manager == nil || s.add != nil {
 		return
 	}
-	pickComposeFiles(s.ctx, &s.window.ApplicationWindow.Window, s.addPicked, func(err error) {
+	pickComposeFiles(s.app.ctx, &s.window.ApplicationWindow.Window, s.addPicked, func(err error) {
 		s.toast(UserError(err).Error())
 	})
 }
@@ -59,7 +59,7 @@ func (s *shell) showAddDialog() {
 // name compose proposes for the main one. Files already chosen add nothing, so
 // an empty pick opens nothing.
 func (s *shell) addPicked(paths []string) {
-	if s.manager == nil || s.add != nil {
+	if s.app.manager == nil || s.add != nil {
 		return
 	}
 	var form AddProjectForm
@@ -108,11 +108,11 @@ func (s *shell) openTerminal(name string) {
 		s.toast(UserError(err).Error())
 		return
 	}
-	if s.store == nil {
+	if s.app.store == nil {
 		return
 	}
 	go func() {
-		cfg, err := s.store.Get(s.ctx)
+		cfg, err := s.app.store.Get(s.app.ctx)
 		if err != nil {
 			glib.IdleAdd(func() { s.toast(UserError(err).Error()) })
 			return
@@ -162,11 +162,11 @@ func (s *shell) openExternal(target string) {
 // Docker: the Manager asks Docker again and refuses a Project that still has a
 // Container.
 func (s *shell) removeFromList(name string) {
-	if s.manager == nil {
+	if s.app.manager == nil {
 		return
 	}
 	go func() {
-		if err := s.manager.RemoveFromList(s.ctx, name); err != nil {
+		if err := s.app.manager.RemoveFromList(s.app.ctx, name); err != nil {
 			glib.IdleAdd(func() { s.toast(UserError(err).Error()) })
 		}
 	}()
