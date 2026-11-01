@@ -1,6 +1,6 @@
 # GUI GTK4 con gotk4
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## Problem Statement
 

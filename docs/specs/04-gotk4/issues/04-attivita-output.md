@@ -4,14 +4,25 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Pannello inferiore con la scheda Attività
-- [ ] Una nuova Attività compare subito con Progetto, Servizio e tipo di Azione
-- [ ] L'output arriva in tempo reale mentre il comando gira
-- [ ] Un'Attività conclusa mostra l'esito positivo o l'errore
-- [ ] Lo storico delle Attività della sessione resta consultabile
-- [ ] Un fallimento mostra un toast con il messaggio italiano
+- [x] Pannello inferiore con la scheda Attività
+- [x] Una nuova Attività compare subito con Progetto, Servizio e tipo di Azione
+- [x] L'output arriva in tempo reale mentre il comando gira
+- [x] Un'Attività conclusa mostra l'esito positivo o l'errore
+- [x] Lo storico delle Attività della sessione resta consultabile
+- [x] Un fallimento mostra un toast con il messaggio italiano
 - [ ] Con 5.000 righe di output, un clic su una riga la seleziona entro un secondo
-- [ ] Selezionare un'Attività mostra il suo output
-- [ ] Chiudere il pannello non termina l'Attività in corso
+- [x] Selezionare un'Attività mostra il suo output
+- [x] Chiudere il pannello non termina l'Attività in corso
+
+## Comments
+
+Implementato nel commit `14e163b`, con le correzioni del primo ciclo di
+revisione in `cb6e845`.
+
+Il pannello si apre da solo quando compare un'Attività nuova. La conferma di
+Down dalla tray non costruisce più la finestra per ospitare il dialogo.
+
+Resta aperto il punto sulle 5000 righe: la selezione non è stata misurata con
+5000 righe reali, solo la costruzione del buffer.

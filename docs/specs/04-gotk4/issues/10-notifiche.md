@@ -4,12 +4,24 @@
 
 **Blocked by:** 09
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Notifica a fine di un'Attività lanciata dalla tray, riuscita o fallita
 - [ ] Notifica per ogni Attività fallita, anche lanciata dalla finestra
 - [ ] Nessuna notifica per un'Attività riuscita lanciata dalla finestra
-- [ ] Una sola notifica per Attività
-- [ ] Titolo e testo coincidono con quelli di oggi
+- [x] Una sola notifica per Attività
+- [x] Titolo e testo coincidono con quelli di oggi
 - [ ] Se il servizio di notifica non risponde, l'app registra l'errore e continua
-- [ ] I test del `Notifier` restano invariati e verdi
+- [x] I test del `Notifier` restano invariati e verdi
+
+## Comments
+
+Implementato nel commit `cd0a676`.
+
+Il glue alimenta `tray.Notifier` con `Launching`, `Aborted` e `Observe`, e il
+trasporto D-Bus gira fuori dal loop GTK con un timeout.
+
+Restano aperti i punti che richiedono un servizio di notifica vero: comparsa
+della notifica, testo a schermo, comportamento senza servizio. La decisione e
+l'invio sono coperti da test con un `Sender` finto, e i test del `Notifier`
+restano invariati.

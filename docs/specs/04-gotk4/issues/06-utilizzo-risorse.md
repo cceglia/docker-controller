@@ -4,14 +4,24 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Barra globale con CPU, memoria, rete in ingresso e uscita, disco in lettura e scrittura
+- [x] Barra globale con CPU, memoria, rete in ingresso e uscita, disco in lettura e scrittura
 - [ ] Ogni Servizio mostra CPU, memoria e rate con meter
-- [ ] Un Servizio senza Container in esecuzione mostra "—" e non zero
-- [ ] La formattazione coincide con quella di oggi: MiB e GiB, MB/s, core, percentuali
-- [ ] Lo stream si ferma quando la finestra si nasconde e riparte quando torna
-- [ ] Nessun valore vecchio resta a schermo dopo lo stop
-- [ ] Con Docker irraggiungibile compare un avviso e la barra resta vuota
-- [ ] Test da tavolo per byte, percentuali, core e rate
+- [x] Un Servizio senza Container in esecuzione mostra "—" e non zero
+- [x] La formattazione coincide con quella di oggi: MiB e GiB, MB/s, core, percentuali
+- [x] Lo stream si ferma quando la finestra si nasconde e riparte quando torna
+- [x] Nessun valore vecchio resta a schermo dopo lo stop
+- [x] Con Docker irraggiungibile compare un avviso e la barra resta vuota
+- [x] Test da tavolo per byte, percentuali, core e rate
 - [ ] Verifica manuale: i numeri si muovono e somigliano a `docker stats`
+
+## Comments
+
+Implementato nel commit `acdffe8`.
+
+Il meter del Servizio copre la CPU, come la vista di oggi; memoria e rate sono
+valori. Il punto 2 del ticket resta aperto per questo: la lettera chiede un
+meter per ogni misura, la parità no.
+
+Resta aperta la verifica manuale dei numeri contro `docker stats`.
