@@ -29,6 +29,16 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 		snapshot: compose.Snapshot{Loading: true},
 	}
 
+	// The settings come before the first window and before the Qt thread: a
+	// close reads them at once, and a database that cannot be read applies the
+	// defaults, so the user is never locked in the window.
+	a.prefs = settings.Defaults()
+	if store != nil {
+		if saved, err := store.Get(ctx); err == nil {
+			a.prefs = saved
+		}
+	}
+
 	// QApplication calls runtime.LockOSThread, so the Qt main thread stays the
 	// thread of Run for the life of the process.
 	a.qt = qt6.NewQApplication(os.Args)
@@ -41,9 +51,9 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 	qt6.QGuiApplication_SetDesktopFileName(appID)
 	// The display name is what the window list of the desktop reads.
 	qt6.QGuiApplication_SetApplicationDisplayName(windowTitle)
-	// Closing the window ends the application. Hiding it in the tray, and the
-	// choice of what the close does, arrive in a later ticket.
-	qt6.QGuiApplication_SetQuitOnLastWindowClosed(true)
+	// Closing the window hides it, so the application does not end with its last
+	// window: the close event decides, and "Esci" is what quits.
+	qt6.QGuiApplication_SetQuitOnLastWindowClosed(false)
 
 	// The window colour of the desktop palette picks the palette of the roles
 	// the sheet carries: a dark window needs lighter colours to keep the
@@ -94,6 +104,10 @@ type application struct {
 	activities *ActivityLog
 	store      *settings.Store
 	notifier   *Notifier
+	// prefs is the saved settings: what a close does and the terminal command.
+	// It is read once at startup and after every save, so a close answers
+	// without a query.
+	prefs settings.Settings
 	// shell is the window of the application.
 	shell *shell
 	// tray is the icon on the panel, nil when the desktop has no tray.
@@ -101,6 +115,13 @@ type application struct {
 	// question is the modal question of a destructive Action chosen in the tray
 	// while it is open, so a second click cannot open a second one.
 	question *confirmDialog
+	// prefsDialog is the settings dialog on screen and closeQuestion the
+	// "Chiedi ogni volta" question of a close: each one opens once.
+	prefsDialog   *preferencesDialog
+	closeQuestion *closeDialog
+	// quitting is true from the first quit: the close event that follows starts
+	// nothing.
+	quitting bool
 	// snapshot is the last one applied.
 	snapshot compose.Snapshot
 }

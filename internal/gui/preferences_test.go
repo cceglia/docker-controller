@@ -51,6 +51,107 @@ func TestCloseBehaviorIndexAndAt_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestCloseBehaviorAvailable(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		behavior settings.CloseBehavior
+		tray     bool
+		want     bool
+	}{
+		{"hide with a tray", settings.CloseHide, true, true},
+		{"hide without a tray", settings.CloseHide, false, false},
+		{"quit without a tray", settings.CloseQuit, false, true},
+		{"ask without a tray", settings.CloseAsk, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := closeBehaviorAvailable(tc.behavior, tc.tray); got != tc.want {
+				t.Errorf("closeBehaviorAvailable(%q, %v) = %v, want %v", tc.behavior, tc.tray, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCloseBehaviorShown(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		behavior settings.CloseBehavior
+		tray     bool
+		want     settings.CloseBehavior
+	}{
+		{"hide with a tray", settings.CloseHide, true, settings.CloseHide},
+		{"quit stays quit", settings.CloseQuit, true, settings.CloseQuit},
+		{"ask stays ask", settings.CloseAsk, true, settings.CloseAsk},
+		// Hiding needs the tray: without one the window would never come back,
+		// and the close quits. The dialog shows what the close really does.
+		{"hide without a tray reads as quit", settings.CloseHide, false, settings.CloseQuit},
+		{"ask without a tray stays ask", settings.CloseAsk, false, settings.CloseAsk},
+		{"unknown shows the default", settings.CloseBehavior("maybe"), true, settings.CloseHide},
+		{"unknown without a tray reads as quit", settings.CloseBehavior("maybe"), false, settings.CloseQuit},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := closeBehaviorShown(tc.behavior, tc.tray); got != tc.want {
+				t.Errorf("closeBehaviorShown(%q, %v) = %q, want %q", tc.behavior, tc.tray, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateTerminalCommand(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		command string
+		want    string
+	}{
+		{"empty means the default", "", ""},
+		{"blanks mean the default", "   \t", ""},
+		{"plain command", "konsole --workdir {dir}", ""},
+		{"quoted argument", `konsole -e sh -c "cd {dir} && ls"`, ""},
+		{"single quotes", "konsole --workdir '{dir}'", ""},
+		{"unterminated quote", `konsole --workdir "dir`, "Comando del terminale non valido"},
+		{"trailing backslash", `konsole {dir}\`, "Comando del terminale non valido"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := validateTerminalCommand(tc.command)
+			if !strings.Contains(got, tc.want) {
+				t.Errorf("validateTerminalCommand(%q) = %q, want it to contain %q", tc.command, got, tc.want)
+			}
+			if strings.Contains(got, "settings:") {
+				t.Errorf("the English error leaked: %q", got)
+			}
+		})
+	}
+}
+
+func TestStoredSettings(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value settings.Settings
+		want  settings.Settings
+	}{
+		{
+			name:  "a command stays as it is",
+			value: settings.Settings{CloseBehavior: settings.CloseAsk, TerminalCommand: "konsole --workdir {dir}"},
+			want:  settings.Settings{CloseBehavior: settings.CloseAsk, TerminalCommand: "konsole --workdir {dir}"},
+		},
+		{
+			name:  "blank spaces around a command go",
+			value: settings.Settings{CloseBehavior: settings.CloseQuit, TerminalCommand: "  konsole {dir} "},
+			want:  settings.Settings{CloseBehavior: settings.CloseQuit, TerminalCommand: "konsole {dir}"},
+		},
+		{
+			name:  "a blank command is the default one",
+			value: settings.Settings{CloseBehavior: settings.CloseHide, TerminalCommand: "   "},
+			want:  settings.Settings{CloseBehavior: settings.CloseHide, TerminalCommand: settings.DefaultTerminalCommand},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := storedSettings(tc.value); got != tc.want {
+				t.Errorf("storedSettings(%+v) = %+v, want %+v", tc.value, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestPreferencesSaveOutcome(t *testing.T) {
 	for _, tc := range []struct {
 		name        string

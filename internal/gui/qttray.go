@@ -195,9 +195,18 @@ func (a *application) present() {
 }
 
 // quit ends the application: "Esci" of the tray and of the window both land
-// here, so the two ways out behave the same. QApplication inherits quit from
-// QCoreApplication, which is the binding miqt exposes.
+// here, so the two ways out behave the same. The streams stop before the event
+// loop ends, so no `docker compose logs` and no `docker stats` outlives the
+// window. QApplication inherits quit from QCoreApplication, which is the binding
+// miqt exposes.
 func (a *application) quit() {
+	if a.quitting {
+		return
+	}
+	a.quitting = true
+	if a.shell != nil {
+		a.shell.stopStreams()
+	}
 	qt6.QCoreApplication_Quit()
 }
 

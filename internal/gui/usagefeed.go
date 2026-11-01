@@ -33,6 +33,13 @@ type usageFeed struct {
 	// project is the Project the stream follows, "" when none is open. A change
 	// of Project ends the stream of the old one before the new one starts.
 	project string
+	// followed is the Project the window shows and reachable is what the last
+	// snapshot said of Docker: the two decide the stream together with hidden.
+	followed  compose.Project
+	reachable bool
+	// hidden is true while the window is off screen: `docker stats` runs only
+	// while the figures can be seen.
+	hidden bool
 	// gen bumps at every change of stream: it is what tells a sample of a stream
 	// that ended from the sample of the one on screen.
 	gen uint64
@@ -63,14 +70,38 @@ func newUsageFeed(ctx context.Context, source UsageSource, draw func(func())) *u
 	return f
 }
 
-// Follow starts or stops the stream for the Project the detail shows. The
-// stream runs while Docker answers and the Project has a Container in
-// execution; a Project without one, and a Docker that leaves, end it, so no
-// `docker stats` outlives what it measures.
+// Follow keeps the Project the detail shows and its Docker state, and starts or
+// stops the stream. The stream runs while the window is on screen, Docker
+// answers and the Project has a Container in execution; a Project without one, a
+// Docker that leaves and a hidden window end it, so no `docker stats` outlives
+// what it measures.
 func (f *usageFeed) Follow(project compose.Project, dockerReachable bool) {
-	want := dockerReachable && f.source != nil && project.Running > 0
-
 	f.mu.Lock()
+	f.followed, f.reachable = project, dockerReachable
+	f.mu.Unlock()
+	f.refresh()
+}
+
+// SetHidden stops the stream when the window leaves the screen and starts it
+// again when the window comes back. The Project and its Docker state stay, so
+// the return reads no snapshot to know what to measure.
+func (f *usageFeed) SetHidden(hidden bool) {
+	f.mu.Lock()
+	changed := f.hidden != hidden
+	f.hidden = hidden
+	f.mu.Unlock()
+	if changed {
+		f.refresh()
+	}
+}
+
+// refresh starts or stops the stream the current state asks for. Only a change
+// of the answer touches the stream, so a new snapshot that changes nothing keeps
+// `docker stats` running.
+func (f *usageFeed) refresh() {
+	f.mu.Lock()
+	project := f.followed
+	want := !f.hidden && f.reachable && f.source != nil && project.Running > 0
 	changed := f.project != project.Name
 	was := f.on
 	restart := want && (!was || changed)

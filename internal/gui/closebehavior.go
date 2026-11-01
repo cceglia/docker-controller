@@ -10,7 +10,9 @@ import (
 type closeAction int
 
 const (
-	// closeHide destroys the window and leaves the application in the tray.
+	// closeHide takes the window off the screen and leaves the application in
+	// the tray. The window, the open Project and the history stay, so the tray
+	// brings them back.
 	closeHide closeAction = iota
 	// closeQuit stops the streams and quits the application.
 	closeQuit
@@ -18,10 +20,14 @@ const (
 	closeAsk
 )
 
-// closeActionFor reads a saved close behavior. A value the settings do not know
-// keeps the default of a fresh installation, so closing never traps the user in
-// the window.
-func closeActionFor(b settings.CloseBehavior) closeAction {
+// closeActionFor reads a saved close behavior. Without a tray the window could
+// not come back, so every behavior quits. A value the settings do not know keeps
+// the default of a fresh installation, so closing never traps the user in the
+// window.
+func closeActionFor(b settings.CloseBehavior, tray bool) closeAction {
+	if !tray {
+		return closeQuit
+	}
 	switch b {
 	case settings.CloseQuit:
 		return closeQuit
@@ -35,17 +41,33 @@ func closeActionFor(b settings.CloseBehavior) closeAction {
 const (
 	// askCloseHeading is the title of the "Chiedi ogni volta" dialog.
 	askCloseHeading = "Chiudere la finestra?"
-	// askCloseBody is the body of the dialog: it says what the user loses.
-	askCloseBody = "Puoi chiudere la finestra e restare nel tray, con i Progetti sotto controllo, " +
-		"oppure uscire dall'app. La cronologia delle Attività va persa."
+	// askCloseBody is the body of the dialog: it says what the two answers do,
+	// and it promises nothing that does not happen. The window is hidden and
+	// not destroyed, so the open Project and the history of the Activities wait
+	// for the next click on the tray icon.
+	askCloseBody = "Puoi nascondere la finestra e restare nel tray, con i Progetti sotto controllo, " +
+		"oppure uscire dall'app. Riaprendo la finestra ritrovi il Progetto aperto e la cronologia delle Attività."
 	// rememberCloseText is the control that saves the answer as the setting.
 	rememberCloseText = "Ricorda la scelta"
+	// askCloseBodyNoTray is the body on a desktop without a tray: the window
+	// could not come back, so the body offers no hiding.
+	askCloseBodyNoTray = "Questo desktop non ha un'icona nella tray, quindi la finestra non può " +
+		"restare nascosta. Chiuderla esce dall'app."
 	// closeHideResponse and closeQuitResponse are the responses of the dialog.
 	closeHideResponse = "hide"
 	closeQuitResponse = "quit"
 	// closeCancelResponse is the response of "Annulla" and of a dismissed dialog.
 	closeCancelResponse = "cancel"
 )
+
+// closeQuestionBody is the body of the question a desktop gets. Without a tray
+// the window cannot stay hidden, so the body never offers it.
+func closeQuestionBody(tray bool) string {
+	if tray {
+		return askCloseBody
+	}
+	return askCloseBodyNoTray
+}
 
 // closeAnswer is one button of the ask dialog.
 type closeAnswer struct {
@@ -62,6 +84,22 @@ var askCloseAnswers = []closeAnswer{
 	{response: closeHideResponse, label: "Nascondi", behavior: settings.CloseHide},
 	{response: closeQuitResponse, label: "Esci", behavior: settings.CloseQuit},
 	{response: closeCancelResponse, label: "Annulla"},
+}
+
+// availableCloseAnswers are the answers a desktop offers. Without a tray there
+// is no way back to a hidden window, so "Nascondi" is not there at all.
+func availableCloseAnswers(tray bool) []closeAnswer {
+	if tray {
+		return askCloseAnswers
+	}
+	answers := make([]closeAnswer, 0, len(askCloseAnswers))
+	for _, answer := range askCloseAnswers {
+		if answer.behavior == settings.CloseHide {
+			continue
+		}
+		answers = append(answers, answer)
+	}
+	return answers
 }
 
 // closeAnswerFor finds the answer of a response. It reports false for

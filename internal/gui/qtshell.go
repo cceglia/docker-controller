@@ -90,6 +90,15 @@ func newShell(app *application, theme designTheme) *shell {
 		s.applyWidth()
 		s.notice.place()
 	})
+	// Closing the window is the choice of the settings: hide it in the tray, ask,
+	// or quit. The window is never destroyed here, so the close is refused and
+	// the answer runs with the window still holding its Project and its history.
+	s.window.OnCloseEvent(func(_ func(event *qt6.QCloseEvent), event *qt6.QCloseEvent) {
+		event.Ignore()
+		if s.app != nil {
+			s.app.closeRequested()
+		}
+	})
 
 	// The tab order follows the reading order: the list, the actions of the
 	// column, then the way back of the narrow view. The panel adds its own
@@ -108,10 +117,11 @@ func keepTarget(widget *qt6.QWidget) {
 	widget.SetMinimumSize2(targetMin, targetMin)
 }
 
-// show puts the window on screen.
+// show puts the window on screen and starts the streams that follow it.
 func (s *shell) show() {
 	s.window.Show()
 	s.applyWidth()
+	s.startStreams()
 }
 
 // present shows the window and brings it to the front: the left click of the
@@ -121,6 +131,38 @@ func (s *shell) present() {
 	s.window.ShowNormal()
 	s.window.Raise()
 	s.window.ActivateWindow()
+	s.startStreams()
+}
+
+// hideWindow takes the window off the screen without destroying it: the Project
+// on screen, the list and the history of the Activities stay, and the two
+// streams that depend on the window stop.
+func (s *shell) hideWindow() {
+	s.stopStreams()
+	s.window.Hide()
+}
+
+// stopStreams ends what draws from a process of its own: the logs of the panel
+// and `docker stats`. The output of an Activity keeps arriving, because the
+// Manager pushes it into the log of the session.
+func (s *shell) stopStreams() {
+	if s.bottom != nil {
+		s.bottom.Suspend()
+	}
+	if s.usage != nil {
+		s.usage.SetHidden(true)
+	}
+}
+
+// startStreams starts the two streams the window carries again: a window that
+// comes back shows current figures and live logs.
+func (s *shell) startStreams() {
+	if s.bottom != nil {
+		s.bottom.Resume()
+	}
+	if s.usage != nil {
+		s.usage.SetHidden(false)
+	}
 }
 
 // buildSidebar builds the column of the Projects: the title, the list that
@@ -159,7 +201,12 @@ func (s *shell) buildSidebar() {
 
 	s.settings = qt6.NewQPushButton3("Impostazioni")
 	s.settings.SetAccessibleName("Impostazioni")
-	s.settings.SetEnabled(false)
+	s.settings.SetToolTip("Scegli cosa fa la chiusura della finestra e il comando del terminale.")
+	s.settings.OnClicked(func() {
+		if s.app != nil {
+			s.app.openPreferences()
+		}
+	})
 	keepTarget(s.settings.QWidget)
 	actions.AddWidget(s.settings.QWidget)
 

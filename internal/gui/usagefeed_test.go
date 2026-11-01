@@ -148,6 +148,36 @@ func TestUsageFeed_AStopTakesTheFiguresOffTheScreen(t *testing.T) {
 	}
 }
 
+func TestUsageFeed_AHiddenWindowStopsTheStreamAndTheReturnStartsIt(t *testing.T) {
+	starts := make(chan struct{}, 2)
+	f := testFeed(t, idleSource(starts), nil)
+	var got []*compose.UsageSample
+	f.OnSample = func(sample *compose.UsageSample) { got = append(got, sample) }
+
+	project := compose.Project{Name: "shop", Running: 1}
+	f.Follow(project, true)
+	waitSignal(t, starts, "the stream")
+
+	// The window leaves the screen: `docker stats` stops and the figures go, so
+	// no number stays on screen as if it were current.
+	f.SetHidden(true)
+	if len(got) != 1 || got[0] != nil {
+		t.Fatalf("samples = %v, want the nil sample of the stop", got)
+	}
+
+	// A snapshot of the hidden window starts nothing.
+	f.Follow(project, true)
+	select {
+	case <-starts:
+		t.Fatal("a hidden window started docker stats")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// The window comes back: the stream of the same Project starts again.
+	f.SetHidden(false)
+	waitSignal(t, starts, "the stream of the window back")
+}
+
 func TestUsageFeed_ASampleQueuedBeforeTheStopNeverArrives(t *testing.T) {
 	queue := &usageQueue{}
 	reported := make(chan struct{}, 1)

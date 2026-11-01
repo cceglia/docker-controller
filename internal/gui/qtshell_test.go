@@ -9,12 +9,14 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/settings"
 	"dockercontroller/internal/tray"
 )
 
@@ -73,9 +75,14 @@ func TestShellOffscreen(t *testing.T) {
 	checkLogs(t)
 	checkUsage(t, s)
 	checkTray(t)
+	checkPreferences(t, s)
+	checkCloseDialog(t, s)
+	checkHiddenWindow(t)
 	if dir := os.Getenv("SHOT_DIR"); dir != "" {
 		captureScreens(t, dir, app)
 	}
+	// The quit comes last: it ends the application of the process.
+	checkQuit(t)
 }
 
 // settle runs the events the layout waits for: a page change and a rebuild
@@ -1948,6 +1955,12 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	captureDialog(t, s.window.QWidget, dir, "21-confirm-remove", RemoveConfirmation(projects[3]))
 	captureAddForm(t, s.window.QWidget, dir, "20-add-form")
 
+	// The settings and the question of a close, with a tray: the three choices
+	// are on, and "Nascondi" is one of the answers.
+	capturePreferences(t, s.window.QWidget, dir, "22-preferences-light", settings.Defaults(), true, false)
+	capturePreferences(t, s.window.QWidget, dir, "22b-preferences-error", settings.Defaults(), true, true)
+	captureCloseQuestion(t, s.window.QWidget, dir, "23-close-light", true)
+
 	// The panel of the Activities: one that runs, one that worked, and one that
 	// failed with the notice that leads to its output.
 	captureActivities(t, dir, lightTheme, "13-activities-light")
@@ -1975,6 +1988,12 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	saveGrab(t, dark.window, dir, "19-form-dark")
 	dark.panel.cancelEdit()
 	captureDialog(t, dark.window.QWidget, dir, "12-confirm-dark", confirm)
+	// The settings and the question of a close on the dark surface: the dialog
+	// shows the desktop without a tray, so the disabled "Nascondi" and its
+	// reason must read here too.
+	darkPrefs := settings.Settings{CloseBehavior: settings.CloseAsk, TerminalCommand: "alacritty --working-directory {dir}"}
+	capturePreferences(t, dark.window.QWidget, dir, "24-preferences-dark", darkPrefs, false, false)
+	captureCloseQuestion(t, dark.window.QWidget, dir, "25-close-dark", false)
 	captureActivities(t, dir, darkTheme, "15-activities-dark")
 	captureLogs(t, dir, darkTheme, "17-log-dark")
 }
@@ -2119,6 +2138,358 @@ func captureDialog(t *testing.T, parent *qt6.QWidget, dir, name string, question
 	t.Helper()
 
 	dialog := newConfirmDialog(parent, question, func() {})
+	dialog.dialog.Show()
+	settle()
+	pixmap := dialog.dialog.Grab()
+	if pixmap == nil {
+		t.Fatalf("grab %q: no pixmap", name)
+	}
+	path := filepath.Join(dir, name+".png")
+	if !pixmap.Save(path) {
+		t.Fatalf("save %q", path)
+	}
+	t.Logf("wrote %s", path)
+	dialog.dialog.Delete()
+}
+
+// checkPreferences drives the settings dialog: the three choices, the command
+// that cannot run and its message under the field, the save that closes it and
+// the choice the desktop cannot honour. It is a step of the smoke test, so the
+// process still has one QApplication.
+func checkPreferences(t *testing.T, s *shell) {
+	t.Helper()
+
+	var saved settings.Settings
+	saves := 0
+	dialog := newPreferencesDialog(s.window.QWidget, settings.Defaults(), true,
+		func(values settings.Settings, done func(error)) {
+			saves++
+			saved = values
+			done(nil)
+		})
+	dialog.open()
+	settle()
+
+	// The three choices are on screen and on, and the saved one is the checked
+	// one.
+	if len(dialog.choices) != len(closeBehaviorChoices) {
+		t.Fatalf("%d choices, want %d", len(dialog.choices), len(closeBehaviorChoices))
+	}
+	for i, radio := range dialog.choices {
+		if radio.Text() != closeBehaviorChoices[i].label {
+			t.Errorf("choice %d = %q, want %q", i, radio.Text(), closeBehaviorChoices[i].label)
+		}
+		if !radio.IsEnabled() {
+			t.Errorf("choice %d is off with a tray", i)
+		}
+	}
+	if !dialog.choices[closeBehaviorIndex(settings.CloseHide)].IsChecked() {
+		t.Error("the dialog does not show the saved behavior")
+	}
+
+	// A command that cannot run shows its message under the field, keeps the
+	// dialog open and saves nothing.
+	dialog.terminal.SetText(`konsole --workdir "shop`)
+	dialog.save.Click()
+	settle()
+	if saves != 0 {
+		t.Fatal("an invalid command reached the save")
+	}
+	if !dialog.error.IsVisible() {
+		t.Fatal("the message of an invalid command is not on screen")
+	}
+	if got := dialog.error.Text(); !strings.Contains(got, "Comando del terminale non valido") {
+		t.Errorf("message = %q, want the Italian refusal of the terminal command", got)
+	}
+	if !strings.Contains(dialog.terminal.AccessibleName(), "Comando del terminale non valido") {
+		t.Errorf("accessible name = %q, want the message with the field", dialog.terminal.AccessibleName())
+	}
+	if !dialog.dialog.IsVisible() {
+		t.Fatal("the dialog closed on an invalid command")
+	}
+
+	// The change of the field takes the message away.
+	dialog.terminal.SetText(settings.DefaultTerminalCommand)
+	if dialog.error.IsVisible() {
+		t.Error("the message of the refusal stays after the command changed")
+	}
+
+	// A valid command and another behavior save both values and close the
+	// dialog.
+	dialog.choices[closeBehaviorIndex(settings.CloseQuit)].Click()
+	dialog.save.Click()
+	settle()
+	if saves != 1 {
+		t.Fatalf("saves = %d, want 1", saves)
+	}
+	want := settings.Settings{CloseBehavior: settings.CloseQuit, TerminalCommand: settings.DefaultTerminalCommand}
+	if saved != want {
+		t.Errorf("saved = %+v, want %+v", saved, want)
+	}
+	if dialog.dialog.IsVisible() {
+		t.Error("the dialog stays on screen after a save that worked")
+	}
+
+	// Without a tray the hide choice is off, with the reason in its tooltip, and
+	// the dialog shows the quit the close really does.
+	noTray := newPreferencesDialog(s.window.QWidget, settings.Defaults(), false, nil)
+	defer noTray.dialog.Delete()
+	hide := noTray.choices[closeBehaviorIndex(settings.CloseHide)]
+	if hide.IsEnabled() {
+		t.Error("hiding the window is a choice without a tray")
+	}
+	if got := hide.ToolTip(); got != noTrayHintText {
+		t.Errorf("tooltip = %q, want the reason hiding is not a choice", got)
+	}
+	if !noTray.choices[closeBehaviorIndex(settings.CloseQuit)].IsChecked() {
+		t.Error("without a tray the dialog does not show Esci")
+	}
+
+	// A save that ends after the dialog closed touches no widget: Escape during
+	// a write must not break the window.
+	late := newPreferencesDialog(s.window.QWidget, settings.Defaults(), true,
+		func(settings.Settings, func(error)) {})
+	late.open()
+	settle()
+	late.dialog.Reject()
+	settle()
+	late.done(nil)
+}
+
+// checkCloseDialog drives the "Chiedi ogni volta" question: the answers, the
+// option to remember, and the answer that comes back after the dialog closed.
+func checkCloseDialog(t *testing.T, s *shell) {
+	t.Helper()
+
+	var choice settings.CloseBehavior
+	kept, calls := false, 0
+	answer := func(c settings.CloseBehavior, k bool) {
+		calls++
+		choice, kept = c, k
+	}
+	question := newCloseDialog(s.window.QWidget, true, answer)
+	question.open()
+	settle()
+
+	if !question.dialog.IsModal() {
+		t.Error("the question is not modal")
+	}
+	if len(question.answers) != len(askCloseAnswers) {
+		t.Fatalf("%d answers, want %d", len(question.answers), len(askCloseAnswers))
+	}
+
+	// "Annulla" is the default and answers nothing, even with the option on.
+	question.remember.SetChecked(true)
+	question.answers[len(question.answers)-1].Click()
+	settle()
+	if calls != 0 {
+		t.Fatal("Annulla answered the question")
+	}
+
+	// The next question remembers the answer and reports it after it closed.
+	second := newCloseDialog(s.window.QWidget, true, answer)
+	second.open()
+	second.remember.SetChecked(true)
+	second.answers[0].Click()
+	settle()
+	if calls != 1 {
+		t.Fatalf("answers = %d, want 1", calls)
+	}
+	if choice != settings.CloseHide || !kept {
+		t.Errorf("answer = %q with remember %v, want hide and the option on", choice, kept)
+	}
+
+	// Without a tray the question offers no way to a window that could not come
+	// back.
+	open := newCloseDialog(s.window.QWidget, false, nil)
+	defer open.dialog.Delete()
+	if len(open.answers) != 2 {
+		t.Fatalf("%d answers without a tray, want Esci and Annulla", len(open.answers))
+	}
+	if got := open.answers[0].Text(); got != "Esci" {
+		t.Errorf("first answer = %q, want Esci", got)
+	}
+}
+
+// checkHiddenWindow hides the window the way the tray does and brings it back:
+// the window is not destroyed, the Project on screen and the history stay, and
+// the stream of the logs stops and starts again. It is a step of the smoke test.
+func checkHiddenWindow(t *testing.T) {
+	t.Helper()
+
+	log := NewActivityLog()
+	// The application answers the close with the saved behavior. An adapter
+	// without an icon is enough: the close asks only whether a tray exists.
+	app := &application{
+		activities: log,
+		prefs:      settings.Settings{CloseBehavior: settings.CloseHide, TerminalCommand: settings.DefaultTerminalCommand},
+		tray:       &trayAdapter{},
+	}
+	s := newShell(app, lightTheme)
+	app.shell = s
+	defer s.window.Delete()
+	s.show()
+	settle()
+
+	projects := screenshotProjects()
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: projects})
+	s.open(projects[1])
+	settle()
+
+	log.Push(started("hide-1", projects[1].Name, "", compose.ActionUp))
+	log.Push(finished("hide-1", projects[1].Name, "", compose.ActionUp, "", ""))
+	waitFor(t, "the history of the Activities", func() bool { return s.bottom.page.list.Count() == 1 })
+	history := s.bottom.page.list.Count()
+
+	// A stream of logs that runs while the window is on screen.
+	done := make(chan struct{})
+	var once sync.Once
+	s.bottom.logs.ctx = context.Background()
+	s.bottom.logs.source = func(ctx context.Context, _ compose.LogRequest, onLine func(compose.LogLine)) error {
+		onLine(compose.LogLine{Service: "web", Text: "GET /index.html 200"})
+		<-ctx.Done()
+		once.Do(func() { close(done) })
+		return nil
+	}
+	s.bottom.ShowLogs(projects[1], "")
+	waitFor(t, "the stream of the logs", func() bool { return s.bottom.logs.Running() })
+
+	// The close of the window follows the saved behavior: the window goes off
+	// the screen, it is not destroyed, and the stream of the logs stops.
+	s.window.Close()
+	settle()
+	if s.window.IsVisible() {
+		t.Fatal("the window is still on screen after the close")
+	}
+	if s.window.CentralWidget() == nil {
+		t.Fatal("the close destroyed the window")
+	}
+	if s.selected != projects[1].Name {
+		t.Errorf("selection = %q after hiding, want %q", s.selected, projects[1].Name)
+	}
+	if s.bottom.logs.Running() {
+		t.Error("the stream of the logs runs with the window hidden")
+	}
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the stream of the logs did not end with the window hidden")
+	}
+
+	// An Activity that runs while the window is hidden keeps its output: the
+	// Manager pushes it into the log of the session, which no window holds.
+	log.Push(started("hide-2", projects[1].Name, "", compose.ActionPull))
+	log.Push(output("hide-2", projects[1].Name, "", compose.ActionPull, "✔ Container shop-web-1  Started", false))
+	wantHistory := history + 1
+	waitFor(t, "the output of the Activity on the hidden window", func() bool {
+		return s.bottom.page.list.Count() == wantHistory &&
+			strings.Contains(s.bottom.page.output.ToPlainText(), "shop-web-1")
+	})
+
+	// The window comes back: the same Project and the same history, and the
+	// stream of the logs starts again.
+	s.present()
+	settle()
+	if !s.window.IsVisible() {
+		t.Fatal("the window is not on screen after present")
+	}
+	if s.selected != projects[1].Name {
+		t.Errorf("selection = %q after the return, want %q", s.selected, projects[1].Name)
+	}
+	if got := s.panel.shown.project.Name; got != projects[1].Name {
+		t.Errorf("the detail shows %q after the return, want %q", got, projects[1].Name)
+	}
+	if got := s.bottom.page.list.Count(); got != wantHistory {
+		t.Errorf("history = %d rows after the return, want %d", got, wantHistory)
+	}
+	// The new Activity opened the panel on its tab, so the logs start again when
+	// the user goes back to their tab: a stopped stream resumes nothing by
+	// itself.
+	s.bottom.tabs.SetCurrentIndex(logTab)
+	waitFor(t, "the stream of the logs on the return", func() bool { return s.bottom.logs.Running() })
+	s.bottom.Close()
+}
+
+// checkQuit ends the application the way "Esci" of the window and of the tray
+// does: the streams stop before the event loop does, so no `docker compose logs`
+// and no `docker stats` outlives the window. It is the last step of the smoke
+// test, because Quit leaves the application of the process closing.
+func checkQuit(t *testing.T) {
+	t.Helper()
+
+	log := NewActivityLog()
+	app := &application{activities: log, prefs: settings.Defaults()}
+	s := newShell(app, lightTheme)
+	app.shell = s
+	defer s.window.Delete()
+	s.show()
+	settle()
+
+	projects := screenshotProjects()
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: projects})
+	s.open(projects[1])
+	settle()
+
+	stopped := make(chan struct{})
+	s.bottom.logs.ctx = context.Background()
+	s.bottom.logs.source = func(ctx context.Context, _ compose.LogRequest, _ func(compose.LogLine)) error {
+		<-ctx.Done()
+		close(stopped)
+		return nil
+	}
+	s.bottom.ShowLogs(projects[1], "")
+	waitFor(t, "the stream of the logs", func() bool { return s.bottom.logs.Running() })
+
+	app.quit()
+	if !app.quitting {
+		t.Error("quit did not mark the application as leaving")
+	}
+	if s.bottom.logs.Running() {
+		t.Error("the stream of the logs runs after quit")
+	}
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the stream of the logs did not end with the application")
+	}
+
+	// A second quit, and the close of a window that would follow, start nothing.
+	app.quit()
+	app.closeRequested()
+}
+
+// capturePreferences writes the PNG of the settings dialog, so its layout and
+// its message under the command can be reviewed without a desktop. withError
+// puts the refusal of an invalid command under the field.
+func capturePreferences(t *testing.T, parent *qt6.QWidget, dir, name string, prefs settings.Settings, tray, withError bool) {
+	t.Helper()
+
+	dialog := newPreferencesDialog(parent, prefs, tray, nil)
+	if withError {
+		invalid := `konsole --workdir "shop`
+		dialog.terminal.SetText(invalid)
+		dialog.showError(validateTerminalCommand(invalid))
+	}
+	dialog.dialog.Show()
+	settle()
+	pixmap := dialog.dialog.Grab()
+	if pixmap == nil {
+		t.Fatalf("grab %q: no pixmap", name)
+	}
+	path := filepath.Join(dir, name+".png")
+	if !pixmap.Save(path) {
+		t.Fatalf("save %q", path)
+	}
+	t.Logf("wrote %s", path)
+	dialog.dialog.Delete()
+}
+
+// captureCloseQuestion writes the PNG of the "Chiedi ogni volta" question of a
+// close.
+func captureCloseQuestion(t *testing.T, parent *qt6.QWidget, dir, name string, tray bool) {
+	t.Helper()
+
+	dialog := newCloseDialog(parent, tray, nil)
 	dialog.dialog.Show()
 	settle()
 	pixmap := dialog.dialog.Grab()

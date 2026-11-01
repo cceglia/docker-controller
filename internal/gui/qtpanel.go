@@ -40,6 +40,9 @@ type bottomPanel struct {
 	fitTimer *qt6.QTimer
 	// open is true while the panel is on screen.
 	open bool
+	// suspended is true while the window is off screen: the stream of the logs
+	// stays closed until the window comes back.
+	suspended bool
 
 	// project is the target of the logs, service is the Service of that
 	// Project, "" for the whole Project. hasProject says whether a Project is
@@ -163,9 +166,10 @@ func (p *bottomPanel) setTarget(project compose.Project, service string) {
 	}
 }
 
-// openLogs starts the logs of the target on screen, if any.
+// openLogs starts the logs of the target on screen, if any. A hidden window
+// starts nothing: the stream waits for the window to come back.
 func (p *bottomPanel) openLogs() {
-	if !p.hasProject {
+	if p.suspended || !p.hasProject {
 		return
 	}
 	p.logs.Open(p.project, p.service)
@@ -200,6 +204,29 @@ func (p *bottomPanel) Close() {
 // showing reports whether the panel is on screen.
 func (p *bottomPanel) showing() bool {
 	return p.open
+}
+
+// Suspend stops the stream of the logs while the window is off screen and keeps
+// the target and the panel, so a window that comes back shows the same logs. The
+// history of the Activities stays: it lives in memory and runs no process.
+func (p *bottomPanel) Suspend() {
+	if p.suspended {
+		return
+	}
+	p.suspended = true
+	p.logs.Stop()
+}
+
+// Resume starts the logs again when the window comes back. A closed panel, a tab
+// other than the Log one and a panel with no Project start nothing.
+func (p *bottomPanel) Resume() {
+	if !p.suspended {
+		return
+	}
+	p.suspended = false
+	if p.open && p.tabs.CurrentIndex() == logTab {
+		p.openLogs()
+	}
 }
 
 // fit gives the panel its height in the vertical splitter and leaves the rest
