@@ -173,31 +173,25 @@ func (d *preferencesDialog) terminalGroup(command string) *qt6.QWidget {
 	return group.QWidget
 }
 
-// buttons are the two commands of the dialog. Annulla comes first, so the
-// reading order ends on Salva, the command that writes the settings.
+// buttons are the two commands of the dialog. The box puts them in the order
+// the platform expects, and Salva is the default, so Return writes the settings
+// from any field.
 func (d *preferencesDialog) buttons() *qt6.QWidget {
-	widget := qt6.NewQWidget2()
+	box := qt6.NewQDialogButtonBox2()
 
-	row := qt6.NewQHBoxLayout(widget)
-	row.SetContentsMargins(0, 0, 0, 0)
-	row.SetSpacing(spaceS)
-	row.AddStretch()
-
-	d.cancel = detailButton(cancelText, "preferencesCancel", "Chiude senza salvare le impostazioni.", true)
+	d.cancel = answerButton(box, cancelText, "preferencesCancel", "Chiude senza salvare le impostazioni.", qt6.QDialogButtonBox__RejectRole)
 	d.cancel.OnClicked(func() { d.dialog.Reject() })
-	row.AddWidget(d.cancel.QWidget)
 
-	d.save = detailButton(saveSettingsText, "primaryAction", "Salva le impostazioni nel database.", true)
+	d.save = answerButton(box, saveSettingsText, "primaryAction", "Salva le impostazioni nel database.", qt6.QDialogButtonBox__AcceptRole)
 	d.save.SetDefault(true)
 	d.save.SetAutoDefault(true)
 	d.save.OnClicked(d.submit)
-	row.AddWidget(d.save.QWidget)
 
-	return widget
+	return box.QWidget
 }
 
 // linkTabOrder puts the dialog in the reading order: the three choices, the
-// command, then the two commands of the dialog.
+// command, then the two commands of the dialog in the order the box shows them.
 func (d *preferencesDialog) linkTabOrder() {
 	prev := d.choices[0].QWidget
 	for _, radio := range d.choices[1:] {
@@ -205,8 +199,8 @@ func (d *preferencesDialog) linkTabOrder() {
 		prev = radio.QWidget
 	}
 	qt6.QWidget_SetTabOrder(prev, d.terminal.QWidget)
-	qt6.QWidget_SetTabOrder(d.terminal.QWidget, d.cancel.QWidget)
-	qt6.QWidget_SetTabOrder(d.cancel.QWidget, d.save.QWidget)
+	qt6.QWidget_SetTabOrder(d.terminal.QWidget, d.save.QWidget)
+	qt6.QWidget_SetTabOrder(d.save.QWidget, d.cancel.QWidget)
 }
 
 // open shows the dialog with the focus on the chosen close behavior, so the

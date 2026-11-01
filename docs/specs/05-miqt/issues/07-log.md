@@ -10,7 +10,7 @@
 - [x] Un Servizio del dettaglio apre i log del solo Servizio
 - [x] Ogni Servizio ha un colore stabile, preso dalla palette dei ruoli
 - [x] Le righe di stderr si distinguono da quelle di stdout
-- [x] La ricerca evidenzia le righe che corrispondono e conta i risultati
+- [x] La ricerca filtra le righe che corrispondono e le conta, come la vecchia app
 - [x] La pausa ferma lo scorrimento e riprendere torna all'ultima riga
 - [x] Il pulsante dei timestamp mostra e nasconde l'ora di ogni riga
 - [x] Il pannello tiene al massimo 5.000 righe e scarta le più vecchie

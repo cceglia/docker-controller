@@ -79,6 +79,11 @@ la stringa `default`. Poi chiama `take(id)`: un id mai inviato, o già consumato
 non produce niente. La callback gira fuori dal lock, quindi una callback lenta
 non ferma la lettura dei segnali.
 
+Il set degli id è limitato a `pendingLimit`, 64. Una notifica che l'utente
+ignora non esce mai dal set, che altrimenti crescerebbe per tutta la sessione.
+A set pieno esce l'id più vecchio: un click su quell'id non fa niente, mentre
+il tetto tiene la memoria costante e la regola sui 64 id resta una sola.
+
 La callback si registra con `DBus.SetOnClick(func())`. `Notifier.OnClick` la
 inoltra quando il mittente implementa `notify.Clickable`; con un mittente che
 non sa riportare il click la chiamata non fa niente e la notifica compare
@@ -202,8 +207,9 @@ notifica non fa scattare niente.
   `handle`. Il servizio vero manda sempre `uint32`.
 - Un id resta in `pending` anche quando l'utente chiude la notifica senza
   cliccare. Il ticket chiede solo `ActionInvoked`, quindi `NotificationClosed`
-  non si ascolta e la mappa cresce di un `uint32` per ogni notifica non
-  cliccata. Una notifica parte solo alla fine di un'Attività, quindi la crescita
+  non si ascolta e il set cresce di un `uint32` per ogni notifica non
+  cliccata, fino al tetto di 64: da lì esce l'id più vecchio, che perde il
+  click. Una notifica parte solo alla fine di un'Attività, quindi la crescita
   è lenta; togliere l'id su `NotificationClosed` sarebbe una decisione nuova.
 - Un click arrivato tra il ritorno di `Notify` e `pending.add` andrebbe perso.
   L'ascolto parte prima della chiamata, quindi il segnale è già in coda, ma

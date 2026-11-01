@@ -17,6 +17,9 @@ type closeDialog struct {
 	remember *qt6.QCheckBox
 	// answers are the buttons, in the order the answers rule gives them.
 	answers []*qt6.QPushButton
+	// cancel is the "Annulla" answer: the default of the dialog, so Enter
+	// without a choice changes nothing.
+	cancel *qt6.QPushButton
 	// choice is the behavior of the answer: "" for "Annulla" and for a dialog
 	// closed without an answer.
 	choice settings.CloseBehavior
@@ -58,19 +61,25 @@ func newCloseDialog(parent *qt6.QWidget, tray bool, onAnswer func(settings.Close
 	keepTarget(c.remember.QWidget)
 	layout.AddWidget(c.remember.QWidget)
 
-	// The buttons read in the order the answers rule gives them, and "Annulla"
-	// is the default: Enter without a choice changes nothing.
-	buttons := qt6.NewQHBoxLayout2()
-	buttons.SetSpacing(spaceS)
-	buttons.AddStretch()
+	// The answers read in the order the platform gives them, and "Annulla" is
+	// the default: Enter without a choice changes nothing.
+	answers := qt6.NewQDialogButtonBox2()
 	for _, answer := range availableCloseAnswers(tray) {
 		answer := answer
-		button := detailButton(answer.label, "closeAnswer", "", true)
+		role := qt6.QDialogButtonBox__AcceptRole
 		if answer.behavior == "" {
+			role = qt6.QDialogButtonBox__RejectRole
+		}
+		button := answerButton(answers, answer.label, "closeAnswer", "", role)
+		if answer.behavior == "" {
+			c.cancel = button
 			button.SetDefault(true)
 			button.SetAutoDefault(true)
 			button.OnClicked(func() { c.dialog.Reject() })
 		} else {
+			// Only the default answers Enter: a focused answer must not run by
+			// a key the user did not mean as that answer.
+			button.SetAutoDefault(false)
 			button.OnClicked(func() {
 				c.choice = answer.behavior
 				c.kept = c.remember.IsChecked()
@@ -78,9 +87,8 @@ func newCloseDialog(parent *qt6.QWidget, tray bool, onAnswer func(settings.Close
 			})
 		}
 		c.answers = append(c.answers, button)
-		buttons.AddWidget(button.QWidget)
 	}
-	layout.AddLayout(buttons.QLayout)
+	layout.AddWidget(answers.QWidget)
 
 	c.dialog.OnFinished(func(int) {
 		// The question is over: it goes away with the event loop, and the
@@ -102,11 +110,9 @@ func newCloseDialog(parent *qt6.QWidget, tray bool, onAnswer func(settings.Close
 func (c *closeDialog) open() {
 	c.dialog.AdjustSize()
 	c.dialog.Open()
-	for _, button := range c.answers {
-		if button.IsDefault() {
-			button.SetFocus()
-			return
-		}
+	if c.cancel != nil {
+		c.cancel.SetFocus()
+		return
 	}
 	if len(c.answers) > 0 {
 		c.answers[0].SetFocus()

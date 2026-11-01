@@ -138,19 +138,16 @@ func newAddDialog(parent *qt6.QWidget, form AddProjectForm, onSubmit func(string
 
 	// The two answers: Annulla closes the form, Aggiungi saves it. Aggiungi is
 	// the default of the dialog, so Enter confirms it while the form is valid.
-	buttons := qt6.NewQHBoxLayout2()
-	buttons.SetSpacing(spaceS)
-	buttons.AddStretch()
+	answers := qt6.NewQDialogButtonBox2()
 
-	d.cancel = detailButton(cancelText, "addCancel", "Chiudi senza aggiungere il Progetto.", true)
+	d.cancel = answerButton(answers, cancelText, "addCancel", "Chiudi senza aggiungere il Progetto.", qt6.QDialogButtonBox__RejectRole)
 	d.cancel.OnClicked(d.close)
-	buttons.AddWidget(d.cancel.QWidget)
 
-	d.add = detailButton(addText, "primaryAction", "Aggiungi il Progetto alla lista.", false)
+	d.add = answerButton(answers, addText, "primaryAction", "Aggiungi il Progetto alla lista.", qt6.QDialogButtonBox__AcceptRole)
+	d.add.SetEnabled(false)
 	d.add.SetDefault(true)
 	d.add.OnClicked(d.submit)
-	buttons.AddWidget(d.add.QWidget)
-	layout.AddLayout(buttons.QLayout)
+	layout.AddWidget(answers.QWidget)
 
 	d.dialog.OnFinished(func(int) {
 		// The form is over: it goes away with the event loop, and the shell that
@@ -367,8 +364,8 @@ func (d *addDialog) clearError() {
 }
 
 // linkTabOrder puts the form in the reading order: the picker, the commands that
-// drop a File compose, the name field and the two answers. The rows are new at
-// every refresh, so the chain is linked again.
+// drop a File compose, the name field and the two answers, in the order the box
+// shows them. The rows are new at every refresh, so the chain is linked again.
 func (d *addDialog) linkTabOrder() {
 	prev := d.pick.QWidget
 	for _, drop := range d.drops {
@@ -376,8 +373,8 @@ func (d *addDialog) linkTabOrder() {
 		prev = drop.QWidget
 	}
 	qt6.QWidget_SetTabOrder(prev, d.name.QWidget)
-	qt6.QWidget_SetTabOrder(d.name.QWidget, d.cancel.QWidget)
-	qt6.QWidget_SetTabOrder(d.cancel.QWidget, d.add.QWidget)
+	qt6.QWidget_SetTabOrder(d.name.QWidget, d.add.QWidget)
+	qt6.QWidget_SetTabOrder(d.add.QWidget, d.cancel.QWidget)
 }
 
 // pickComposeFiles shows the picker of one or more File compose over parent and

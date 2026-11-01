@@ -10,6 +10,23 @@ const (
 	dialogMaxWidth = 560
 )
 
+// answerButton adds an answer to a box of a dialog. The box orders the answers
+// the way the platform expects, so the dialog reads as the rest of the desktop.
+// The name of the style sheet, the accessible name and the tooltip stay the
+// ones of the command it replaces.
+func answerButton(box *qt6.QDialogButtonBox, text, name, tooltip string, role qt6.QDialogButtonBox__ButtonRole) *qt6.QPushButton {
+	button := box.AddButton2(text, role)
+	if name != "" {
+		setObjectName(button.QWidget, name)
+	}
+	button.SetAccessibleName(text)
+	if tooltip != "" {
+		button.SetToolTip(tooltip)
+	}
+	keepTarget(button.QWidget)
+	return button
+}
+
 // confirmDialog is the modal question of a destructive Action. It is built
 // before it shows and it never blocks the caller: the affirmative answer runs
 // onRun, and every answer, including Escape, runs onClosed.
@@ -73,9 +90,8 @@ func newConfirmDialog(parent *qt6.QWidget, question Confirmation, onRun func()) 
 	}
 
 	box := qt6.NewQDialogButtonBox2()
-	c.cancel = box.AddButton2("Annulla", qt6.QDialogButtonBox__RejectRole)
-	c.confirm = box.AddButton2(question.ConfirmLabel, qt6.QDialogButtonBox__AcceptRole)
-	c.confirm.SetAccessibleName(question.ConfirmLabel)
+	c.cancel = answerButton(box, "Annulla", "", "", qt6.QDialogButtonBox__RejectRole)
+	c.confirm = answerButton(box, question.ConfirmLabel, "", "", qt6.QDialogButtonBox__AcceptRole)
 	c.confirm.SetDefault(true)
 	c.confirm.SetAutoDefault(true)
 	c.confirm.SetEnabled(question.TypeToConfirm == "")
