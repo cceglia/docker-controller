@@ -15,6 +15,8 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/settings"
+	"dockercontroller/internal/tray"
+	"dockercontroller/internal/trayadapter"
 )
 
 const (
@@ -60,17 +62,25 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 
 // shell owns the window and the two sides of its split view.
 type shell struct {
+	// app is the application: "Esci" quits it, so the loop returns.
+	app     *adw.Application
 	window  *adw.ApplicationWindow
 	toasts  *adw.ToastOverlay
 	split   *adw.NavigationSplitView
 	list    *gtk.ListBox
 	content *adw.NavigationPage
 	detail  *detailView
+	// tray is the icon in the system tray, nil when it could not start.
+	tray *trayadapter.Tray
+	// confirmations are the questions of the tray that are on screen.
+	confirmations []*adw.MessageDialog
 	// manager runs the Actions and ctx stops them when the application quits.
 	manager *compose.Manager
 	ctx     context.Context
 	// store holds the settings: the terminal command of "Apri terminale".
 	store *settings.Store
+	// snapshot is the last one applied: the tray builds its menu from it.
+	snapshot compose.Snapshot
 	// add is the dialog of a new Project while it is on screen, nil otherwise.
 	add *addDialog
 	// rows maps the index of a row of the list to its Project. GTK hands the
@@ -96,8 +106,14 @@ type shell struct {
 // and the breakpoint that collapses the two into pages under 900 sp.
 func newShell(app *adw.Application, activities *ActivityLog, store *settings.Store) *shell {
 	// Until the first snapshot arrives Docker has not been asked yet, so the
-	// detail must not call it unreachable.
-	s := &shell{rows: map[int]compose.Project{}, loading: true, store: store}
+	// detail must not call it unreachable and the tray must not show the notice.
+	s := &shell{
+		app:      app,
+		rows:     map[int]compose.Project{},
+		loading:  true,
+		store:    store,
+		snapshot: compose.Snapshot{Loading: true},
+	}
 
 	s.list = gtk.NewListBox()
 	s.list.SetSelectionMode(gtk.SelectionSingle)
@@ -201,6 +217,9 @@ func (s *shell) watch(ctx context.Context, manager *compose.Manager) {
 	s.detail.panel.logs.source = manager.Logs
 	s.detail.panel.logs.ctx = ctx
 	s.watchUsage(manager)
+	// The tray shows the state before the first snapshot, so the icon is on the
+	// panel as soon as the window is.
+	s.startTray()
 	go func() {
 		for snapshot := range manager.Watch(ctx) {
 			glib.IdleAdd(func() { s.apply(snapshot) })
@@ -312,6 +331,10 @@ func (s *shell) activityFailed(a Activity) {
 // apply rebuilds the list from a snapshot, keeping the open Project selected
 // and refreshing its detail in place.
 func (s *shell) apply(snapshot compose.Snapshot) {
+	s.snapshot = snapshot
+	if s.tray != nil {
+		s.tray.Show(tray.BuildMenu(snapshot), tray.IconFor(snapshot))
+	}
 	s.reachable = snapshot.DockerReachable
 	s.loading = snapshot.Loading
 	s.projects = snapshot.Projects
