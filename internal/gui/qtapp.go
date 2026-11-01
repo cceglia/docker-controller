@@ -91,6 +91,15 @@ type application struct {
 	snapshot compose.Snapshot
 }
 
+// logSource is the stream the Log tab opens. A Manager that is not wired yet
+// leaves the page with no source, so the window still builds.
+func (a *application) logSource() LogSource {
+	if a.manager == nil {
+		return nil
+	}
+	return a.manager.Logs
+}
+
 // watch follows the Manager and moves every snapshot onto the Qt thread.
 func (a *application) watch(ctx context.Context) {
 	go func() {

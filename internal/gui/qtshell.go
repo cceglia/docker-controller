@@ -200,10 +200,13 @@ func (s *shell) buildPages() {
 	s.column = qt6.NewQSplitter3(qt6.Vertical)
 	s.column.SetChildrenCollapsible(false)
 	s.column.AddWidget(s.detail)
-	s.bottom = newBottomPanel(s.app.activities, s.column)
+	s.bottom = newBottomPanel(s.app.activities, s.app.logSource(), s.app.ctx, s.theme, s.column)
 	s.bottom.onFailure = func(a Activity) {
 		s.showNoticeAction(ActivityToastText(a), showOutputText, func() { s.bottom.Show(a.ID) })
 	}
+	// The two ways to the logs: the head of the detail opens the whole Project,
+	// a Service opens its own output.
+	s.panel.onLogs = func(project compose.Project, service string) { s.bottom.ShowLogs(project, service) }
 	s.column.AddWidget(s.bottom.widget)
 	s.column.SetStretchFactor(0, 1)
 	// The panel is built closed: Qt shows the children of a splitter, so the
@@ -303,6 +306,7 @@ func (s *shell) showList() {
 func (s *shell) open(project compose.Project) {
 	s.selected = project.Name
 	s.panel.set(project, s.snapshot.DockerReachable, s.snapshot.Loading)
+	s.bottom.setProject(project)
 	s.linkTabChain()
 	if s.narrow {
 		s.showNarrowPage()
@@ -318,18 +322,21 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 	s.list.set(snapshot.Projects, s.selected, snapshot.Loading)
 	if s.selected == "" {
 		s.panel.clear()
+		s.bottom.setProject(compose.Project{})
 		return
 	}
 	project, ok := projectOf(snapshot.Projects, s.selected)
 	if !ok {
 		s.selected = ""
 		s.panel.clear()
+		s.bottom.setProject(compose.Project{})
 		if s.narrow {
 			s.showNarrowPage()
 		}
 		return
 	}
 	s.panel.set(project, snapshot.DockerReachable, snapshot.Loading)
+	s.bottom.setProject(project)
 	s.linkTabChain()
 }
 

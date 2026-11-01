@@ -52,6 +52,65 @@ func TestThemeRolesMeetContrast(t *testing.T) {
 	}
 }
 
+// TestServiceColoursComeFromTheRoles reads the colours the log page paints a
+// Service name with: one role per palette entry, in both themes, with the
+// contrast of a text.
+func TestServiceColoursComeFromTheRoles(t *testing.T) {
+	for _, theme := range themes {
+		theme := theme
+		t.Run(theme.name, func(t *testing.T) {
+			for hue := 0; hue < ServiceHues; hue++ {
+				role, ok := theme.roles[serviceRole(hue)]
+				if !ok {
+					t.Fatalf("hue %d has no role in the %s theme", hue, theme.name)
+				}
+				if !isHexColor(role.color) {
+					t.Fatalf("hue %d: colour %q is not #rrggbb", hue, role.color)
+				}
+				if role.kind != contrastText {
+					t.Errorf("hue %d: kind %d, want a text colour", hue, role.kind)
+				}
+				if got := contrastRatio(role.color, theme.surface); got < minServiceContrast {
+					t.Errorf("hue %d: %s on %s is %.2f:1, want at least %.1f:1",
+						hue, role.color, theme.surface, got, minServiceContrast)
+				}
+				if got := ServiceColor(hue, theme); got != role.color {
+					t.Errorf("ServiceColor(%d, %s) = %q, want the role colour %q", hue, theme.name, got, role.color)
+				}
+			}
+		})
+	}
+
+	t.Run("an entry outside the palette has no colour", func(t *testing.T) {
+		for _, hue := range []int{-1, ServiceHues} {
+			if got := ServiceColor(hue, lightTheme); got != "" {
+				t.Errorf("ServiceColor(%d) = %q, want no colour", hue, got)
+			}
+		}
+	})
+
+	t.Run("the two themes differ on every entry", func(t *testing.T) {
+		for hue := 0; hue < ServiceHues; hue++ {
+			if ServiceColor(hue, lightTheme) == ServiceColor(hue, darkTheme) {
+				t.Errorf("hue %d is the same colour on both themes", hue)
+			}
+		}
+	})
+
+	t.Run("the entries of a theme differ from each other", func(t *testing.T) {
+		for _, theme := range themes {
+			seen := make(map[string]int, ServiceHues)
+			for hue := 0; hue < ServiceHues; hue++ {
+				colour := ServiceColor(hue, theme)
+				if other, duplicate := seen[colour]; duplicate {
+					t.Errorf("%s: hues %d and %d share %s", theme.name, other, hue, colour)
+				}
+				seen[colour] = hue
+			}
+		}
+	})
+}
+
 func TestStyleSheetColoursComeFromTheRoles(t *testing.T) {
 	for _, theme := range themes {
 		t.Run(theme.name, func(t *testing.T) {

@@ -1,6 +1,8 @@
 package gui
 
 import (
+	"context"
+
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
@@ -19,11 +21,17 @@ const (
 // bottomPanel is the panel at the bottom of the detail: the tabs Attività and
 // Log and the button that hides it. It sits in the vertical splitter of the
 // shell, under the detail, and takes no room while it is closed: the window
-// stays compact until an Activity starts.
+// stays compact until an Activity starts or the logs open.
+//
+// The panel owns the target of the logs: the Project the shell selected and the
+// Service the detail asked for, "" for the whole Project. It stops the stream
+// when it closes and when the target changes, so no `docker compose logs`
+// process outlives what it shows.
 type bottomPanel struct {
 	widget *qt6.QWidget
 	tabs   *qt6.QTabWidget
 	page   *activityPage
+	logs   *logPage
 	close  *qt6.QPushButton
 	// splitter is the vertical splitter the panel shares with the detail: it is
 	// what gives the panel its height when it opens.
@@ -33,6 +41,13 @@ type bottomPanel struct {
 	// open is true while the panel is on screen.
 	open bool
 
+	// project is the target of the logs, service is the Service of that
+	// Project, "" for the whole Project. hasProject says whether a Project is
+	// open at all.
+	project    compose.Project
+	service    string
+	hasProject bool
+
 	// onFailure, when set, is called once for each failed Activity: the shell
 	// turns it into the notice with the link to the output.
 	onFailure func(Activity)
@@ -40,8 +55,8 @@ type bottomPanel struct {
 
 // newBottomPanel builds the panel closed. splitter is the vertical splitter the
 // panel shares with the detail. A nil log builds a panel that never opens by
-// itself.
-func newBottomPanel(log *ActivityLog, splitter *qt6.QSplitter) *bottomPanel {
+// itself; a nil source builds a Log page that streams nothing.
+func newBottomPanel(log *ActivityLog, source LogSource, ctx context.Context, theme designTheme, splitter *qt6.QSplitter) *bottomPanel {
 	p := &bottomPanel{splitter: splitter}
 
 	p.page = newActivityPage(log)
@@ -52,6 +67,10 @@ func newBottomPanel(log *ActivityLog, splitter *qt6.QSplitter) *bottomPanel {
 			p.onFailure(a)
 		}
 	}
+
+	p.logs = newLogPage(theme)
+	p.logs.source = source
+	p.logs.ctx = ctx
 
 	p.tabs = qt6.NewQTabWidget2()
 	p.tabs.SetAccessibleName(panelAccessibleName)
@@ -64,11 +83,18 @@ func newBottomPanel(log *ActivityLog, splitter *qt6.QSplitter) *bottomPanel {
 	// around a frame would take a line away from the output.
 	p.tabs.SetDocumentMode(true)
 	p.tabs.AddTab(p.page.widget, activityPageTitle)
-	p.tabs.AddTab(newLogPage(), logPageTitle)
+	p.tabs.AddTab(p.logs.widget, logPageTitle)
+	// The Log tab shows the logs of the Project on screen when the user chooses
+	// it, so a tab that was never opened still streams what it names.
+	p.tabs.OnCurrentChanged(func(index int) {
+		if p.open && index == logTab {
+			p.openLogs()
+		}
+	})
 
 	p.close = qt6.NewQPushButton3(panelCloseText)
 	p.close.SetAccessibleName(panelCloseText)
-	p.close.SetToolTip("Nascondi il pannello. L'Attività in corso continua.")
+	p.close.SetToolTip("Nascondi il pannello e ferma il flusso dei log. L'Attività in corso continua.")
 	p.close.OnClicked(func() { p.Close() })
 	keepTarget(p.close.QWidget)
 	// The button sits at the right of the tabs, clear of the two of them.
@@ -89,28 +115,60 @@ func newBottomPanel(log *ActivityLog, splitter *qt6.QSplitter) *bottomPanel {
 	return p
 }
 
-// newLogPage is the tab of the Log until the ticket that streams it: an empty
-// page with the line that says so.
-func newLogPage() *qt6.QWidget {
-	page := qt6.NewQWidget2()
-	layout := qt6.NewQVBoxLayout(page)
-	layout.SetContentsMargins(spaceM, spaceM, spaceM, spaceM)
-	layout.SetSpacing(spaceS)
-
-	label := qt6.NewQLabel3(emptyLogText)
-	setObjectName(label.QWidget, "logEmpty")
-	label.SetWordWrap(true)
-	layout.AddWidget(label.QWidget)
-	layout.AddStretch()
-
-	return page
-}
-
 // Show opens the panel on an Activity of the history: its tab and its output.
 func (p *bottomPanel) Show(id compose.ActivityID) {
 	p.Open()
 	p.tabs.SetCurrentIndex(activityTab)
 	p.page.Select(id)
+}
+
+// ShowLogs opens the panel on the logs of a Project, whole or of one of its
+// Services, and starts the stream.
+func (p *bottomPanel) ShowLogs(project compose.Project, service string) {
+	p.setTarget(project, service)
+	p.Open()
+	p.tabs.SetCurrentIndex(logTab)
+	// The choice of the tab opens the stream already; the call covers the case
+	// of a tab that did not change.
+	p.openLogs()
+}
+
+// setProject follows the Project the shell has open. A change of Project
+// terminates the stream of the old one; the Log tab, when it is on screen,
+// starts again on the new Project.
+func (p *bottomPanel) setProject(project compose.Project) {
+	if p.hasProject && p.project.Name == project.Name {
+		p.project = project
+		return
+	}
+	p.setTarget(project, "")
+	if p.hasProject && p.open && p.tabs.CurrentIndex() == logTab {
+		p.openLogs()
+	}
+}
+
+// setTarget keeps the target of the logs and stops the stream of the old one.
+// It never starts a stream: the panel opens one only when the Log tab is on
+// screen, so a closed panel holds no `docker compose logs` process.
+func (p *bottomPanel) setTarget(project compose.Project, service string) {
+	changed := !p.hasProject || p.project.Name != project.Name
+	p.project, p.hasProject = project, project.Name != ""
+	if p.hasProject {
+		p.service = service
+	} else {
+		p.service = ""
+	}
+	if changed {
+		p.logs.Clear()
+	}
+}
+
+// openLogs starts the logs of the target on screen, if any.
+func (p *bottomPanel) openLogs() {
+	if !p.hasProject {
+		return
+	}
+	p.logs.Open(p.project, p.service)
 }
 
 // Open shows the panel at its height. The Activity on screen keeps running.
@@ -123,13 +181,20 @@ func (p *bottomPanel) Open() {
 	// The height of the splitter arrives with the layout, so the size waits for
 	// the next turn of the event loop.
 	p.fitTimer.Start(0)
+	// The Log tab may be the one on screen: a panel that opens on it starts the
+	// stream of the Project the shell has open.
+	if p.tabs.CurrentIndex() == logTab {
+		p.openLogs()
+	}
 }
 
-// Close hides the panel. It stops nothing and keeps the history.
+// Close hides the panel and terminates the stream of the logs. It keeps the
+// history of the Activities.
 func (p *bottomPanel) Close() {
 	p.open = false
 	p.fitTimer.Stop()
 	p.widget.SetVisible(false)
+	p.logs.Stop()
 }
 
 // showing reports whether the panel is on screen.
@@ -154,7 +219,7 @@ func (p *bottomPanel) fit() {
 
 // linkAfter puts the controls of the panel after a control of the shell, so the
 // tab chain reads the panel after the detail: the button that closes it, the
-// history, then the output.
+// history, the output, then the bar and the text of the logs.
 func (p *bottomPanel) linkAfter(prev *qt6.QWidget) {
 	if prev == nil {
 		return
@@ -162,4 +227,8 @@ func (p *bottomPanel) linkAfter(prev *qt6.QWidget) {
 	qt6.QWidget_SetTabOrder(prev, p.close.QWidget)
 	qt6.QWidget_SetTabOrder(p.close.QWidget, p.page.list.QWidget)
 	qt6.QWidget_SetTabOrder(p.page.list.QWidget, p.page.output.QWidget)
+	qt6.QWidget_SetTabOrder(p.page.output.QWidget, p.logs.search.QWidget)
+	qt6.QWidget_SetTabOrder(p.logs.search.QWidget, p.logs.clocks.QWidget)
+	qt6.QWidget_SetTabOrder(p.logs.clocks.QWidget, p.logs.pause.QWidget)
+	qt6.QWidget_SetTabOrder(p.logs.pause.QWidget, p.logs.view.QWidget)
 }

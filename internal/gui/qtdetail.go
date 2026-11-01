@@ -69,6 +69,9 @@ type detailPanel struct {
 	// onAction hands an Action to the shell, which reaches the Manager off the
 	// Qt thread. A nil function launches nothing.
 	onAction func(compose.Action)
+	// onLogs asks the shell to show the logs of a Project, whole or of one of
+	// its Services. A nil function opens nothing.
+	onLogs func(compose.Project, string)
 	// guard stops a second click between a launch and its result.
 	guard startGuard
 	// launching is the command the last click disabled. A render destroys the
@@ -309,6 +312,21 @@ func (p *detailPanel) header() *qt6.QWidget {
 		box.AddWidget(label.QWidget)
 	}
 
+	// The logs of the whole Project sit under the head, where the old view put
+	// them: one press opens the panel on the tab of the logs.
+	row := qt6.NewQHBoxLayout2()
+	row.SetSpacing(spaceS)
+	logs := detailButton(showLogsText, "logButton", "Mostra i log del Progetto.", true)
+	logs.OnClicked(func() {
+		if p.onLogs != nil {
+			p.onLogs(project, "")
+		}
+	})
+	row.AddWidget(logs.QWidget)
+	row.AddStretch()
+	box.AddLayout2(row.QLayout, 0)
+	p.controls = append(p.controls, panelControl{widget: logs.QWidget, label: showLogsText})
+
 	return block
 }
 
@@ -494,6 +512,18 @@ func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidg
 		moreLabel := detailLabel(fmt.Sprintf("+%d", more), "tacksMore")
 		line.AddWidget3(moreLabel.QWidget, 0, qt6.AlignVCenter)
 	}
+
+	// The logs of this Service alone, next to its name: the panel follows one
+	// Container's output instead of the whole Project.
+	logs := detailButton(serviceLogText, "serviceLogButton", "Mostra i log del Servizio.", true)
+	logs.SetAccessibleName(serviceLogText + " di " + service.Name)
+	logs.OnClicked(func() {
+		if p.onLogs != nil {
+			p.onLogs(p.shown.project, service.Name)
+		}
+	})
+	line.AddWidget3(logs.QWidget, 0, qt6.AlignVCenter)
+	p.controls = append(p.controls, panelControl{widget: logs.QWidget, label: service.Name + "/" + serviceLogText})
 	box.AddLayout2(line.QLayout, 0)
 
 	for _, container := range service.Containers {

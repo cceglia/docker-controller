@@ -86,12 +86,73 @@ func TestAppendLogLines(t *testing.T) {
 	}
 }
 
+// texts returns the text of some lines, for the messages of a failed case.
 func texts(lines []compose.LogLine) []string {
 	out := make([]string, len(lines))
 	for i, line := range lines {
 		out[i] = line.Text
 	}
 	return out
+}
+
+// TestAppendLogLines_KeepsTheCapOfThePanel uses the real limit of the page, so
+// a change of LogLineLimit that leaves the panel's cap behind fails here.
+func TestAppendLogLines_KeepsTheCapOfThePanel(t *testing.T) {
+	numbered := func(from, to int) []compose.LogLine {
+		out := make([]compose.LogLine, 0, to-from)
+		for i := from; i < to; i++ {
+			out = append(out, logLine("web", strconv.Itoa(i)))
+		}
+		return out
+	}
+
+	t.Run("one line over the cap drops the oldest", func(t *testing.T) {
+		lines := numbered(0, LogLineLimit)
+		got := AppendLogLines(lines, numbered(LogLineLimit, LogLineLimit+1), LogLineLimit)
+		if len(got) != LogLineLimit {
+			t.Fatalf("kept %d lines, want %d", len(got), LogLineLimit)
+		}
+		if got[0].Text != "1" {
+			t.Errorf("oldest line = %q, want %q", got[0].Text, "1")
+		}
+		if last := got[len(got)-1].Text; last != strconv.Itoa(LogLineLimit) {
+			t.Errorf("newest line = %q, want %q", last, strconv.Itoa(LogLineLimit))
+		}
+	})
+
+	t.Run("a burst bigger than the cap keeps its tail", func(t *testing.T) {
+		got := AppendLogLines(numbered(0, 100), numbered(100, 100+LogLineLimit+10), LogLineLimit)
+		if len(got) != LogLineLimit {
+			t.Fatalf("kept %d lines, want %d", len(got), LogLineLimit)
+		}
+		if got[0].Text != "110" {
+			t.Errorf("oldest line = %q, want %q", got[0].Text, "110")
+		}
+		if last := got[len(got)-1].Text; last != strconv.Itoa(100+LogLineLimit+9) {
+			t.Errorf("newest line = %q, want %q", last, strconv.Itoa(100+LogLineLimit+9))
+		}
+	})
+}
+
+func TestLogTargetText(t *testing.T) {
+	shop := compose.Project{Name: "shop", DisplayName: "Negozio"}
+	for _, tc := range []struct {
+		name    string
+		project compose.Project
+		service string
+		want    string
+	}{
+		{name: "no Project names no target"},
+		{name: "a Project without a Display name reads its compose name", project: compose.Project{Name: "blog"}, want: "blog"},
+		{name: "the Display name names the Project", project: shop, want: "Negozio"},
+		{name: "one Service follows the Project", project: shop, service: "web", want: "Negozio · web"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := LogTargetText(tc.project, tc.service); got != tc.want {
+				t.Errorf("LogTargetText() = %q, want %q", got, tc.want)
+			}
+		})
+	}
 }
 
 func TestFilterLogLines(t *testing.T) {
@@ -302,43 +363,61 @@ func TestServiceHue(t *testing.T) {
 	})
 }
 
-func TestServiceColor_ReadsOnBothAdwaitaThemes(t *testing.T) {
-	// The window background of Adwaita, light and dark.
-	background := map[bool]string{false: "#fafafa", true: "#242424"}
-	for hue := 0; hue < ServiceHues; hue++ {
-		for _, dark := range []bool{false, true} {
-			color := ServiceColor(hue, dark)
-			if !isHexColor(color) {
-				t.Errorf("ServiceColor(%d, %v) = %q, want a #rrggbb colour", hue, dark, color)
-				continue
+func TestServiceTag(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		service string
+		want    string
+	}{
+		{name: "a name keeps the tag of its hue", service: "web", want: "log-service-4"},
+		{name: "another name keeps its own tag", service: "db", want: "log-service-14"},
+		{name: "an empty name still gets a tag", service: "", want: "log-service-0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ServiceTag(tc.service); got != tc.want {
+				t.Errorf("ServiceTag(%q) = %q, want %q", tc.service, got, tc.want)
 			}
-			if got := contrastRatio(color, background[dark]); got < minServiceContrast {
-				t.Errorf("ServiceColor(%d, dark=%v) = %q, contrast %.2f, want at least %.1f",
-					hue, dark, color, got, minServiceContrast)
-			}
-		}
+		})
 	}
 
-	t.Run("the light and the dark palettes differ", func(t *testing.T) {
+	t.Run("every hue has its own tag, apart from the other tags", func(t *testing.T) {
+		seen := make(map[string]int, ServiceHues)
 		for hue := 0; hue < ServiceHues; hue++ {
-			if ServiceColor(hue, false) == ServiceColor(hue, true) {
-				t.Errorf("hue %d is the same colour on both themes", hue)
+			tag := serviceTag(hue)
+			if want := serviceTagPrefix + strconv.Itoa(hue); tag != want {
+				t.Errorf("serviceTag(%d) = %q, want %q", hue, tag, want)
+			}
+			if other, duplicate := seen[tag]; duplicate {
+				t.Errorf("hues %d and %d share the tag %q", other, hue, tag)
+			}
+			seen[tag] = hue
+			if tag == LogTimestampTag || tag == LogStderrTag {
+				t.Errorf("hue %d takes the tag %q of another part of the line", hue, tag)
 			}
 		}
 	})
+}
 
-	t.Run("the palette entries differ from each other", func(t *testing.T) {
-		seen := map[string]int{}
-		for hue := 0; hue < ServiceHues; hue++ {
-			for _, dark := range []bool{false, true} {
-				color := ServiceColor(hue, dark)
-				if other, duplicate := seen[color]; duplicate {
-					t.Errorf("hues %d and %d share %s", other, hue, color)
-				}
-				seen[color] = hue
+func TestServiceHueOf(t *testing.T) {
+	for _, name := range []string{"web", "db", "api", "worker", ""} {
+		t.Run(name, func(t *testing.T) {
+			hue, ok := serviceHueOf(ServiceTag(name))
+			if !ok {
+				t.Fatalf("the tag %q belongs to no hue", ServiceTag(name))
 			}
-		}
-	})
+			if want := ServiceHue(name); hue != want {
+				t.Errorf("the tag of %q reads as hue %d, want %d", name, hue, want)
+			}
+		})
+	}
+
+	for _, tag := range []string{"", LogTimestampTag, LogStderrTag, serviceTagPrefix, serviceTagPrefix + "x", serviceTagPrefix + "-1", serviceTagPrefix + strconv.Itoa(ServiceHues)} {
+		t.Run("foreign/"+tag, func(t *testing.T) {
+			if hue, ok := serviceHueOf(tag); ok {
+				t.Errorf("serviceHueOf(%q) = %d, want no hue", tag, hue)
+			}
+		})
+	}
 }
 
 func TestLogCountText(t *testing.T) {

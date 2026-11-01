@@ -25,32 +25,6 @@ const (
 // serviceTagPrefix names the colour tag of a Service.
 const serviceTagPrefix = "log-service-"
 
-// ServiceHues is how many colours the Service palette has.
-const ServiceHues = 16
-
-// minServiceContrast is the WCAG contrast a Service colour keeps against the
-// window background of Adwaita, light and dark. The Service name is bold, so
-// 4.5 (the level AA of normal text) is the floor.
-const minServiceContrast = 4.5
-
-// servicePaletteLight and servicePaletteDark hold one colour per hue: dark
-// enough to read on the light window, light enough to read on the dark one.
-// Each hue is 22.5 degrees of the colour wheel at a fixed saturation.
-var (
-	servicePaletteLight = [ServiceHues]string{
-		"#721d1d", "#723d1d", "#725d1d", "#68721d",
-		"#47721d", "#27721d", "#1d7232", "#1d7252",
-		"#1d7272", "#1d5272", "#1d3272", "#271d72",
-		"#471d72", "#681d72", "#721d5d", "#721d3d",
-	}
-	servicePaletteDark = [ServiceHues]string{
-		"#e08585", "#e0a785", "#e0c985", "#d5e085",
-		"#b3e085", "#90e085", "#85e09c", "#85e0be",
-		"#85e0e0", "#85bee0", "#859ce0", "#9085e0",
-		"#b385e0", "#d585e0", "#e085c9", "#e085a7",
-	}
-)
-
 // LogSegment is a part of the text of one line with the tag the view applies
 // to it. An empty Tag means no tag: the text of a Container has none.
 type LogSegment struct {
@@ -140,15 +114,26 @@ func serviceTag(hue int) string {
 }
 
 // ServiceColor is the colour of one palette entry in the theme, as "#rrggbb".
-// An entry outside the palette has no colour.
-func ServiceColor(hue int, dark bool) string {
+// The colours live with the other design tokens, so the token test checks
+// them. An entry outside the palette has no colour.
+func ServiceColor(hue int, theme designTheme) string {
 	if hue < 0 || hue >= ServiceHues {
 		return ""
 	}
-	if dark {
-		return servicePaletteDark[hue]
+	return theme.color(serviceRole(hue))
+}
+
+// LogTargetText is the target the Log page names: the Display name of the
+// Project and, when the stream follows one Service, the name of that Service.
+func LogTargetText(project compose.Project, service string) string {
+	if project.Name == "" {
+		return ""
 	}
-	return servicePaletteLight[hue]
+	name := ProjectName(project)
+	if service == "" {
+		return name
+	}
+	return name + " · " + service
 }
 
 // LogCountText is the count of the bar: how many lines are on screen, and how

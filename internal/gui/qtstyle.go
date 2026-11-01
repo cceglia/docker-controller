@@ -70,6 +70,24 @@ QLabel#toastText {
 QPlainTextEdit#activityOutput {
     padding: %dpx %dpx;
 }
+QPlainTextEdit#logView {
+    padding: %dpx %dpx;
+}
+QLabel#logTarget {
+    font-weight: 600;
+}
+QLabel#logCount {
+    padding: 0 %dpx;
+}
+QLabel#logStatus {
+    padding: 0 %dpx %dpx %dpx;
+}
+QLabel#logStatusFault {
+    color: %s;
+}
+QCheckBox#logClocks {
+    padding: %dpx 0;
+}
 QLabel#statusActive {
     color: %s;
 }
@@ -113,6 +131,11 @@ QWidget#projectRowSelected QLabel {
 		spaceXS,
 		spaceS, spaceM,
 		spaceS, spaceS,
+		spaceS, spaceS,
+		spaceS,
+		spaceS, spaceS, spaceS,
+		theme.color(roleStatusFault),
+		spaceXS,
 		theme.color(roleStatusActive),
 		theme.color(roleStatusPartial),
 		theme.color(roleStatusFault),

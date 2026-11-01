@@ -3,11 +3,13 @@
 package gui
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mappu/miqt/qt6"
 
@@ -62,6 +64,7 @@ func TestShellOffscreen(t *testing.T) {
 	checkActions(t, s)
 	checkConfirmDialog(t, s)
 	checkBottomPanel(t)
+	checkLogs(t)
 	if dir := os.Getenv("SHOT_DIR"); dir != "" {
 		captureScreens(t, dir, app)
 	}
@@ -407,9 +410,19 @@ func checkBottomPanel(t *testing.T) {
 			t.Errorf("tab %d is %q, want %q", i, got, want)
 		}
 	}
-	// The Log tab is a placeholder until the ticket that streams it.
-	if page := s.bottom.tabs.Widget(logTab); page == nil || !hasWidgetNamed(page, "logEmpty") {
-		t.Error("the Log tab carries no placeholder")
+	// The Log tab carries the page of the logs, with its bar over the text.
+	page := s.bottom.tabs.Widget(logTab)
+	if page == nil || page.UnsafePointer() != s.bottom.logs.widget.UnsafePointer() {
+		t.Fatal("the Log tab does not carry the page of the logs")
+	}
+	if !s.bottom.logs.view.IsReadOnly() {
+		t.Error("the text of the logs is editable")
+	}
+	if got := s.bottom.logs.searchLabel.Text(); got != logSearchLabelText {
+		t.Errorf("the search label reads %q, want %q", got, logSearchLabelText)
+	}
+	if got := s.bottom.logs.status.Text(); got != emptyLogText {
+		t.Errorf("the empty log reads %q, want %q", got, emptyLogText)
 	}
 	if s.bottom.showing() || s.bottom.widget.IsVisible() {
 		t.Fatal("the panel takes room before the first Activity")
@@ -534,6 +547,224 @@ func checkBottomPanel(t *testing.T) {
 	}
 
 	checkMinimumTargets(t, s.window)
+}
+
+// checkLogs drives the Log tab over a fake stream: the tab of the selected
+// Project, a Service of the detail, the colours of the roles, the search, the
+// pause, the timestamps, the cap and the end of the process when the panel
+// closes or the Project changes.
+func checkLogs(t *testing.T) {
+	t.Helper()
+
+	log := NewActivityLog()
+	s := newShell(&application{activities: log}, lightTheme)
+	defer s.window.Delete()
+	s.show()
+	settle()
+
+	projects := screenshotProjects()
+	project := projects[0] // vakt: web, db and cache
+
+	lines := make(chan compose.LogLine, 2*LogLineLimit)
+	stopped := make(chan struct{}, 8)
+	s.bottom.logs.ctx = context.Background()
+	s.bottom.logs.source = func(ctx context.Context, _ compose.LogRequest, onLine func(compose.LogLine)) error {
+		for {
+			select {
+			case <-ctx.Done():
+				stopped <- struct{}{}
+				return nil
+			case line := <-lines:
+				onLine(line)
+			}
+		}
+	}
+
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: projects})
+	s.open(project)
+	settle()
+
+	// A closed panel starts nothing: the stream begins with the Log tab.
+	if s.bottom.logs.Running() {
+		t.Error("the Log page streams while the panel is closed")
+	}
+
+	if !hasWidgetNamed(blockNamed(s.panel, "Intestazione del Progetto"), "logButton") {
+		t.Error("the head of the Project carries no way to its logs")
+	}
+	services := blockNamed(s.panel, "Servizi del Progetto")
+	if got, want := len(widgetsNamed(services, "serviceLogButton")), len(project.Services); got != want {
+		t.Errorf("the Services carry %d ways to their logs, want %d", got, want)
+	}
+	for _, button := range widgetsNamed(services, "serviceLogButton") {
+		if button.AccessibleName() == "" {
+			t.Error("a way to the logs of a Service has no accessible name")
+		}
+	}
+
+	// The tab names the selected Project and starts the stream.
+	s.bottom.Open()
+	s.bottom.tabs.SetCurrentIndex(logTab)
+	waitFor(t, "the stream of the Project", func() bool { return s.bottom.logs.Running() })
+	if got, want := s.bottom.logs.target.Text(), LogTargetText(project, ""); got != want {
+		t.Errorf("the Log tab names %q, want %q", got, want)
+	}
+
+	clock := LogTime("2024-03-01T12:34:56Z")
+	for _, line := range []compose.LogLine{
+		{Service: "web", Timestamp: "2024-03-01T12:34:56Z", Text: "GET /index.html 200"},
+		{Service: "db", Text: "database system is ready"},
+		{Text: "no configuration file provided", Stderr: true},
+	} {
+		lines <- line
+	}
+	waitFor(t, "the first lines", func() bool { return len(s.bottom.logs.lines) == 3 })
+	settle()
+
+	text := s.bottom.logs.view.ToPlainText()
+	for _, want := range []string{"web", "GET /index.html 200", "db", "database system is ready", clock} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the text is %q, want %q", text, want)
+		}
+	}
+	// A message of compose itself carries a prefix, so it reads without the
+	// colour too.
+	if !strings.Contains(text, stderrPrefix+"no configuration file provided") {
+		t.Errorf("the text is %q, want the prefix of a message of compose", text)
+	}
+
+	// The format of a Service comes from the role of the palette.
+	hue := ServiceHue("web")
+	if got, want := s.bottom.logs.formats.service[hue].Foreground().Color().Name(), ServiceColor(hue, lightTheme); got != want {
+		t.Errorf("the colour of the name %q is %s, want %s", "web", got, want)
+	}
+
+	// The search keeps the lines that match and counts them.
+	s.bottom.logs.search.SetText("ready")
+	settle()
+	text = s.bottom.logs.view.ToPlainText()
+	if strings.Contains(text, "GET /index.html 200") || !strings.Contains(text, "database system is ready") {
+		t.Errorf("the search shows %q, want the matching line alone", text)
+	}
+	if got, want := s.bottom.logs.count.Text(), LogCountText(1, 3); got != want {
+		t.Errorf("the count reads %q, want %q", got, want)
+	}
+
+	// A search with no match keeps the text empty and says so.
+	s.bottom.logs.search.SetText("missing")
+	settle()
+	if got := s.bottom.logs.status.Text(); got != logNoMatchText {
+		t.Errorf("the empty search reads %q, want %q", got, logNoMatchText)
+	}
+	s.bottom.logs.search.SetText("")
+	settle()
+
+	// The timestamps come and go.
+	s.bottom.logs.clocks.SetChecked(false)
+	settle()
+	if strings.Contains(s.bottom.logs.view.ToPlainText(), clock) {
+		t.Error("the clock stays on screen with the timestamps off")
+	}
+	s.bottom.logs.clocks.SetChecked(true)
+	settle()
+
+	// The pause stops the scrolling; resuming goes back to the last line.
+	s.bottom.logs.pause.Click()
+	settle()
+	if !s.bottom.logs.paused {
+		t.Fatal("the pause does not stop the scrolling")
+	}
+	if got := s.bottom.logs.pause.Text(); got != logResumeText {
+		t.Errorf("the pause button reads %q, want %q", got, logResumeText)
+	}
+	for i := 0; i < 400; i++ {
+		lines <- compose.LogLine{Service: "web", Text: fmt.Sprintf("filler %d", i)}
+	}
+	waitFor(t, "the filler lines", func() bool { return len(s.bottom.logs.lines) == 403 })
+	settle()
+	bar := s.bottom.logs.view.VerticalScrollBar()
+	if bar == nil || bar.Maximum() == 0 {
+		t.Fatal("the text of the logs does not scroll")
+	}
+	if got, max := bar.Value(), bar.Maximum(); got >= max {
+		t.Errorf("the scroll is at %d of %d while paused, want the view left behind", got, max)
+	}
+	s.bottom.logs.pause.Click()
+	settle()
+	waitFor(t, "the last line after the resume", func() bool { return bar.Value() == bar.Maximum() })
+
+	// The panel keeps at most LogLineLimit lines and drops the oldest.
+	for i := 0; i < LogLineLimit; i++ {
+		lines <- compose.LogLine{Service: "db", Text: fmt.Sprintf("overflow %d", i)}
+	}
+	waitFor(t, "the cap of the lines", func() bool { return len(s.bottom.logs.lines) == LogLineLimit })
+	if got := len(s.bottom.logs.lines); got != LogLineLimit {
+		t.Errorf("the panel keeps %d lines, want %d", got, LogLineLimit)
+	}
+	if text := s.bottom.logs.view.ToPlainText(); strings.Contains(text, "GET /index.html 200") ||
+		!strings.Contains(text, "overflow 0\n") || !strings.Contains(text, "overflow 4999") {
+		t.Error("the text does not hold the last lines of the burst alone")
+	}
+	if got, limit := s.bottom.logs.view.Document().BlockCount(), LogLineLimit+1; got > limit {
+		t.Errorf("the text holds %d blocks, want at most %d", got, limit)
+	}
+
+	// A Service of the detail opens the logs of that Service alone.
+	s.bottom.ShowLogs(project, "db")
+	waitFor(t, "the stream of the Service", func() bool { return s.bottom.logs.Running() })
+	if got, want := s.bottom.logs.target.Text(), LogTargetText(project, "db"); got != want {
+		t.Errorf("the Log tab names %q, want %q", got, want)
+	}
+	if name, service := s.bottom.logs.Target(); name != project.Name || service != "db" {
+		t.Errorf("the page streams %q/%q, want %q/%q", name, service, project.Name, "db")
+	}
+
+	// The way of a Service in the detail reaches the same page.
+	s.panel.onLogs(project, "cache")
+	waitFor(t, "the stream of the Service button", func() bool { return s.bottom.logs.Running() })
+	if name, service := s.bottom.logs.Target(); name != project.Name || service != "cache" {
+		t.Errorf("the Service button streams %q/%q, want %q/%q", name, service, project.Name, "cache")
+	}
+
+	// Closing the panel terminates the process of the logs.
+	s.bottom.Close()
+	waitSignal(t, stopped, "the end of the stream on close")
+	if s.bottom.logs.Running() {
+		t.Error("the stream runs after the panel closed")
+	}
+
+	// A change of Project terminates the stream of the old one, and the Log
+	// tab on screen starts again on the new one.
+	s.bottom.ShowLogs(project, "")
+	waitFor(t, "the stream again", func() bool { return s.bottom.logs.Running() })
+	s.open(projects[2]) // blog
+	waitSignal(t, stopped, "the end of the stream on a change of Project")
+	waitFor(t, "the stream of the new Project", func() bool { return s.bottom.logs.Running() })
+	if name, service := s.bottom.logs.Target(); name != projects[2].Name || service != "" {
+		t.Errorf("the page streams %q/%q, want %q alone", name, service, projects[2].Name)
+	}
+	s.bottom.Close()
+	waitSignal(t, stopped, "the last stream")
+}
+
+// waitFor processes the events of the Qt thread until cond holds or the
+// deadline passes. A stream runs on its own goroutine, so the test cannot wait
+// for it with a plain settle.
+func waitFor(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		for i := 0; i < 4; i++ {
+			qt6.QCoreApplication_ProcessEvents()
+		}
+		if cond() {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
 }
 
 // hasWidgetNamed reports whether a widget or one of its children carries the
@@ -755,6 +986,8 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	// The panel of the Activities: one that runs, one that worked, and one that
 	// failed with the notice that leads to its output.
 	captureActivities(t, dir, lightTheme, "13-activities-light")
+	// The tab of the logs, with more Services and a message of compose itself.
+	captureLogs(t, dir, lightTheme, "16-log-light")
 
 	// The dark desktop: the same blocks with the palette of Breeze Dark, so a
 	// role that reads on white and disappears on black shows here.
@@ -770,6 +1003,7 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	saveGrab(t, dark.window, dir, "11-detail-dark")
 	captureDialog(t, dark.window.QWidget, dir, "12-confirm-dark", confirm)
 	captureActivities(t, dir, darkTheme, "15-activities-dark")
+	captureLogs(t, dir, darkTheme, "17-log-dark")
 }
 
 // captureActivities writes the PNGs of the panel of the Activities in one
@@ -812,6 +1046,59 @@ func captureActivities(t *testing.T, dir string, theme designTheme, name string)
 	log.Push(output("cap-bad", "blog", "", compose.ActionPull, "error: no such image", true))
 	log.Push(finished("cap-bad", "blog", "", compose.ActionPull, "error: no such image\n", "error: no such image"))
 	saveGrab(t, s.window, dir, name+"-failure")
+}
+
+// captureLogs writes the PNG of the Log tab in one theme: several Services,
+// the clock of each line and a message of compose itself.
+func captureLogs(t *testing.T, dir string, theme designTheme, name string) {
+	t.Helper()
+
+	log := NewActivityLog()
+	s := newShell(&application{activities: log}, theme)
+	defer s.window.Delete()
+	s.show()
+	settle()
+
+	projects := screenshotProjects()
+	project := projects[0]
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: projects})
+	s.open(project)
+	settle()
+
+	const base = "2024-03-01T12:34:5"
+	lines := []compose.LogLine{
+		{Service: "web", Timestamp: base + "1Z", Text: "GET /index.html 200 3ms"},
+		{Service: "db", Timestamp: base + "2Z", Text: "database system is ready to accept connections"},
+		{Service: "web", Timestamp: base + "3Z", Text: "GET /api/health 200 1ms"},
+		{Service: "cache", Timestamp: base + "4Z", Text: "Ready to accept connections tcp"},
+		{Service: "db", Timestamp: base + "5Z", Text: "checkpoint starting: time"},
+		{Service: "web", Timestamp: base + "6Z", Text: "GET /api/items 500 12ms"},
+		{Service: "cache", Timestamp: base + "7Z", Text: "1 clients connected"},
+		{Timestamp: base + "8Z", Text: "warning: no dependency for service cache", Stderr: true},
+		{Service: "web", Timestamp: base + "9Z", Text: "GET /static/app.css 200 2ms"},
+	}
+
+	done := make(chan struct{})
+	s.bottom.logs.ctx = context.Background()
+	s.bottom.logs.source = func(ctx context.Context, _ compose.LogRequest, onLine func(compose.LogLine)) error {
+		for _, line := range lines {
+			onLine(line)
+		}
+		<-ctx.Done()
+		close(done)
+		return nil
+	}
+	s.bottom.ShowLogs(project, "")
+	waitFor(t, "the lines of the capture", func() bool { return len(s.bottom.logs.lines) == len(lines) })
+	settle()
+	saveGrab(t, s.window, dir, name)
+
+	s.bottom.Close()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the stream of the capture did not end")
+	}
 }
 
 // testDarkPalette is the palette of Breeze Dark: the offscreen backend has no
