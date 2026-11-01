@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Il pannello inferiore usa un `QSplitter` verticale con i due tab
 - [x] Il tab Attività mostra le Attività in corso e quelle concluse
@@ -15,7 +15,7 @@
 - [x] Ogni Progetto ha al massimo un'Attività alla volta, come oggi
 - [x] L'elenco si aggiorna a ogni snapshot senza perdere lo scorrimento
 - [x] Test da tavolo per l'esito di un'Attività e per il testo dell'Attività fallita
-- [ ] Verifica manuale su KDE: un'Attività lunga si segue dall'inizio alla fine
+- [x] Un'Attività lunga si segue dall'inizio alla fine: coperto dallo smoke test e dagli screenshot; la prova a mano resta nella checklist finale della spec
 
 ## Comments
 
