@@ -14,7 +14,7 @@
 - [x] Un Servizio senza Container non mostra indicatore
 - [x] Il numero di Container non cambia l'altezza delle righe
 - [x] Test da tavolo per la formattazione di byte, percentuali, core e rate
-- [ ] Il fermo e il riavvio alla visibilità della finestra si verificano nel ticket 13
+- [x] Il fermo e il riavvio alla visibilità della finestra si verificano nel ticket 13, che li ha implementati e provati
 
 ## Comments
 

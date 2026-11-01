@@ -6,7 +6,7 @@
 
 **Status:** resolved
 
-- [x] `.gremlins.yaml` è versionato con `workers: 0` e `timeout-coefficient: 20`
+- [x] Un file di configurazione versionato fissa `workers: 0` e `timeout-coefficient: 20`. Il ticket 16 lo ha diviso in un file per package sotto `.gremlins/`
 - [x] `make tools` installa gremlins `v0.6.0` con `go install`
 - [x] `make mutate` esegue gremlins sui tre package scelti
 - [x] `make check` non esegue gremlins
