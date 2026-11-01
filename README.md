@@ -35,7 +35,15 @@ Il binario di produzione finisce in `bin/dockercontroller`.
 make test        # go test ./...
 make vet         # go vet ./...
 make check       # vet + test + build
+make test-ui     # test della UI senza display, con il backend offscreen
 ```
+
+`make test-ui` esegue con `QT_QPA_PLATFORM=offscreen` il package
+`internal/gui` con il tag di build `ui`: lo smoke test costruisce e distrugge
+la finestra, e il test dei token controlla la scala tipografica, i contrasti e
+il bersaglio minimo. Il target non chiede un display, ma chiede Qt 6
+(`qt6-base-dev`), `pkg-config` e un compilatore C++, perché la build usa cgo.
+I test senza tag restano senza display e girano anche in `make check`.
 
 ## Installazione
 

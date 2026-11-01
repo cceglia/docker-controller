@@ -1,52 +1,67 @@
 package gui
 
+import "fmt"
+
 // The style sheet covers only the roles the desktop theme does not carry: the
 // marker of the state of a Project, the headings of the Groups and the size of
 // the text of a row. Every other colour comes from the palette of the theme,
 // so a window on KDE reads as the rest of the system.
 //
+// The sheet is built from the tokens in designtokens.go: the type scale, the
+// colours of the roles and the spacing rhythm. No colour is written here, so a
+// change of the palette is one edit in one place.
+//
 // The type scale uses the ratio 1.125 with a body of 16 px: 18 px for a heading
 // and 20 px for the title of the detail. Secondary text keeps the body size and
 // the colour of the theme: a smaller size would break the minimum of 16 px, and
 // a muted role does not guarantee the contrast a text needs.
-//
-// The two colours of state are declared here, next to their role. The marker is
-// never the only cue: its shape differs and its accessible name says the state
-// in words.
-const applicationStyleSheet = `
+func applicationStyleSheet(theme designTheme) string {
+	return fmt.Sprintf(`
 QLabel#sidebarTitle {
-    font-size: 18px;
+    font-size: %dpx;
     font-weight: 600;
-    padding: 0 0 8px 0;
+    padding: 0 0 %dpx 0;
 }
 QLabel#listHeading {
-    font-size: 18px;
+    font-size: %dpx;
     font-weight: 600;
-    padding: 12px 12px 4px 12px;
+    padding: %dpx %dpx %dpx %dpx;
 }
 QLabel#listEmpty {
-    padding: 12px;
+    padding: %dpx;
 }
 QLabel#projectName {
-    font-size: 16px;
+    font-size: %dpx;
 }
 QLabel#composeName {
-    font-size: 16px;
+    font-size: %dpx;
 }
 QLabel#projectCount {
-    font-size: 16px;
+    font-size: %dpx;
 }
 QLabel#tacksMore {
-    font-size: 16px;
+    font-size: %dpx;
 }
 QLabel#placeholderTitle {
-    font-size: 20px;
+    font-size: %dpx;
     font-weight: 600;
 }
 QLabel#statusActive {
-    color: #2f9e44;
+    color: %s;
 }
 QLabel#statusPartial {
-    color: #b8860b;
+    color: %s;
 }
-`
+`,
+		headingFontSize, spaceS,
+		headingFontSize, spaceM, spaceM, spaceXS, spaceM,
+		spaceM,
+		bodyFontSize,
+		bodyFontSize,
+		bodyFontSize,
+		bodyFontSize,
+		titleFontSize,
+		theme.color(roleStatusActive),
+		theme.color(roleStatusPartial),
+	)
+}

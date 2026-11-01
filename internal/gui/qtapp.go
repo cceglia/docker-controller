@@ -45,14 +45,32 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 	// the window instead, arrive in a later ticket.
 	qt6.QGuiApplication_SetQuitOnLastWindowClosed(true)
 
-	a.qt.SetStyleSheet(applicationStyleSheet)
+	// The window colour of the desktop palette picks the palette of the roles
+	// the sheet carries: a dark window needs lighter colours to keep the
+	// contrast of the labels of state.
+	theme := themeForPalette(qt6.QGuiApplication_Palette())
 
-	a.shell = newShell(a)
+	a.qt.SetStyleSheet(applicationStyleSheet(theme))
+
+	a.shell = newShell(a, theme)
 	a.watch(ctx)
 	a.shell.show()
 
 	qt6.QApplication_Exec()
 	return nil
+}
+
+// themeForPalette reads the window colour of the desktop palette. A missing
+// palette or colour falls back to the light theme.
+func themeForPalette(palette *qt6.QPalette) designTheme {
+	if palette == nil {
+		return lightTheme
+	}
+	window := palette.ColorWithCr(qt6.QPalette__Window)
+	if window == nil {
+		return lightTheme
+	}
+	return themeForLightness(window.Lightness())
 }
 
 // application owns what outlives the window: the Qt application, the Manager,

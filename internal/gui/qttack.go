@@ -13,15 +13,12 @@ const (
 	// tackStoppedAlpha is how faint a stopped Container reads: the tack is
 	// still there, so the count of the Project stays readable.
 	tackStoppedAlpha = 64
-	// tackFaultColor is the fallback colour of a faulty Container: the palette
-	// has no error role, so the colour is declared next to its role.
-	tackFaultColor = "#da4453"
 )
 
 // newTackStrip draws the tacks of a Project: filled for a running Container,
-// faint for a stopped one and in the fault colour for an unhealthy or dead one.
+// faint for a stopped one and in the fault role for an unhealthy or dead one.
 // A strip without tacks is empty but keeps its place, so the rows line up.
-func newTackStrip(states []TackState) *qt6.QWidget {
+func newTackStrip(states []TackState, theme designTheme) *qt6.QWidget {
 	width := 0
 	if len(states) > 0 {
 		width = len(states)*(tackWidth+tackGap) - tackGap
@@ -36,7 +33,7 @@ func newTackStrip(states []TackState) *qt6.QWidget {
 		defer painter.End()
 
 		foreground := strip.Palette().ColorWithCr(qt6.QPalette__WindowText)
-		fault := qt6.NewQColor6(tackFaultColor)
+		fault := qt6.NewQColor6(theme.color(roleTackFault))
 
 		for i, state := range states {
 			color := qt6.NewQColor10(foreground)

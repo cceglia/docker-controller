@@ -34,6 +34,9 @@ const (
 // a Project; it never changes one.
 type projectList struct {
 	widget *qt6.QListWidget
+	// theme supplies the colours of the roles the style sheet does not reach,
+	// like the tack of a faulty Container.
+	theme designTheme
 	// rows holds the Project of each row. A heading and the empty line carry
 	// the zero Project, so the row of a Project is found without a map keyed on
 	// the wrapper.
@@ -44,8 +47,8 @@ type projectList struct {
 }
 
 // newProjectList builds the empty list. The rows arrive with set.
-func newProjectList() *projectList {
-	p := &projectList{widget: qt6.NewQListWidget2()}
+func newProjectList(theme designTheme) *projectList {
+	p := &projectList{widget: qt6.NewQListWidget2(), theme: theme}
 	p.widget.SetSelectionMode(qt6.QAbstractItemView__SingleSelection)
 	// A Project with a Display name that differs from the compose name takes
 	// two lines, so the rows do not share one size and the list must not assume
@@ -142,7 +145,7 @@ func (p *projectList) appendProject(project compose.Project) {
 	if project.DisplayName != "" && project.DisplayName != project.Name {
 		height = rowHeightTwoLines
 	}
-	p.appendRow(rowProject, project, newProjectRow(project), height)
+	p.appendRow(rowProject, project, newProjectRow(project, p.theme), height)
 }
 
 // appendRow adds a row with its widget and its tooltip.
@@ -166,7 +169,7 @@ func (p *projectList) appendRow(kind rowKind, project compose.Project, widget *q
 
 // newProjectRow builds the content of the row of one Project: the marker of the
 // state, the name, the compose name when it differs, the count and the tacks.
-func newProjectRow(project compose.Project) *qt6.QWidget {
+func newProjectRow(project compose.Project, theme designTheme) *qt6.QWidget {
 	status := StatusOf(project.Status)
 
 	row := qt6.NewQWidget2()
@@ -206,7 +209,7 @@ func newProjectRow(project compose.Project) *qt6.QWidget {
 	tacks, more := Tacks(project.Services)
 	strip := qt6.NewQHBoxLayout2()
 	strip.SetSpacing(2)
-	strip.AddWidget(newTackStrip(tacks))
+	strip.AddWidget(newTackStrip(tacks, theme))
 	if more > 0 {
 		moreLabel := qt6.NewQLabel3(fmt.Sprintf("+%d", more))
 		setObjectName(moreLabel.QWidget, "tacksMore")

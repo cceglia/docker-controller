@@ -21,11 +21,16 @@ ICON_INSTALL := $(foreach s,$(ICON_SIZES),$(DESTDIR)$(ICON_ROOT)/$(s)/apps/$(APP
 LEGACY_DESKTOP := $(DESTDIR)$(DESKTOP_DIR)/docker-controller.desktop
 LEGACY_ICON := $(foreach s,$(ICON_SIZES),$(DESTDIR)$(ICON_ROOT)/$(s)/apps/docker-controller.png)
 
-.PHONY: test vet check build install uninstall
+.PHONY: test test-ui vet check build install uninstall
 
 ## test: Go tests
 test:
 	go test ./...
+
+## test-ui: UI tests without a display: offscreen smoke test and design tokens
+test-ui:
+	QT_QPA_PLATFORM=offscreen go vet -tags ui ./internal/gui
+	QT_QPA_PLATFORM=offscreen go test -tags ui ./internal/gui
 
 vet:
 	go vet ./...

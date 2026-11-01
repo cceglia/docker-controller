@@ -13,6 +13,8 @@ import (
 type shell struct {
 	app    *application
 	window *qt6.QMainWindow
+	// theme supplies the palette the style sheet and the painted roles use.
+	theme designTheme
 
 	// pages holds the wide layout and the two pages of the narrow one. Only one
 	// page shows at a time: under the breakpoint the window shows the list or
@@ -45,8 +47,8 @@ type shell struct {
 // newShell builds the window. The Project chosen in the list only marks the
 // selection: the detail arrives in a later ticket, so the right panel invites
 // the user to choose one.
-func newShell(app *application) *shell {
-	s := &shell{app: app}
+func newShell(app *application, theme designTheme) *shell {
+	s := &shell{app: app, theme: theme}
 
 	s.window = qt6.NewQMainWindow2()
 	s.window.SetWindowTitle(windowTitle)
@@ -73,6 +75,12 @@ func newShell(app *application) *shell {
 	return s
 }
 
+// keepTarget raises the minimum size of an interactive control to the token, so
+// a desktop theme that draws a smaller control still meets the target.
+func keepTarget(widget *qt6.QWidget) {
+	widget.SetMinimumSize2(targetMin, targetMin)
+}
+
 // show puts the window on screen.
 func (s *shell) show() {
 	s.window.Show()
@@ -87,29 +95,32 @@ func (s *shell) buildSidebar() {
 	s.sidebar.SetAccessibleName("Progetti")
 
 	layout := qt6.NewQVBoxLayout(s.sidebar)
-	layout.SetContentsMargins(16, 16, 12, 12)
-	layout.SetSpacing(8)
+	layout.SetContentsMargins(spaceL, spaceL, spaceM, spaceM)
+	layout.SetSpacing(spaceS)
 
 	title := qt6.NewQLabel3("Progetti")
 	setObjectName(title.QWidget, "sidebarTitle")
 	layout.AddWidget(title.QWidget)
 
-	s.list = newProjectList()
+	s.list = newProjectList(s.theme)
 	s.list.onOpen = s.open
+	keepTarget(s.list.widget.QWidget)
 	layout.AddWidget2(s.list.widget.QWidget, 1)
 
 	actions := qt6.NewQHBoxLayout2()
-	actions.SetSpacing(8)
+	actions.SetSpacing(spaceS)
 
 	s.add = qt6.NewQPushButton3("Aggiungi progetto")
 	s.add.SetAccessibleName("Aggiungi progetto")
 	s.add.SetEnabled(false)
+	keepTarget(s.add.QWidget)
 	actions.AddWidget(s.add.QWidget)
 	actions.AddStretch()
 
 	s.settings = qt6.NewQPushButton3("Impostazioni")
 	s.settings.SetAccessibleName("Impostazioni")
 	s.settings.SetEnabled(false)
+	keepTarget(s.settings.QWidget)
 	actions.AddWidget(s.settings.QWidget)
 
 	layout.AddLayout(actions.QLayout)
@@ -123,7 +134,7 @@ func (s *shell) buildDetail() {
 	s.detail.SetAccessibleName("Dettaglio del Progetto")
 
 	layout := qt6.NewQVBoxLayout(s.detail)
-	layout.SetContentsMargins(24, 24, 24, 24)
+	layout.SetContentsMargins(spaceXL, spaceXL, spaceXL, spaceXL)
 	layout.AddStretch()
 
 	// The invite is a block of its own with a bounded width: the sentence fits
@@ -131,7 +142,7 @@ func (s *shell) buildDetail() {
 	invite := qt6.NewQWidget2()
 	invite.SetMaximumWidth(640)
 	box := qt6.NewQVBoxLayout(invite)
-	box.SetSpacing(8)
+	box.SetSpacing(spaceS)
 
 	title := qt6.NewQLabel3("Scegli un Progetto")
 	setObjectName(title.QWidget, "placeholderTitle")
@@ -167,6 +178,7 @@ func (s *shell) buildPages() {
 	s.back.SetToolTip("Torna alla lista dei Progetti.")
 	s.back.OnClicked(func() { s.showList() })
 	s.back.SetVisible(false)
+	keepTarget(s.back.QWidget)
 
 	s.narrowDetailPage = qt6.NewQWidget2()
 	s.narrowDetailLayout = qt6.NewQVBoxLayout(s.narrowDetailPage)
