@@ -36,6 +36,8 @@ Ogni prompt di delega che può esplorare codice sorgente inizia con un blocco **
 
 Issue e spec sono file markdown locali in `docs/specs/`. See `docs/agents/issue-tracker.md`.
 
+**REGOLA OBBLIGATORIA: ogni cartella dentro `docs/specs/` porta un ID numerico come prefisso, nel formato `<id>-<nome>`.** L'ID è di due cifre e cresce in ordine di creazione: `01-docker-controller-v1`, `02-restyling-interfaccia`, `03-wails-v3-stabile`, `04-gotk4`. Una cartella di spec senza prefisso non è ammessa, nemmeno per una spec appena creata, temporanea o di prova. Un ID già usato non si riusa. Se crei una spec, prima scegli il numero successivo e poi la cartella.
+
 ### Triage labels
 
 Le cinque etichette canoniche predefinite (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
