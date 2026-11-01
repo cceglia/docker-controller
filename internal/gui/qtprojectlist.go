@@ -110,8 +110,12 @@ func (p *projectList) set(projects []compose.Project, selected string, loading b
 		}
 	}
 
-	if shown == 0 && !loading {
-		p.appendEmpty()
+	if shown == 0 {
+		if loading {
+			p.appendLineText(loadingListText)
+		} else {
+			p.appendLineText(emptyListText)
+		}
 	}
 
 	if selected != "" {
@@ -179,9 +183,10 @@ func (p *projectList) appendHeading(title string) {
 	p.appendRow(rowHeading, compose.Project{}, label.QWidget, nil, rowHeight)
 }
 
-// appendEmpty adds the line of an empty list.
-func (p *projectList) appendEmpty() {
-	label := qt6.NewQLabel3(emptyListText)
+// appendLineText adds a line of text that is not a Project: the state of an
+// empty list, or the wait for the first snapshot.
+func (p *projectList) appendLineText(text string) {
+	label := qt6.NewQLabel3(text)
 	setObjectName(label.QWidget, "listEmpty")
 	label.SetAttribute2(qt6.WA_TransparentForMouseEvents, true)
 

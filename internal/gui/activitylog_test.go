@@ -169,6 +169,11 @@ func TestActivityOutput(t *testing.T) {
 			"one\nboom\n",
 		},
 		{
+			"a failure whose error already reached the output says it once",
+			Activity{State: ActivityFailed, Project: "shop", Kind: compose.ActionUp, Lines: []ActivityLine{{Text: "Pulling web...", Stderr: true}, {Text: "error: no such image", Stderr: true}}, Error: "error: no such image\n"},
+			"Pulling web...\nerror: no such image\n",
+		},
+		{
 			"an Activity without output",
 			Activity{State: ActivityRunning},
 			"",

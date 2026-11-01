@@ -120,6 +120,9 @@ func (s *shell) buildSidebar() {
 
 	s.list = newProjectList(s.theme)
 	s.list.onOpen = s.open
+	// Before the first snapshot the list is not empty: it is waiting. The line
+	// says so, so a slow Docker never reads as "no Project".
+	s.list.set(nil, "", true)
 	keepTarget(s.list.widget.QWidget)
 	layout.AddWidget2(s.list.widget.QWidget, 1)
 

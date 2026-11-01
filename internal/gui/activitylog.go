@@ -129,13 +129,19 @@ func linesText(lines []ActivityLine) string {
 }
 
 // ActivityOutput is the whole text of the output of an Activity: its lines and,
-// when it is over, the outcome on the last line.
+// when it is over, the outcome on the last line. The outcome of a failure is the
+// stderr of compose, which the Manager already streamed as lines: the message
+// must not appear twice.
 func ActivityOutput(a Activity) string {
 	text := linesText(a.Lines)
-	if outcome := ActivityOutcome(a); outcome != "" {
-		text += outcome + "\n"
+	outcome := ActivityOutcome(a)
+	if outcome == "" {
+		return text
 	}
-	return text
+	if strings.HasSuffix(strings.TrimRight(text, "\n"), strings.TrimSpace(outcome)) {
+		return text
+	}
+	return text + outcome + "\n"
 }
 
 // ActivityLog keeps the Activities of the session, newest first, with their

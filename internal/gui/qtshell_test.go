@@ -230,10 +230,18 @@ func checkActions(t *testing.T, s *shell) {
 	if actions == nil {
 		t.Fatal("the panel has no row of Actions")
 	}
-	if got, want := len(widgetsNamed(actions, "actionButton")), len(ProjectActions(project, true)); got != want {
+	commands := projectActionButtons(actions)
+	if got, want := len(commands), len(ProjectActions(project, true)); got != want {
 		t.Fatalf("the row of Actions carries %d commands, want %d", got, want)
 	}
-	for _, button := range widgetsNamed(actions, "actionButton") {
+	primary := widgetsNamed(actions, "primaryAction")
+	if len(primary) != 1 {
+		t.Fatalf("the row of Actions carries %d primary commands, want 1", len(primary))
+	}
+	if got, want := primary[0].AccessibleName(), ProjectActions(project, true)[0].Label; got != want {
+		t.Errorf("the primary command is %q, want the one the state suggests: %q", got, want)
+	}
+	for _, button := range commands {
 		if !button.IsEnabled() {
 			t.Errorf("the command %q is insensitive with Docker answering", button.AccessibleName())
 		}
@@ -255,7 +263,7 @@ func checkActions(t *testing.T, s *shell) {
 	settle()
 
 	actions = blockNamed(s.panel, "Azioni del Progetto")
-	for _, button := range widgetsNamed(actions, "actionButton") {
+	for _, button := range projectActionButtons(actions) {
 		if button.IsEnabled() {
 			t.Errorf("the command %q is enabled during an Activity", button.AccessibleName())
 		}
@@ -533,6 +541,13 @@ func checkBottomPanel(t *testing.T) {
 // through them.
 func hasWidgetNamed(widget *qt6.QWidget, name string) bool {
 	return len(widgetsNamed(widget, name)) > 0
+}
+
+// projectActionButtons returns the commands of the row of the Actions of a
+// Project: the ordinary ones and the primary one the state suggests.
+func projectActionButtons(block *qt6.QWidget) []*qt6.QWidget {
+	buttons := widgetsNamed(block, "actionButton")
+	return append(buttons, widgetsNamed(block, "primaryAction")...)
 }
 
 // widgetsNamed collects the widgets that carry an object name of the style

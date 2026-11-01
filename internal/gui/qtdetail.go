@@ -371,8 +371,14 @@ func (p *detailPanel) actions() *qt6.QWidget {
 
 	row := qt6.NewQHBoxLayout2()
 	row.SetSpacing(spaceS)
-	for _, view := range ProjectActions(project, p.shown.dockerReachable) {
-		button := detailButton(view.Label, "actionButton", "", view.Enabled)
+	for i, view := range ProjectActions(project, p.shown.dockerReachable) {
+		// The Action the state suggests comes first: it carries the role that
+		// makes it the one the eye finds, without a colour of its own.
+		name := "actionButton"
+		if i == 0 {
+			name = "primaryAction"
+		}
+		button := detailButton(view.Label, name, "", view.Enabled)
 		if reason != "" {
 			button.SetAccessibleDescription(reason)
 			button.SetToolTip(reason)

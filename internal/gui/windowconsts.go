@@ -14,6 +14,9 @@ const (
 	// breakpointWidth is the width under which the window shows one page at a
 	// time, in scale independent pixels.
 	breakpointWidth = 900
-	// emptyListText is the line of the list when no Project is saved.
-	emptyListText = "Nessun Progetto."
+	// emptyListText is the line of the list when no Project is saved, and
+	// loadingListText the line before the first snapshot: an empty list that is
+	// still loading must not read as an empty list.
+	emptyListText   = "Nessun Progetto."
+	loadingListText = "Caricamento…"
 )

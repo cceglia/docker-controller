@@ -79,6 +79,16 @@ QLabel#statusPartial {
 QLabel#statusFault {
     color: %s;
 }
+QPushButton#primaryAction {
+    background: palette(highlight);
+    color: palette(highlighted-text);
+    font-weight: 600;
+}
+QPushButton#primaryAction:disabled {
+    background: palette(button);
+    color: palette(mid);
+    font-weight: 600;
+}
 QListWidget::item:selected {
     background: palette(highlight);
     color: palette(highlighted-text);
