@@ -1,37 +1,23 @@
 # Docker Controller - validation and build commands.
-# Every Go command needs the gtk3 build tag (only GTK3/WebKitGTK-4.1 is installed).
+# The build is GTK4 via gotk4.
 GOBIN := $(shell go env GOPATH)/bin
 export PATH := $(PATH):$(GOBIN)
-TAGS := gtk3
 
-.PHONY: test vet typecheck bindings check build dev install uninstall
+.PHONY: test vet check build install uninstall
 
-## test: Go tests (run `make bindings` or `make check` first only if you changed bound types)
+## test: Go tests
 test:
-	go test -tags $(TAGS) ./...
+	go test ./...
 
 vet:
-	go vet -tags $(TAGS) ./...
+	go vet ./...
 
-## bindings: regenerate the Wails TypeScript bindings (frontend/bindings, git-ignored)
-bindings:
-	wails3 generate bindings -f '-tags $(TAGS)' -clean=true -ts -i
-
-## typecheck: svelte-check on the frontend (needs the bindings)
-typecheck: bindings
-	cd frontend && npm install --silent && npm run check
-
-## check: everything the orchestrator runs after a ticket: vet + tests + frontend typecheck/build
-check: vet test typecheck
-	cd frontend && npm run build
+## check: everything the orchestrator runs after a ticket: vet + tests
+check: vet test
 
 ## build: production binary in bin/
 build:
-	wails3 build
-
-## dev: run the app with hot reload
-dev:
-	wails3 dev -config ./build/config.yml
+	CGO_ENABLED=1 go build -o bin/dockercontroller .
 
 ## install: build the production binary and install it with the desktop entry and icon under $(PREFIX) (default ~/.local)
 PREFIX ?= $(HOME)/.local

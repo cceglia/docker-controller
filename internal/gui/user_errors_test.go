@@ -1,4 +1,4 @@
-package main
+package gui
 
 import (
 	"errors"
@@ -30,17 +30,17 @@ func TestUserError_TranslatesKnownErrorsToItalian(t *testing.T) {
 		{"docker unreachable", compose.ErrDockerUnreachable, "Docker non è raggiungibile."},
 		{"close behavior", settings.ErrInvalidCloseBehavior, "Comportamento alla chiusura non valido."},
 		{"terminal command", fmt.Errorf("%w: unterminated quote", settings.ErrInvalidTerminalCommand), "Comando del terminale non valido"},
-		{"invalid port", fmt.Errorf("%w: %d", errInvalidPort, 0), "Porta non valida."},
-		{"no folder", fmt.Errorf("%w: %s", errNoFolder, "p"), "non ha una cartella"},
-		{"folder missing", fmt.Errorf("%w: %s", errFolderMissing, "/x"), "cartella del Progetto non esiste"},
-		{"log open", fmt.Errorf("%w: id", errLogOpen), "già aperto"},
-		{"cannot open", fmt.Errorf("%w: %w", errCannotOpen, errors.New("exec: not found")), "Impossibile aprire"},
-		{"terminal start", fmt.Errorf("%w: %w", errTerminalStart, errors.New("exec: not found")), "Impossibile avviare il terminale"},
+		{"invalid port", fmt.Errorf("%w: %d", ErrInvalidPort, 0), "Porta non valida."},
+		{"no folder", fmt.Errorf("%w: %s", ErrNoFolder, "p"), "non ha una cartella"},
+		{"folder missing", fmt.Errorf("%w: %s", ErrFolderMissing, "/x"), "cartella del Progetto non esiste"},
+		{"log open", fmt.Errorf("%w: id", ErrLogOpen), "già aperto"},
+		{"cannot open", fmt.Errorf("%w: %w", ErrCannotOpen, errors.New("exec: not found")), "Impossibile aprire"},
+		{"terminal start", fmt.Errorf("%w: %w", ErrTerminalStart, errors.New("exec: not found")), "Impossibile avviare il terminale"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := userError(tc.err)
+			got := UserError(tc.err)
 			if got == nil || !strings.Contains(got.Error(), tc.want) {
-				t.Errorf("userError(%v) = %v, want it to contain %q", tc.err, got, tc.want)
+				t.Errorf("UserError(%v) = %v, want it to contain %q", tc.err, got, tc.want)
 			}
 			if strings.Contains(got.Error(), "compose:") || strings.Contains(got.Error(), "Operazione non riuscita") {
 				t.Errorf("English text leaked: %v", got)
@@ -53,14 +53,14 @@ func TestUserError_TranslatesKnownErrorsToItalian(t *testing.T) {
 }
 
 func TestUserError_UnknownErrorGetsAnItalianPrefixAndTheDetail(t *testing.T) {
-	got := userError(errors.New("disk on fire"))
+	got := UserError(errors.New("disk on fire"))
 	if got == nil || got.Error() != "Errore: disk on fire" {
 		t.Errorf("got %v", got)
 	}
 }
 
 func TestUserError_NilStaysNil(t *testing.T) {
-	if userError(nil) != nil {
+	if UserError(nil) != nil {
 		t.Error("nil must stay nil")
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package gui
 
 import (
 	"errors"
@@ -10,8 +10,8 @@ import (
 
 // italianMessages is the single place where the errors of the backend become
 // the Italian text the user reads. The Go errors stay idiomatic English; the
-// bindings pass what they return through userError. Order matters: a more
-// specific error comes before the general one it also wraps.
+// views pass what they return through UserError. Order matters: a more specific
+// error comes before the general one it also wraps.
 var italianMessages = []struct {
 	err error
 	msg string
@@ -30,21 +30,26 @@ var italianMessages = []struct {
 	{compose.ErrDockerUnreachable, "Docker non è raggiungibile."},
 	{settings.ErrInvalidCloseBehavior, "Comportamento alla chiusura non valido."},
 	{settings.ErrInvalidTerminalCommand, "Comando del terminale non valido: controlla virgolette e backslash, e che non sia vuoto."},
-	{errInvalidPort, "Porta non valida."},
-	{errNoFolder, "Il Progetto non ha una cartella."},
-	{errFolderMissing, "La cartella del Progetto non esiste."},
-	{errLogOpen, "Flusso dei log già aperto."},
-	{errCannotOpen, "Impossibile aprire: xdg-open non è riuscito a partire."},
-	{errTerminalStart, "Impossibile avviare il terminale: controlla il comando nelle Impostazioni."},
+	{ErrInvalidPort, "Porta non valida."},
+	{ErrNoFolder, "Il Progetto non ha una cartella."},
+	{ErrFolderMissing, "La cartella del Progetto non esiste."},
+	{ErrLogOpen, "Flusso dei log già aperto."},
+	{ErrCannotOpen, "Impossibile aprire: xdg-open non è riuscito a partire."},
+	{ErrTerminalStart, "Impossibile avviare il terminale: controlla il comando nelle Impostazioni."},
 }
 
-// Errors of the bindings that open things on the desktop.
+// Errors of the views that open things on the desktop.
 var (
-	errInvalidPort   = errors.New("invalid port")
-	errNoFolder      = errors.New("project has no folder")
-	errFolderMissing = errors.New("project folder does not exist")
-	errCannotOpen    = errors.New("cannot open with xdg-open")
-	errTerminalStart = errors.New("cannot start the terminal")
+	// ErrInvalidPort reports a port outside 1-65535.
+	ErrInvalidPort = errors.New("invalid port")
+	// ErrNoFolder reports a Project without a folder.
+	ErrNoFolder = errors.New("project has no folder")
+	// ErrFolderMissing reports a Project folder that no longer exists.
+	ErrFolderMissing = errors.New("project folder does not exist")
+	// ErrCannotOpen reports that xdg-open did not start.
+	ErrCannotOpen = errors.New("cannot open with xdg-open")
+	// ErrTerminalStart reports that the terminal command did not start.
+	ErrTerminalStart = errors.New("cannot start the terminal")
 )
 
 // unknownErrorPrefix introduces the detail of an error without a message above.
@@ -60,9 +65,9 @@ type localizedError struct {
 func (e *localizedError) Error() string { return e.msg }
 func (e *localizedError) Unwrap() error { return e.cause }
 
-// userError returns err with an Italian message: the one registered for the
+// UserError returns err with an Italian message: the one registered for the
 // error it wraps, or an Italian prefix followed by its own text.
-func userError(err error) error {
+func UserError(err error) error {
 	if err == nil {
 		return nil
 	}
