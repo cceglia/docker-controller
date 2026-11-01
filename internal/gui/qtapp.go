@@ -100,6 +100,16 @@ func (a *application) logSource() LogSource {
 	return a.manager.Logs
 }
 
+// usageSource is the stream the detail opens for the Utilizzo risorse. A
+// Manager that is not wired yet leaves it with no source, so no `docker stats`
+// starts and the window still builds.
+func (a *application) usageSource() UsageSource {
+	if a.manager == nil {
+		return nil
+	}
+	return a.manager.Usage
+}
+
 // watch follows the Manager and moves every snapshot onto the Qt thread.
 func (a *application) watch(ctx context.Context) {
 	go func() {

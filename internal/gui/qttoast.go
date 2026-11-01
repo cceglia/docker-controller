@@ -43,6 +43,10 @@ type toast struct {
 	timer  *qt6.QTimer
 	// run is what the button of the notice does, nil for a message alone.
 	run func()
+	// top is the extra space the notice keeps from the top of its host, beyond
+	// its margin: the bar of the Utilizzo risorse sits there, and a message must
+	// not cover a figure. A nil function keeps the plain margin.
+	top func() int
 }
 
 // newToast builds the notice over host. The notice stays hidden until a message
@@ -134,8 +138,9 @@ func (t *toast) hide() {
 	t.frame.SetVisible(false)
 }
 
-// place puts the notice at the top right of its host. The placement runs on
-// every resize, so the notice stays where the window expects it.
+// place puts the notice at the top right of its host, below the bar of the
+// Utilizzo risorse when the bar is on screen. The placement runs on every
+// resize, so the notice stays where the window expects it.
 func (t *toast) place() {
 	if t.host == nil || t.frame == nil {
 		return
@@ -144,5 +149,9 @@ func (t *toast) place() {
 	if x < toastMargin {
 		x = toastMargin
 	}
-	t.frame.Move(x, toastMargin)
+	y := toastMargin
+	if t.top != nil {
+		y += t.top()
+	}
+	t.frame.Move(x, y)
 }

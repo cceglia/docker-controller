@@ -38,9 +38,11 @@ type shell struct {
 	// two share the right column, and the panel takes no room while it is closed.
 	column *qt6.QSplitter
 
-	list     *projectList
-	panel    *detailPanel
-	bottom   *bottomPanel
+	list   *projectList
+	panel  *detailPanel
+	bottom *bottomPanel
+	// usage runs the stream of the Utilizzo risorse for the Project on screen.
+	usage    *usageFeed
 	add      *qt6.QPushButton
 	settings *qt6.QPushButton
 	back     *qt6.QPushButton
@@ -73,6 +75,9 @@ func newShell(app *application, theme designTheme) *shell {
 	s.buildDetail()
 	s.buildPages()
 	s.notice = newToast(s.pages.QWidget)
+	// The bar of the Utilizzo risorse takes the top of the detail: a message in
+	// sovrimpressione goes under it and never covers a figure.
+	s.notice.top = s.noticeTop
 
 	s.window.SetCentralWidget(s.pages.QWidget)
 	s.window.OnResizeEvent(func(super func(event *qt6.QResizeEvent), event *qt6.QResizeEvent) {
@@ -152,6 +157,10 @@ func (s *shell) buildDetail() {
 	s.panel = newDetailPanel(s.theme)
 	s.panel.onAction = s.do
 	s.detail = s.panel.widget
+	// The figures of the machine reach the panel on the Qt thread, and only
+	// while the Project on screen has a Container to measure.
+	s.usage = newUsageFeed(s.app.ctx, s.app.usageSource(), mainthread.Start)
+	s.usage.OnSample = s.panel.setUsage
 }
 
 // do launches an Action on the Manager off the Qt thread: Docker runs for
@@ -173,6 +182,20 @@ func (s *shell) do(action compose.Action) {
 			s.panel.actionDone()
 		})
 	}()
+}
+
+// noticeTop is the space the notice keeps from the top of the pages: the bar of
+// the Utilizzo risorse takes the top of the detail, so the notice starts under
+// it. A bar that is not on screen leaves the plain margin.
+func (s *shell) noticeTop() int {
+	if s.panel == nil || s.panel.strip == nil || !s.panel.strip.widget.IsVisible() {
+		return 0
+	}
+	point := s.panel.strip.widget.MapTo2(s.pages.QWidget, qt6.NewQPoint2(0, 0))
+	if point == nil {
+		return 0
+	}
+	return point.Y() + s.panel.strip.widget.Height()
 }
 
 // showNotice puts a message in the notice of the window. A refused Action shows
@@ -306,6 +329,7 @@ func (s *shell) showList() {
 func (s *shell) open(project compose.Project) {
 	s.selected = project.Name
 	s.panel.set(project, s.snapshot.DockerReachable, s.snapshot.Loading)
+	s.usage.Follow(project, s.snapshot.DockerReachable)
 	s.bottom.setProject(project)
 	s.linkTabChain()
 	if s.narrow {
@@ -322,6 +346,7 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 	s.list.set(snapshot.Projects, s.selected, snapshot.Loading)
 	if s.selected == "" {
 		s.panel.clear()
+		s.usage.Follow(compose.Project{}, false)
 		s.bottom.setProject(compose.Project{})
 		return
 	}
@@ -329,6 +354,7 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 	if !ok {
 		s.selected = ""
 		s.panel.clear()
+		s.usage.Follow(compose.Project{}, false)
 		s.bottom.setProject(compose.Project{})
 		if s.narrow {
 			s.showNarrowPage()
@@ -336,6 +362,7 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 		return
 	}
 	s.panel.set(project, snapshot.DockerReachable, snapshot.Loading)
+	s.usage.Follow(project, snapshot.DockerReachable)
 	s.bottom.setProject(project)
 	s.linkTabChain()
 }

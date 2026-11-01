@@ -24,8 +24,10 @@ func TestFormatBytes_BinaryUnits(t *testing.T) {
 		{"one mebibyte", 1048576, "1,00 MiB"},
 		{"one and a half mebibytes", 1572864, "1,50 MiB"},
 		{"past a hundred mebibytes", 124465971, "119 MiB"},
+		{"a hundred kibibytes drop their decimals", 102400, "100 KiB"},
 		{"one GiB and some", 33318208799, "31,0 GiB"},
 		{"four digits keep no separator", 1048166, "1024 KiB"},
+		{"the last byte of a kibibyte carries over", 1048575, "1024 KiB"},
 		{"a large size", 1e15, "909 TiB"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -47,7 +49,9 @@ func TestFormatBytes_DecimalUnits(t *testing.T) {
 		{"one kilobyte", 1000, "1,00 kB"},
 		{"one and a half kilobytes", 1500, "1,50 kB"},
 		{"a rate with two decimals", 1234.5, "1,23 kB"},
+		{"1024 bytes stay a thousand and twenty-four", 1024, "1,02 kB"},
 		{"one megabyte", 1e6, "1,00 MB"},
+		{"just under a megabyte", 999999, "1000 kB"},
 		{"gigabytes", 6260000000, "6,26 GB"},
 		{"one terabyte", 1e12, "1,00 TB"},
 		{"petabytes", 2.5e15, "2,50 PB"},
@@ -75,6 +79,8 @@ func TestFormatPercent_OneDecimalWithTheItalianComma(t *testing.T) {
 		{"a full core", 100, "100,0%"},
 		{"above a hundred", 123.45, "123,5%"},
 		{"half a percent", 0.5, "0,5%"},
+		{"a hundredth rounds half away from zero", 0.05, "0,1%"},
+		{"a negative percentage keeps its sign", -12.34, "-12,3%"},
 		{"five digits take the separator", 12345.6, "12.345,6%"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -98,6 +104,8 @@ func TestFormatCores_TwoDecimalsOfACore(t *testing.T) {
 		{"one core and a bit", 123.4, "1,23 core"},
 		{"twelve cores", 1234.5, "12,35 core"},
 		{"half a core", 50, "0,50 core"},
+		{"a fifth of a core", 20, "0,20 core"},
+		{"a hundred cores", 10000, "100,00 core"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := FormatCores(tc.cpuPercent); got != tc.want {
@@ -114,7 +122,9 @@ func TestFormatRate_UsesDecimalUnitsPerSecond(t *testing.T) {
 		want        string
 	}{
 		{"an idle rate", 0, "0 B/s"},
-		{"a kilobyte per second", 1234.5, "1,23 kB/s"},
+		{"just under a kilobyte per second", 999, "999 B/s"},
+		{"a kilobyte per second", 1000, "1,00 kB/s"},
+		{"a kilobyte and a half per second", 1234.5, "1,23 kB/s"},
 		{"a megabyte and a half per second", 1.5e6, "1,50 MB/s"},
 		{"gigabytes per second", 2.5e9, "2,50 GB/s"},
 	} {

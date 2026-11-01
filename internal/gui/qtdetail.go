@@ -87,6 +87,16 @@ type detailPanel struct {
 	// a Project at all.
 	shown   detailData
 	visible bool
+
+	// strip is the Utilizzo risorse of the machine, above the detail: it is the
+	// machine's, so it stays out of the blocks a Project rebuilds.
+	strip *usageStrip
+	// usage is the sample the panel draws, nil until the first one arrives and
+	// after the stream stops. usageRows holds the indicator of each Service of
+	// the Project on screen, by "project/service": a render builds them again
+	// from the sample it kept.
+	usage     *compose.UsageSample
+	usageRows map[string]*serviceUsageRow
 }
 
 // newDetailPanel builds the panel at rest: the invitation to choose a Project,
@@ -115,7 +125,20 @@ func newDetailPanel(theme designTheme) *detailPanel {
 	p.stack.AddWidget(p.invite)
 	p.stack.AddWidget(p.scroll.QWidget)
 	p.stack.SetCurrentWidget(p.invite)
-	p.widget = p.stack.QWidget
+
+	// The bar of the machine sits above the stack, so it keeps its place while
+	// the detail scrolls. It stays out of the blocks: a render of a Project
+	// never rebuilds a figure of the machine.
+	p.strip = newUsageStrip()
+	p.strip.widget.SetVisible(false)
+	p.usageRows = make(map[string]*serviceUsageRow)
+
+	p.widget = qt6.NewQWidget2()
+	column := qt6.NewQVBoxLayout(p.widget)
+	column.SetContentsMargins(0, 0, 0, 0)
+	column.SetSpacing(0)
+	column.AddWidget(p.strip.widget)
+	column.AddWidget2(p.stack.QWidget, 1)
 
 	// The rebuilt blocks change the range of the scroll bar, and the new range
 	// is what gives the old value back: a render cannot set the value itself,
@@ -166,6 +189,9 @@ func (p *detailPanel) set(project compose.Project, dockerReachable, loading bool
 	p.shown = data
 	p.guard.snapshot(project.Activity != nil)
 	p.stack.SetCurrentWidget(p.scroll.QWidget)
+	// The bar of the machine belongs to the detail: with no Project open there
+	// is nothing to measure it for.
+	p.strip.widget.SetVisible(true)
 	if p.question != nil {
 		// The question belongs to the command on screen: the panel keeps it
 		// until the answer, then draws the data that arrived.
@@ -187,6 +213,12 @@ func (p *detailPanel) clear() {
 	p.waitingDraw = false
 	p.controls = p.controls[:0]
 	p.launching = nil
+	// The figures of a Project that left the screen go with it: the stream
+	// stops, and nothing may stay behind as if it were current.
+	p.usage = nil
+	p.usageRows = make(map[string]*serviceUsageRow)
+	p.strip.set(nil)
+	p.strip.widget.SetVisible(false)
 	clearDetailLayout(p.layout.QLayout)
 	p.stack.SetCurrentWidget(p.invite)
 	if p.question != nil {
@@ -225,6 +257,9 @@ func (p *detailPanel) render() {
 	p.controls = p.controls[:0]
 	p.launching = nil
 	p.waitingDraw = false
+	// The blocks are new, so their indicators are new too: the sample the panel
+	// kept comes back on them at once, without waiting for the next frame.
+	p.usageRows = make(map[string]*serviceUsageRow)
 
 	p.layout.AddWidget(p.header())
 	p.layout.AddWidget(p.data())
@@ -236,8 +271,52 @@ func (p *detailPanel) render() {
 	p.layout.AddWidget(p.services())
 	p.layout.AddStretch()
 
+	p.applyUsage()
+	p.showUsage()
 	p.linkTabOrder()
 	p.pendingOffset = offset
+}
+
+// setUsage shows one sample of the Utilizzo risorse. A nil sample is a stream
+// that stopped: the bar goes back to its waiting line and the indicators of the
+// Services leave the page, so an old figure never stands as the current one.
+func (p *detailPanel) setUsage(sample *compose.UsageSample) {
+	p.usage = sample
+	p.showUsage()
+	p.applyUsage()
+}
+
+// showUsage puts the bar in the state the panel knows: a Docker that does not
+// answer shows the warning in place of the figures, whatever the last sample
+// said, and a sample otherwise says what it saw at its instant.
+func (p *detailPanel) showUsage() {
+	if !p.shown.loading && !p.shown.dockerReachable {
+		p.strip.setUnreachable()
+		return
+	}
+	p.strip.set(p.usage)
+}
+
+// applyUsage puts the sample on screen: the four measures of every Service the
+// sample carries. A Service without an entry, without a running Container or
+// without figures shows no indicator at all, and a Docker that does not answer
+// takes every indicator away.
+func (p *detailPanel) applyUsage() {
+	unreachable := !p.shown.loading && !p.shown.dockerReachable
+	byService := make(map[string]compose.ServiceUsage, len(p.usageRows))
+	if p.usage != nil {
+		for _, usage := range p.usage.Services {
+			byService[usage.Project+"/"+usage.Service] = usage
+		}
+	}
+	for key, row := range p.usageRows {
+		entry, ok := byService[key]
+		state := UsageNone
+		if !unreachable {
+			state = UsageStateOf(p.usage, ok, row.running)
+		}
+		row.set(state, entry)
+	}
 }
 
 // keepScroll gives the scroll bar its value back when the rebuilt content has
@@ -472,17 +551,18 @@ func (p *detailPanel) services() *qt6.QWidget {
 
 	for i, service := range project.Services {
 		if i > 0 {
-			box.AddWidget(serviceSeparator())
+			box.AddWidget(detailSeparator())
 		}
 		box.AddWidget(p.service(service, reason))
 	}
 	return block
 }
 
-// serviceSeparator is the line between two Services. A QFrame draws it with the
+// detailSeparator is the line between two blocks of the detail: two Services,
+// and the Utilizzo risorse of the machine above them. A QFrame draws it with the
 // colours of the desktop palette: a plain widget would not paint the background
 // of the style sheet, and a colour of the sheet reads as the window itself.
-func serviceSeparator() *qt6.QWidget {
+func detailSeparator() *qt6.QWidget {
 	line := qt6.NewQFrame2()
 	line.SetFrameShape(qt6.QFrame__HLine)
 	line.SetFrameShadow(qt6.QFrame__Sunken)
@@ -492,10 +572,10 @@ func serviceSeparator() *qt6.QWidget {
 }
 
 // service is one block of the detail: the name, the state of its Containers,
-// their tacks, the Actions of the Service, the place of the Utilizzo risorse and
-// one row per Container. The place of the indicator is reserved and empty: the
-// indicator arrives in a later ticket and must not change the height of the
-// block.
+// their tacks, the Actions of the Service, one row per Container and the place
+// of the Utilizzo risorse. The indicator of the Utilizzo risorse arrives with
+// the first sample and takes no room before it: a Service without a measure, and
+// a Service without a Container, show no indicator.
 func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidget {
 	block, box := detailBlock()
 	block.SetAccessibleName(service.Name)
@@ -529,6 +609,12 @@ func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidg
 	for _, container := range service.Containers {
 		box.AddWidget(newContainerRow(container))
 	}
+
+	// The Utilizzo risorse of the Service sits under its Containers, where the
+	// old view put it. It takes no room until a sample carries the Service.
+	usage := newServiceUsageRow(p.shown.project.Name, service.Name, ServiceRuns(service))
+	p.usageRows[usage.key] = usage
+	box.AddWidget(usage.widget)
 
 	// The Actions close the block, so the Containers stay under their own
 	// Service and the row of the next Service starts after a divider.

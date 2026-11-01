@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"math"
 	"testing"
 
 	"dockercontroller/internal/compose"
@@ -48,6 +49,28 @@ func TestUsageStateOf_NeverShowsZeroWithoutMeasures(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := UsageStateOf(tc.sample, tc.hasEntry, tc.running); got != tc.want {
 				t.Errorf("UsageStateOf = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestMeterValue_StepsOfTenthsOfAPercent(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		percent float64
+		want    int
+	}{
+		{"zero", 0, 0},
+		{"half", 50, 500},
+		{"all", 100, 1000},
+		{"a decimal of a percent", 12.34, 123},
+		{"above all stays inside the bar", 150, 1000},
+		{"below zero stays inside the bar", -5, 0},
+		{"not a number", math.NaN(), 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := meterValue(tc.percent); got != tc.want {
+				t.Errorf("meterValue(%v) = %d, want %d", tc.percent, got, tc.want)
 			}
 		})
 	}

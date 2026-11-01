@@ -65,6 +65,7 @@ func TestShellOffscreen(t *testing.T) {
 	checkConfirmDialog(t, s)
 	checkBottomPanel(t)
 	checkLogs(t)
+	checkUsage(t, s)
 	if dir := os.Getenv("SHOT_DIR"); dir != "" {
 		captureScreens(t, dir, app)
 	}
@@ -747,6 +748,175 @@ func checkLogs(t *testing.T) {
 	waitSignal(t, stopped, "the last stream")
 }
 
+// checkUsage checks the Utilizzo risorse: the bar of the machine above the
+// detail, the indicator of a Service that has a measure, the Service without a
+// Container, the height of the rows, and the figures of a stream that stopped.
+func checkUsage(t *testing.T, s *shell) {
+	t.Helper()
+
+	project := compose.Project{
+		Name: "usage", Group: "Casa", Status: compose.StatusActive,
+		Folder: "/srv/usage", ComposeFiles: []string{"/srv/usage/compose.yml"},
+		Running: 1, Total: 2,
+		Services: []compose.Service{
+			{Name: "web", Containers: []compose.Container{
+				{Name: "usage-web-1", State: "running"},
+				{Name: "usage-web-2", State: "exited"},
+			}},
+			{Name: "worker", Containers: []compose.Container{{Name: "usage-worker-1", State: "exited"}}},
+			{Name: "idle"},
+		},
+	}
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{project}})
+	s.open(project)
+	settle()
+
+	// Before the first sample the bar waits and claims no figure, and no
+	// Service holds room for an indicator.
+	if !s.panel.strip.widget.IsVisible() {
+		t.Fatal("the bar of the machine is not on screen with a Project open")
+	}
+	if s.panel.strip.body.CurrentWidget().UnsafePointer() != s.panel.strip.message.QWidget.UnsafePointer() {
+		t.Error("the bar shows figures before the first sample")
+	}
+	if got := s.panel.strip.message.Text(); got != waitingUsageText {
+		t.Errorf("the bar says %q before the first sample, want %q", got, waitingUsageText)
+	}
+	for key, row := range s.panel.usageRows {
+		if row.widget.IsVisible() {
+			t.Errorf("the Service %q shows an indicator before the first sample", key)
+		}
+	}
+
+	sample := compose.UsageSample{
+		DockerReachable: true, Containers: 2,
+		CPUs: 4, MemoryTotalBytes: 8 << 30,
+		CPUMachinePercent: 12.3, MemoryMachinePercent: 21.3,
+		Total: compose.Measures{CPUPercent: 49.2, MemoryBytes: 1 << 30},
+		Rate: compose.Rates{
+			NetInBytesPerSec: 1234.5, NetOutBytesPerSec: 340,
+			BlockReadBytesPerSec: 1234.5, BlockWriteBytesPerSec: 340,
+		},
+		Services: []compose.ServiceUsage{{
+			Project:  "usage",
+			Service:  "web",
+			Measures: compose.Measures{CPUPercent: 49.2, MemoryBytes: 512 << 20},
+			Rate:     compose.Rates{NetInBytesPerSec: 1234.5, NetOutBytesPerSec: 340},
+		}},
+	}
+	s.panel.setUsage(&sample)
+	settle()
+
+	// The first sample brings the figures of the machine and the indicator of
+	// the Service it carries, and nothing for the others.
+	if s.panel.strip.body.CurrentWidget().UnsafePointer() != s.panel.strip.row.widget.UnsafePointer() {
+		t.Fatal("the bar does not show the figures of the first sample")
+	}
+	if got := s.panel.strip.row.cpu.value.Text(); got != "12,3%" {
+		t.Errorf("the CPU of the machine reads %q, want %q", got, "12,3%")
+	}
+	if got := s.panel.strip.row.memory.note.Text(); got != "di 8,00 GiB" {
+		t.Errorf("the memory of the machine sits in %q, want %q", got, "di 8,00 GiB")
+	}
+
+	web := s.panel.usageRows["usage/web"]
+	if web == nil {
+		t.Fatal("the Service web has no indicator")
+	}
+	if !web.widget.IsVisible() {
+		t.Fatal("the indicator of web is not on screen with its sample")
+	}
+	if got := web.row.cpu.bar.Value(); got != 492 {
+		t.Errorf("the bar of the CPU of web is at %d steps, want 492", got)
+	}
+	if got := web.row.cpu.value.Text(); got != "49,2%" {
+		t.Errorf("the CPU of web reads %q, want %q", got, "49,2%")
+	}
+	if got := web.row.cpu.note.Text(); got != "0,49 core" {
+		t.Errorf("the CPU of web reads %q in cores, want %q", got, "0,49 core")
+	}
+	for _, key := range []string{"usage/worker", "usage/idle"} {
+		if row := s.panel.usageRows[key]; row != nil && row.widget.IsVisible() {
+			t.Errorf("the Service %q shows an indicator without a running Container", key)
+		}
+	}
+
+	// The figures keep one line: neither the width of the window nor the number
+	// of Containers moves their height.
+	height := web.widget.Height()
+	if height <= 0 {
+		t.Fatal("the indicator of web has no height on screen")
+	}
+	s.window.Resize(940, 700)
+	s.applyWidth()
+	settle()
+	if got := web.widget.Height(); got != height {
+		t.Errorf("the indicator is %d px tall at 940 px, want %d", got, height)
+	}
+	s.window.Resize(windowWidth, windowHeight)
+	s.applyWidth()
+	settle()
+
+	grown := project
+	grown.Services = append([]compose.Service{}, project.Services...)
+	grown.Services[0].Containers = append(grown.Services[0].Containers, compose.Container{Name: "usage-web-3", State: "running"})
+	grown.Running = 2
+	grown.Total = 3
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{grown}})
+	settle()
+
+	web = s.panel.usageRows["usage/web"]
+	if web == nil || !web.widget.IsVisible() {
+		t.Fatal("the indicator of web left the screen after a Container was added")
+	}
+	if got := web.widget.Height(); got != height {
+		t.Errorf("the indicator is %d px tall with three Containers, want %d", got, height)
+	}
+
+	// A stream that stops takes every figure away: nothing of the old sample
+	// stays on screen as if it were current.
+	s.panel.setUsage(nil)
+	settle()
+	if s.panel.strip.body.CurrentWidget().UnsafePointer() != s.panel.strip.message.QWidget.UnsafePointer() {
+		t.Error("the bar keeps the figures after the stream stopped")
+	}
+	for key, row := range s.panel.usageRows {
+		if row.widget.IsVisible() {
+			t.Errorf("the Service %q keeps its indicator after the stream stopped", key)
+		}
+	}
+
+	// A Docker that does not answer shows the warning in place of the figures.
+	unreachable := compose.UsageSample{Error: "Cannot connect to the Docker daemon"}
+	s.panel.setUsage(&unreachable)
+	settle()
+	if got := s.panel.strip.message.Text(); got != unreachableUsageText {
+		t.Errorf("the bar says %q with Docker unreachable, want %q", got, unreachableUsageText)
+	}
+	if got := s.panel.strip.message.ObjectName(); got != roleStatusFault {
+		t.Errorf("the warning carries the role %q, want %q", got, roleStatusFault)
+	}
+	if s.panel.strip.body.CurrentWidget().UnsafePointer() != s.panel.strip.message.QWidget.UnsafePointer() {
+		t.Error("the bar shows figures while Docker does not answer")
+	}
+
+	// A Docker that does not answer with no sample at all shows the same
+	// warning: the snapshot knows it before the stream does.
+	s.panel.setUsage(nil)
+	s.apply(compose.Snapshot{DockerReachable: false, Projects: []compose.Project{grown}})
+	settle()
+	if got := s.panel.strip.message.Text(); got != unreachableUsageText {
+		t.Errorf("the bar says %q from an unreachable snapshot, want %q", got, unreachableUsageText)
+	}
+
+	// With no Project open there is nothing to measure: the bar leaves too.
+	s.apply(compose.Snapshot{DockerReachable: true})
+	settle()
+	if s.panel.strip.widget.IsVisible() {
+		t.Error("the bar stays on screen with no Project open")
+	}
+}
+
 // waitFor processes the events of the Qt thread until cond holds or the
 // deadline passes. A stream runs on its own goroutine, so the test cannot wait
 // for it with a plain settle.
@@ -942,6 +1112,10 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 
 	s.open(projects[1])
 	settle()
+	shot("03a-waiting")
+	// The figures of the machine and of the Services of the open Project, as
+	// the first sample brings them.
+	s.panel.setUsage(screenshotUsage(projects[1]))
 	shot("03-detail")
 
 	s.showNotice(ActivityRunningText)
@@ -1000,6 +1174,7 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	dark.apply(compose.Snapshot{DockerReachable: true, Projects: projects})
 	dark.open(projects[1])
 	settle()
+	dark.panel.setUsage(screenshotUsage(projects[1]))
 	saveGrab(t, dark.window, dir, "11-detail-dark")
 	captureDialog(t, dark.window.QWidget, dir, "12-confirm-dark", confirm)
 	captureActivities(t, dir, darkTheme, "15-activities-dark")
@@ -1158,6 +1333,44 @@ func captureDialog(t *testing.T, parent *qt6.QWidget, dir, name string, question
 	}
 	t.Logf("wrote %s", path)
 	dialog.dialog.Delete()
+}
+
+// screenshotUsage is a sample of the Utilizzo risorse for a Project: the figures
+// of the machine and those of every Service that runs, so the bar and the
+// indicators both show numbers in the capture.
+func screenshotUsage(project compose.Project) *compose.UsageSample {
+	sample := &compose.UsageSample{
+		DockerReachable:      true,
+		CPUs:                 8,
+		MemoryTotalBytes:     16 << 30,
+		CPUMachinePercent:    18.7,
+		MemoryMachinePercent: 41.2,
+		Total:                compose.Measures{CPUPercent: 149.6, MemoryBytes: 6<<30 + 400<<20},
+		Rate: compose.Rates{
+			NetInBytesPerSec:      1_200_000,
+			NetOutBytesPerSec:     340_000,
+			BlockReadBytesPerSec:  12_000_000,
+			BlockWriteBytesPerSec: 2_400_000,
+		},
+	}
+	for i, service := range project.Services {
+		if !ServiceRuns(service) {
+			continue
+		}
+		sample.Containers += len(service.Containers)
+		sample.Services = append(sample.Services, compose.ServiceUsage{
+			Project:  project.Name,
+			Service:  service.Name,
+			Measures: compose.Measures{CPUPercent: 62.4 + float64(i)*7.5, MemoryBytes: 1<<30 + uint64(i)*256<<20},
+			Rate: compose.Rates{
+				NetInBytesPerSec:      620_000 + float64(i)*40_000,
+				NetOutBytesPerSec:     180_000 + float64(i)*20_000,
+				BlockReadBytesPerSec:  9_000_000 + float64(i)*500_000,
+				BlockWriteBytesPerSec: 1_200_000 + float64(i)*100_000,
+			},
+		})
+	}
+	return sample
 }
 
 // screenshotProjects fills the list with every state and a Project with more
