@@ -55,6 +55,18 @@ QLabel#detailHeading {
 QLabel#serviceName {
     font-weight: 600;
 }
+QLabel#dialogTitle {
+    font-size: %dpx;
+    font-weight: 600;
+}
+QFrame#toast {
+    background: palette(base);
+    border: 1px solid palette(mid);
+    border-radius: %dpx;
+}
+QLabel#toastText {
+    padding: %dpx %dpx;
+}
 QLabel#statusActive {
     color: %s;
 }
@@ -84,6 +96,9 @@ QWidget#projectRowSelected QLabel {
 		titleFontSize,
 		titleFontSize,
 		headingFontSize,
+		headingFontSize,
+		spaceXS,
+		spaceS, spaceM,
 		theme.color(roleStatusActive),
 		theme.color(roleStatusPartial),
 		theme.color(roleStatusFault),

@@ -2,14 +2,16 @@ package gui
 
 import (
 	"github.com/mappu/miqt/qt6"
+	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
 )
 
 // shell is the window of the application: the column of the Projects on the
 // left and the panel of the detail on the right, or one page at a time when the
-// window is narrower than breakpointWidth. It reads the snapshot and never
-// changes a Project; the actions arrive in later tickets.
+// window is narrower than breakpointWidth. It reads the snapshot and reaches the
+// Manager for the Actions, off the Qt thread. A refused Action, and later a
+// failed Activity, reach the user through the notice.
 type shell struct {
 	app    *application
 	window *qt6.QMainWindow
@@ -38,6 +40,9 @@ type shell struct {
 	add      *qt6.QPushButton
 	settings *qt6.QPushButton
 	back     *qt6.QPushButton
+	// notice shows a message in sovrimpressione, off the commands. A refused
+	// Action shows its Italian message there.
+	notice *toast
 
 	// selected is the compose name of the open Project, "" when none is open.
 	selected string
@@ -62,11 +67,13 @@ func newShell(app *application, theme designTheme) *shell {
 	s.buildSidebar()
 	s.buildDetail()
 	s.buildPages()
+	s.notice = newToast(s.pages.QWidget)
 
 	s.window.SetCentralWidget(s.pages.QWidget)
 	s.window.OnResizeEvent(func(super func(event *qt6.QResizeEvent), event *qt6.QResizeEvent) {
 		super(event)
 		s.applyWidth()
+		s.notice.place()
 	})
 
 	// The tab order follows the reading order: the list, the two actions of the
@@ -131,10 +138,42 @@ func (s *shell) buildSidebar() {
 }
 
 // buildDetail builds the panel of the right. The panel starts at rest, with the
-// invitation to choose a Project, and fills when the user chooses one.
+// invitation to choose a Project, and fills when the user chooses one. Its
+// Actions reach the Manager through do.
 func (s *shell) buildDetail() {
 	s.panel = newDetailPanel(s.theme)
+	s.panel.onAction = s.do
 	s.detail = s.panel.widget
+}
+
+// do launches an Action on the Manager off the Qt thread: Docker runs for
+// seconds, and the window must keep answering. The result comes back on the Qt
+// thread, where a refusal becomes the Italian message of the notice and the
+// panel lets the command be pressed again.
+func (s *shell) do(action compose.Action) {
+	manager := s.app.manager
+	if manager == nil {
+		s.panel.actionDone()
+		return
+	}
+	go func() {
+		_, err := manager.Do(s.app.ctx, action)
+		mainthread.Start(func() {
+			if err != nil {
+				s.showNotice(UserError(err).Error())
+			}
+			s.panel.actionDone()
+		})
+	}()
+}
+
+// showNotice puts a message in the notice of the window. A refused Action shows
+// its reason here, and the failed Activity of the next ticket uses the same one.
+func (s *shell) showNotice(message string) {
+	if s.notice == nil {
+		return
+	}
+	s.notice.show(message)
 }
 
 // buildPages puts the two layouts in the stack of the responsive view and

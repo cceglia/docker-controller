@@ -12,7 +12,7 @@
 - [x] Un File compose mancante mostra l'avviso e il comando per rimuovere il Progetto dalla lista
 - [x] I dati del Progetto mostrano Gruppo, Profili attivi e File compose
 - [x] La riga delle Azioni è disabilitata quando il Progetto non ammette Azioni, con il motivo visibile
-- [x] Ogni Servizio mostra nome, stato dei suoi Container e lo spazio dell'indicatore di utilizzo
+- [x] Ogni Servizio mostra nome e stato dei suoi Container. Lo spazio riservato all'indicatore è stato tolto nel ticket 05, su richiesta dell'utente
 - [x] Un Progetto senza Servizi mostra il testo di oggi
 - [x] Un aggiornamento dello snapshot non muove lo scorrimento sotto gli occhi dell'utente
 - [x] Il dettaglio si aggiorna da solo a ogni snapshot, senza perdere la selezione
@@ -41,7 +41,7 @@ ogni snapshot: `shell.apply` cerca il Progetto selezionato e lo dà al pannello,
 | File compose mancante | L'avviso e il comando "Rimuovi dalla lista", presente e disabilitato |
 | Azioni | La riga di `ProjectActions`, disabilitata, con il motivo di `actionReasonText` scritto accanto |
 | Comandi | "Cartella", "Terminale", "Porta", presenti e disabilitati |
-| Servizi | Il titolo con il numero, un blocco per Servizio con nome, conteggio dei Container, tacche, lo spazio riservato dell'indicatore di utilizzo e una riga per Container. Senza Servizi mostra `NoServicesText` |
+| Servizi | Il titolo con il numero, un blocco per Servizio con nome, conteggio dei Container, tacche e una riga per Container. Senza Servizi mostra `NoServicesText`. Il ticket 05 ha tolto lo spazio riservato all'indicatore e ha portato i comandi in fondo al blocco |
 
 Lo stato ha sempre un testo: il glifo dello stato e la parola ("Attivo",
 "Parziale", "Fermo", "Rimosso"), il glifo del Container con lo stato e la salute

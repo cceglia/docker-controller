@@ -58,8 +58,10 @@ func TestShellOffscreen(t *testing.T) {
 
 	checkMinimumTargets(t, s.window)
 	checkDetailPanel(t, s)
+	checkActions(t, s)
+	checkConfirmDialog(t, s)
 	if dir := os.Getenv("SHOT_DIR"); dir != "" {
-		captureScreens(t, dir)
+		captureScreens(t, dir, app)
 	}
 }
 
@@ -105,8 +107,8 @@ func checkDetailPanel(t *testing.T, s *shell) {
 			t.Fatalf("the panel has no block %q", name)
 		}
 	}
-	if !hasWidgetNamed(blockNamed(s.panel, "Servizi del Progetto"), "serviceUsage") {
-		t.Error("no Service reserves the place of the Utilizzo risorse")
+	if !hasWidgetNamed(blockNamed(s.panel, "Servizi del Progetto"), "serviceState") {
+		t.Error("no Service shows the state of its Containers")
 	}
 
 	// The same data draws the same panel: the blocks are not built again, so
@@ -210,35 +212,196 @@ func checkDetailPanel(t *testing.T, s *shell) {
 	checkMinimumTargets(t, s.window)
 }
 
+// checkActions checks the wiring of the Actions: the commands of the Project
+// and of every Service are there and follow the snapshot, an insensitive
+// command shows its reason, and Down opens its question without showing it in a
+// blocking way.
+func checkActions(t *testing.T, s *shell) {
+	t.Helper()
+
+	project := fakeProject()
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{project}})
+	s.open(project)
+	settle()
+
+	actions := blockNamed(s.panel, "Azioni del Progetto")
+	if actions == nil {
+		t.Fatal("the panel has no row of Actions")
+	}
+	if got, want := len(widgetsNamed(actions, "actionButton")), len(ProjectActions(project, true)); got != want {
+		t.Fatalf("the row of Actions carries %d commands, want %d", got, want)
+	}
+	for _, button := range widgetsNamed(actions, "actionButton") {
+		if !button.IsEnabled() {
+			t.Errorf("the command %q is insensitive with Docker answering", button.AccessibleName())
+		}
+	}
+
+	services := blockNamed(s.panel, "Servizi del Progetto")
+	if services == nil {
+		t.Fatal("the panel has no block of Services")
+	}
+	perService := len(ServiceActions(project, project.Services[0], true))
+	if got, want := len(widgetsNamed(services, "serviceActionButton")), len(project.Services)*perService; got != want {
+		t.Errorf("the Services carry %d commands, want %d", got, want)
+	}
+
+	// An Activity disables every command and writes the reason beside the rows.
+	busy := project
+	busy.Activity = &compose.ActivityRef{ID: "act-1", Kind: compose.ActionUp}
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{busy}})
+	settle()
+
+	actions = blockNamed(s.panel, "Azioni del Progetto")
+	for _, button := range widgetsNamed(actions, "actionButton") {
+		if button.IsEnabled() {
+			t.Errorf("the command %q is enabled during an Activity", button.AccessibleName())
+		}
+		if got := button.AccessibleDescription(); got != ActivityRunningText {
+			t.Errorf("the command %q says %q, want %q", button.AccessibleName(), got, ActivityRunningText)
+		}
+	}
+	if !hasWidgetNamed(actions, "actionsReason") {
+		t.Error("the row of Actions hides the reason of an insensitive command")
+	}
+	for _, button := range widgetsNamed(blockNamed(s.panel, "Servizi del Progetto"), "serviceActionButton") {
+		if got := button.AccessibleDescription(); got != ActivityRunningText {
+			t.Errorf("the command %q says %q, want %q", button.AccessibleName(), got, ActivityRunningText)
+		}
+	}
+
+	// Down opens its question, and a rejection launches nothing.
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{project}})
+	settle()
+	down, ok := actionKind(ProjectActions(project, true), compose.ActionDown)
+	if !ok {
+		t.Fatal("the Project offers no Down")
+	}
+	s.panel.choose(down, nil, down.Label)
+	settle()
+	if s.panel.question == nil {
+		t.Fatal("Down opens no question")
+	}
+	if !s.panel.question.confirm.IsEnabled() {
+		t.Error("the affirmative button of Down is off without a text to type")
+	}
+	s.panel.question.dialog.Reject()
+	settle()
+	if s.panel.question != nil {
+		t.Error("the question stays open after a rejection")
+	}
+	if s.panel.guard.waiting() {
+		t.Error("a rejected question took the guard: it launched something")
+	}
+}
+
+// actionKind finds the view of an ActionKind in a row.
+func actionKind(views []ActionView, kind compose.ActionKind) (ActionView, bool) {
+	for _, view := range views {
+		if view.Action.Kind == kind {
+			return view, true
+		}
+	}
+	return ActionView{}, false
+}
+
+// checkConfirmDialog builds the question of Down con volumi and checks the
+// rules of the dialog: modal, affirmative button as default, text to type, and
+// a rejection that runs nothing. The question never opens in a blocking way.
+func checkConfirmDialog(t *testing.T, s *shell) {
+	t.Helper()
+
+	question := Confirmation{
+		Title:         "Down con volumi di shop",
+		Message:       "Rimuove i Container e ELIMINA i volumi del Progetto: i dati nei volumi andranno persi per sempre.",
+		ConfirmLabel:  "Down con volumi",
+		TypeToConfirm: "shop",
+		Destructive:   true,
+	}
+	ran := false
+	dialog := newConfirmDialog(s.window.QWidget, question, func() { ran = true })
+
+	if !dialog.dialog.IsModal() {
+		t.Error("the question is not modal")
+	}
+	if got := dialog.dialog.WindowTitle(); got != question.Title {
+		t.Errorf("the question is titled %q, want %q", got, question.Title)
+	}
+	if !dialog.confirm.IsDefault() {
+		t.Error("the affirmative button is not the default of the question")
+	}
+	if dialog.confirm.IsEnabled() {
+		t.Error("the affirmative button is on before the name is typed")
+	}
+	if dialog.entry == nil {
+		t.Fatal("the question asks for no text to type")
+	}
+	dialog.entry.SetText("sho")
+	if dialog.confirm.IsEnabled() {
+		t.Error("the affirmative button is on with a partial name")
+	}
+	dialog.entry.SetText(question.TypeToConfirm)
+	if !dialog.confirm.IsEnabled() {
+		t.Error("the affirmative button stays off with the name typed")
+	}
+
+	dialog.dialog.Reject()
+	if ran {
+		t.Error("a rejected question ran the Action")
+	}
+	settle()
+
+	// The affirmative answer runs the Action.
+	dialog = newConfirmDialog(s.window.QWidget, question, func() { ran = true })
+	dialog.entry.SetText(question.TypeToConfirm)
+	dialog.dialog.Accept()
+	if !ran {
+		t.Error("the affirmative answer ran nothing")
+	}
+	settle()
+}
+
 // hasWidgetNamed reports whether a widget or one of its children carries the
 // object name of the style sheet. The blocks nest layouts, so the walk goes
 // through them.
 func hasWidgetNamed(widget *qt6.QWidget, name string) bool {
-	if widget == nil {
-		return false
-	}
-	if widget.ObjectName() == name {
-		return true
-	}
-	if layout := widget.Layout(); layout != nil {
-		return layoutHasNamed(layout, name)
-	}
-	return false
+	return len(widgetsNamed(widget, name)) > 0
 }
 
-// layoutHasNamed reports whether a layout holds a widget with the object name
-// of the style sheet, directly or inside one of its own layouts.
-func layoutHasNamed(layout *qt6.QLayout, name string) bool {
+// widgetsNamed collects the widgets that carry an object name of the style
+// sheet, in the order the layouts hold them.
+func widgetsNamed(widget *qt6.QWidget, name string) []*qt6.QWidget {
+	var found []*qt6.QWidget
+	walkWidget(widget, func(w *qt6.QWidget) {
+		if w.ObjectName() == name {
+			found = append(found, w)
+		}
+	})
+	return found
+}
+
+// walkWidget walks a widget and its children through their layouts.
+func walkWidget(widget *qt6.QWidget, visit func(*qt6.QWidget)) {
+	if widget == nil {
+		return
+	}
+	visit(widget)
+	if layout := widget.Layout(); layout != nil {
+		walkLayout(layout, visit)
+	}
+}
+
+// walkLayout walks the widgets and the nested layouts of a layout.
+func walkLayout(layout *qt6.QLayout, visit func(*qt6.QWidget)) {
 	for i := 0; layout.ItemAt(i) != nil; i++ {
 		item := layout.ItemAt(i)
-		if child := item.Widget(); child != nil && hasWidgetNamed(child, name) {
-			return true
+		if child := item.Widget(); child != nil {
+			walkWidget(child, visit)
 		}
-		if nested := item.Layout(); nested != nil && layoutHasNamed(nested, name) {
-			return true
+		if nested := item.Layout(); nested != nil {
+			walkLayout(nested, visit)
 		}
 	}
-	return false
 }
 
 // blockAt is the widget of one block of the detail, in the order the panel
@@ -325,7 +488,7 @@ func checkMinimumTargets(t *testing.T, window *qt6.QMainWindow) {
 // captureScreens writes the PNGs of the main states of the window, so a change
 // of layout can be reviewed without a display. The test skips without SHOT_DIR:
 // the files are a review aid, not an assertion.
-func captureScreens(t *testing.T, dir string) {
+func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	t.Helper()
 
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -361,24 +524,117 @@ func captureScreens(t *testing.T, dir string) {
 	settle()
 	shot("03-detail")
 
+	s.showNotice(ActivityRunningText)
+	shot("04-notice")
+	s.notice.hide()
+
 	missing := projects[1]
 	missing.ComposeMissing = true
 	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{missing}})
-	shot("04-detail-missing")
+	shot("05-detail-missing")
 
 	s.apply(compose.Snapshot{DockerReachable: false, Projects: []compose.Project{missing}})
-	shot("05-detail-unreachable")
+	shot("06-detail-unreachable")
 
 	s.apply(compose.Snapshot{DockerReachable: true, Projects: projects})
 	s.window.Resize(800, 620)
 	s.applyWidth()
 	s.showList()
-	shot("06-narrow-list")
+	shot("07-narrow-list")
 
 	s.open(projects[1])
 	settle()
 	s.applyWidth()
-	shot("07-narrow-detail")
+	shot("08-narrow-detail")
+
+	// The modal question is grabbed on its own: the window behind it would hide
+	// the size of the dialog, which is what the check is about.
+	confirm := Confirmation{
+		Title:        "Down di " + ProjectName(projects[0]),
+		Message:      "Ferma e rimuove i Container del Progetto. I volumi restano. Il Progetto resta in lista come Rimosso.",
+		ConfirmLabel: "Down",
+	}
+	captureDialog(t, s.window.QWidget, dir, "09-confirm", confirm)
+
+	typed := confirm
+	typed.Title = "Down con volumi di " + ProjectName(projects[0])
+	typed.Message = "Rimuove i Container e ELIMINA i volumi del Progetto: i dati nei volumi andranno persi per sempre."
+	typed.ConfirmLabel = "Down con volumi"
+	typed.TypeToConfirm = projects[0].Name
+	captureDialog(t, s.window.QWidget, dir, "10-confirm-type", typed)
+
+	// The dark desktop: the same blocks with the palette of Breeze Dark, so a
+	// role that reads on white and disappears on black shows here.
+	qt6.QApplication_SetPalette(testDarkPalette())
+	app.SetStyleSheet(applicationStyleSheet(darkTheme))
+	dark := newShell(&application{}, darkTheme)
+	defer dark.window.Delete()
+	dark.show()
+	settle()
+	dark.apply(compose.Snapshot{DockerReachable: true, Projects: projects})
+	dark.open(projects[1])
+	settle()
+	saveGrab(t, dark.window, dir, "11-detail-dark")
+	captureDialog(t, dark.window.QWidget, dir, "12-confirm-dark", confirm)
+}
+
+// testDarkPalette is the palette of Breeze Dark: the offscreen backend has no
+// desktop theme, so a test that reviews the dark mode brings its own.
+func testDarkPalette() *qt6.QPalette {
+	palette := qt6.NewQPalette()
+	set := func(role qt6.QPalette__ColorRole, hex string) {
+		palette.SetColor2(role, qt6.NewQColor6(hex))
+	}
+	set(qt6.QPalette__Window, "#232629")
+	set(qt6.QPalette__WindowText, "#eff0f1")
+	set(qt6.QPalette__Base, "#1b1e20")
+	set(qt6.QPalette__AlternateBase, "#232629")
+	set(qt6.QPalette__Text, "#eff0f1")
+	set(qt6.QPalette__Button, "#31363b")
+	set(qt6.QPalette__ButtonText, "#eff0f1")
+	set(qt6.QPalette__BrightText, "#ffffff")
+	set(qt6.QPalette__Highlight, "#3daee9")
+	set(qt6.QPalette__HighlightedText, "#ffffff")
+	set(qt6.QPalette__Mid, "#4a4f55")
+	set(qt6.QPalette__Dark, "#191c1e")
+	set(qt6.QPalette__Light, "#5a6068")
+	return palette
+}
+
+// saveGrab writes the PNG of one window.
+func saveGrab(t *testing.T, window *qt6.QMainWindow, dir, name string) {
+	t.Helper()
+
+	settle()
+	pixmap := window.Grab()
+	if pixmap == nil {
+		t.Fatalf("grab %q: no pixmap", name)
+	}
+	path := filepath.Join(dir, name+".png")
+	if !pixmap.Save(path) {
+		t.Fatalf("save %q", path)
+	}
+	t.Logf("wrote %s", path)
+}
+
+// captureDialog writes the PNG of a modal question, so its size and its text
+// can be reviewed without a desktop.
+func captureDialog(t *testing.T, parent *qt6.QWidget, dir, name string, question Confirmation) {
+	t.Helper()
+
+	dialog := newConfirmDialog(parent, question, func() {})
+	dialog.dialog.Show()
+	settle()
+	pixmap := dialog.dialog.Grab()
+	if pixmap == nil {
+		t.Fatalf("grab %q: no pixmap", name)
+	}
+	path := filepath.Join(dir, name+".png")
+	if !pixmap.Save(path) {
+		t.Fatalf("save %q", path)
+	}
+	t.Logf("wrote %s", path)
+	dialog.dialog.Delete()
 }
 
 // screenshotProjects fills the list with every state and a Project with more
