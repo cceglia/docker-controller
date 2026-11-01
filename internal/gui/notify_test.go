@@ -23,11 +23,46 @@ func (f *fakeSender) Send(title, body string) {
 	f.notifications = append(f.notifications, sent{Title: title, Body: body})
 }
 
+// clickableSender is a fake Sender that also reports a click, like the D-Bus
+// sender does.
+type clickableSender struct {
+	fakeSender
+	onClick func()
+}
+
+func (c *clickableSender) SetOnClick(fn func()) { c.onClick = fn }
+
 // shop is the Project of the fixture: the notifications show its DisplayName.
 var shop = compose.Project{Name: "shop", DisplayName: "Negozio"}
 
 // launchOK is a Manager that accepts the Action.
 func launchOK(compose.Action) (compose.ActivityID, error) { return "act-1", nil }
+
+func TestNotifier_OnClick(t *testing.T) {
+	t.Parallel()
+
+	sender := &clickableSender{}
+	n := NewNotifier(sender)
+	var clicks int
+	n.OnClick(func() { clicks++ })
+
+	if sender.onClick == nil {
+		t.Fatal("the click of a notification must reach a Sender that reports it")
+	}
+	sender.onClick()
+	if clicks != 1 {
+		t.Errorf("clicks = %d, want 1", clicks)
+	}
+}
+
+// A Sender that cannot report a click still shows the notification, so the
+// registration must be a no-op and not a failure.
+func TestNotifier_OnClickWithoutAClickableSender(t *testing.T) {
+	t.Parallel()
+
+	n := NewNotifier(&fakeSender{})
+	n.OnClick(func() { t.Error("a Sender without a click must not run the callback") })
+}
 
 func TestNotifier(t *testing.T) {
 	for _, tc := range []struct {

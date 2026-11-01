@@ -53,6 +53,11 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 	a.qt.SetStyleSheet(applicationStyleSheet(theme))
 
 	a.shell = newShell(a, theme)
+	// The click on a notification shows the window. The signal arrives on a
+	// D-Bus goroutine, so the window is touched on the Qt thread.
+	if notifier != nil {
+		notifier.OnClick(func() { mainthread.Start(a.present) })
+	}
 	// The tray comes before the first snapshot and before the window shows, so
 	// the icon is on the panel while the list is still loading. Without a tray
 	// the field stays nil and the window keeps "Esci" and "Impostazioni".

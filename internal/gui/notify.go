@@ -28,6 +28,15 @@ func NewNotifier(sender notify.Sender) *Notifier {
 	return &Notifier{sender: sender, labels: map[string]string{}}
 }
 
+// OnClick registers the function that runs when the user clicks one of the
+// notifications of this Notifier. A Sender that cannot report a click ignores
+// the call: the notification shows and the click does nothing.
+func (n *Notifier) OnClick(fn func()) {
+	if clickable, ok := n.sender.(notify.Clickable); ok {
+		clickable.SetOnClick(fn)
+	}
+}
+
 // SetProjects records the Display names of the last snapshot, so a notification
 // names a Project as the list does. A Project without a Display name keeps its
 // compose name.
