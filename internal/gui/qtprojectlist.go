@@ -21,11 +21,15 @@ const (
 	rowEmpty
 )
 
-// rowHeight and rowHeightTwoLines size a row of the list: a Project with a
-// Display name that differs from the compose name needs two lines.
+// rowHeight sizes a row of the list. Every row is one line: the Display name,
+// or the compose name when it is missing, the count and the tacks.
+const rowHeight = 46
+
+// The object names of the row: the style sheet colours the labels of a selected
+// row with the highlighted text, so the blue band keeps its contrast.
 const (
-	rowHeight         = 46
-	rowHeightTwoLines = 62
+	rowObjectName         = "projectRow"
+	rowSelectedObjectName = "projectRowSelected"
 )
 
 // projectList is the column of the Projects: one section per Group, with the
@@ -42,6 +46,9 @@ type projectList struct {
 	// the wrapper.
 	rows  []compose.Project
 	kinds []rowKind
+	// strips holds the painted tacks of each row, nil for a heading and for the
+	// line of an empty list.
+	strips []*tackStrip
 
 	onOpen func(compose.Project)
 }
@@ -50,10 +57,8 @@ type projectList struct {
 func newProjectList(theme designTheme) *projectList {
 	p := &projectList{widget: qt6.NewQListWidget2(), theme: theme}
 	p.widget.SetSelectionMode(qt6.QAbstractItemView__SingleSelection)
-	// A Project with a Display name that differs from the compose name takes
-	// two lines, so the rows do not share one size and the list must not assume
-	// they do.
-	p.widget.SetUniformItemSizes(false)
+	// Every row has the same height, so the list can size its viewport once.
+	p.widget.SetUniformItemSizes(true)
 	p.widget.SetSpacing(0)
 	p.widget.SetAccessibleName("Progetti")
 	// The click, not the change of the current row, opens the Project: a click
@@ -61,6 +66,9 @@ func newProjectList(theme designTheme) *projectList {
 	// back to the list.
 	p.widget.OnItemClicked(p.choose)
 	p.widget.OnItemActivated(p.choose)
+	// The selected row paints its own labels and tacks, because a real widget
+	// in a row does not take the colours of the item it sits in.
+	p.widget.OnCurrentRowChanged(func(int) { p.markSelection() })
 	return p
 }
 
@@ -86,6 +94,7 @@ func (p *projectList) set(projects []compose.Project, selected string, loading b
 	p.widget.Clear()
 	p.rows = nil
 	p.kinds = nil
+	p.strips = nil
 
 	shown := 0
 	for _, section := range Sections(projects) {
@@ -108,6 +117,46 @@ func (p *projectList) set(projects []compose.Project, selected string, loading b
 	if selected != "" {
 		p.selectProject(selected)
 	}
+	p.markSelection()
+}
+
+// markSelection gives the selected row the colours of the highlight and the
+// other rows the colours of the theme. A widget placed in a row does not take
+// the palette of the item, so the row is painted on its own: the style sheet
+// switches on the object name and the tacks are painted from the palette.
+func (p *projectList) markSelection() {
+	if p.widget == nil {
+		return
+	}
+	palette := p.widget.Palette()
+	if palette == nil {
+		return
+	}
+	current := p.widget.CurrentRow()
+
+	for i, kind := range p.kinds {
+		if kind != rowProject {
+			continue
+		}
+		item := p.widget.Item(i)
+		if item == nil {
+			continue
+		}
+		row := p.widget.ItemWidget(item)
+		if row == nil {
+			continue
+		}
+		name := rowObjectName
+		if i == current {
+			name = rowSelectedObjectName
+		}
+		if row.ObjectName() != name {
+			setObjectName(row, name)
+			row.Style().Unpolish(row)
+			row.Style().Polish(row)
+		}
+		p.strips[i].setSelected(i == current)
+	}
 }
 
 // selectProject selects the row of a Project, if it is still in the list.
@@ -127,7 +176,7 @@ func (p *projectList) appendHeading(title string) {
 	setObjectName(label.QWidget, "listHeading")
 	label.SetAttribute2(qt6.WA_TransparentForMouseEvents, true)
 
-	p.appendRow(rowHeading, compose.Project{}, label.QWidget, rowHeight)
+	p.appendRow(rowHeading, compose.Project{}, label.QWidget, nil, rowHeight)
 }
 
 // appendEmpty adds the line of an empty list.
@@ -136,20 +185,17 @@ func (p *projectList) appendEmpty() {
 	setObjectName(label.QWidget, "listEmpty")
 	label.SetAttribute2(qt6.WA_TransparentForMouseEvents, true)
 
-	p.appendRow(rowEmpty, compose.Project{}, label.QWidget, rowHeight)
+	p.appendRow(rowEmpty, compose.Project{}, label.QWidget, nil, rowHeight)
 }
 
 // appendProject adds the row of one Project.
 func (p *projectList) appendProject(project compose.Project) {
-	height := rowHeight
-	if project.DisplayName != "" && project.DisplayName != project.Name {
-		height = rowHeightTwoLines
-	}
-	p.appendRow(rowProject, project, newProjectRow(project, p.theme), height)
+	row, strip := newProjectRow(project, p.theme)
+	p.appendRow(rowProject, project, row, strip, rowHeight)
 }
 
 // appendRow adds a row with its widget and its tooltip.
-func (p *projectList) appendRow(kind rowKind, project compose.Project, widget *qt6.QWidget, height int) {
+func (p *projectList) appendRow(kind rowKind, project compose.Project, widget *qt6.QWidget, strip *tackStrip, height int) {
 	item := qt6.NewQListWidgetItem2("")
 	item.SetSizeHint(qt6.NewQSize2(0, height))
 	if kind != rowProject {
@@ -157,22 +203,33 @@ func (p *projectList) appendRow(kind rowKind, project compose.Project, widget *q
 	}
 	if kind == rowProject {
 		status := StatusOf(project.Status)
+		// The row is one line, so the compose name lives here when the Display
+		// name hides it.
+		name := ProjectName(project)
+		if project.Name != name {
+			name = fmt.Sprintf("%s (%s)", name, project.Name)
+		}
 		item.SetToolTip(fmt.Sprintf("%s, %s, %d Container in esecuzione su %d",
-			ProjectName(project), status.Label, project.Running, project.Total))
+			name, status.Label, project.Running, project.Total))
 	}
 
 	p.widget.AddItemWithItem(item)
 	p.widget.SetItemWidget(item, widget)
 	p.rows = append(p.rows, project)
 	p.kinds = append(p.kinds, kind)
+	p.strips = append(p.strips, strip)
 }
 
-// newProjectRow builds the content of the row of one Project: the marker of the
-// state, the name, the compose name when it differs, the count and the tacks.
-func newProjectRow(project compose.Project, theme designTheme) *qt6.QWidget {
+// newProjectRow builds the content of the row of one Project on one line: the
+// marker of the state, the name, the count and the tacks. The compose name
+// stays in the tooltip and in the detail, so the row never wraps. The strip of
+// the tacks comes back with the row: it is painted, not styled, so the
+// selection has to reach it in person.
+func newProjectRow(project compose.Project, theme designTheme) (*qt6.QWidget, *tackStrip) {
 	status := StatusOf(project.Status)
 
 	row := qt6.NewQWidget2()
+	setObjectName(row, rowObjectName)
 	row.SetAttribute2(qt6.WA_TransparentForMouseEvents, true)
 
 	layout := qt6.NewQHBoxLayout(row)
@@ -188,19 +245,9 @@ func newProjectRow(project compose.Project, theme designTheme) *qt6.QWidget {
 	marker.SetAccessibleName(status.Label)
 	layout.AddWidget3(marker.QWidget, 0, qt6.AlignVCenter)
 
-	text := qt6.NewQVBoxLayout2()
-	text.SetSpacing(0)
-
 	name := qt6.NewQLabel3(ProjectName(project))
 	setObjectName(name.QWidget, "projectName")
-	text.AddWidget(name.QWidget)
-
-	if project.DisplayName != "" && project.DisplayName != project.Name {
-		composeName := qt6.NewQLabel3(project.Name)
-		setObjectName(composeName.QWidget, "composeName")
-		text.AddWidget(composeName.QWidget)
-	}
-	layout.AddLayout2(text.QLayout, 1)
+	layout.AddWidget3(name.QWidget, 1, qt6.AlignVCenter)
 
 	count := qt6.NewQLabel3(ProjectCount(project))
 	setObjectName(count.QWidget, "projectCount")
@@ -209,7 +256,8 @@ func newProjectRow(project compose.Project, theme designTheme) *qt6.QWidget {
 	tacks, more := Tacks(project.Services)
 	strip := qt6.NewQHBoxLayout2()
 	strip.SetSpacing(2)
-	strip.AddWidget(newTackStrip(tacks, theme))
+	bar := newTackStrip(tacks, theme)
+	strip.AddWidget(bar.QWidget)
 	if more > 0 {
 		moreLabel := qt6.NewQLabel3(fmt.Sprintf("+%d", more))
 		setObjectName(moreLabel.QWidget, "tacksMore")
@@ -217,7 +265,7 @@ func newProjectRow(project compose.Project, theme designTheme) *qt6.QWidget {
 	}
 	layout.AddLayout2(strip.QLayout, 0)
 
-	return row
+	return row, bar
 }
 
 // statusObjectName is the name the style sheet uses for the marker of a state.

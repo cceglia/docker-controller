@@ -256,3 +256,27 @@ func TestActionDisabledReason_ExplainsWhyTheButtonIsOff(t *testing.T) {
 		})
 	}
 }
+
+func TestActionReasonText_SaysNothingBeforeTheFirstSnapshot(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		loading   bool
+		reachable bool
+		busy      bool
+		want      string
+	}{
+		{"first snapshot pending", true, false, false, ""},
+		{"first snapshot pending while an Activity runs", true, false, true, ""},
+		{"docker answers and the Project is free", false, true, false, ""},
+		{"docker does not answer", false, false, false, DockerUnreachableText},
+		{"an Activity runs", false, true, true, ActivityRunningText},
+		{"an Activity runs and docker does not answer", false, false, true, DockerUnreachableText},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := actionReasonText(tc.loading, tc.reachable, tc.busy); got != tc.want {
+				t.Errorf("actionReasonText(%v, %v, %v) = %q, want %q",
+					tc.loading, tc.reachable, tc.busy, got, tc.want)
+			}
+		})
+	}
+}

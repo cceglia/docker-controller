@@ -32,13 +32,29 @@ type designTheme struct {
 	roles   map[string]designRole
 }
 
-// The role names. The style sheet selects on the first two and the tacks of a
-// Project paint with the third.
+// The role names. The style sheet selects on the first three and the tacks of
+// a Project paint with the last.
 const (
 	roleStatusActive  = "statusActive"
 	roleStatusPartial = "statusPartial"
+	roleStatusFault   = "statusFault"
 	roleTackFault     = "tackFault"
 )
+
+// stateRole is the role of the style sheet that carries a state of the old
+// view: success reads as Attivo, warning as Parziale and error as the fault of
+// a Container. A quiet state has no role and keeps the colour of the theme.
+func stateRole(cssClass string) string {
+	switch cssClass {
+	case "success":
+		return roleStatusActive
+	case "warning":
+		return roleStatusPartial
+	case "error":
+		return roleStatusFault
+	}
+	return ""
+}
 
 // lightTheme is the palette of a light desktop. The surface is the base colour
 // of the list, where the labels of state sit.
@@ -50,6 +66,9 @@ var lightTheme = designTheme{
 		// white: too faint for text. These values stay above 4.5:1.
 		roleStatusActive:  {color: "#1a7f37", kind: contrastText},
 		roleStatusPartial: {color: "#8a6508", kind: contrastText},
+		// The fault reads as text too: the state of a Container carries a
+		// label, so the red must pass the 4.5:1 of text, not the 3:1 of a tack.
+		roleStatusFault: {color: "#b42318", kind: contrastText},
 		// The tack of a faulty Container is a component, not text.
 		roleTackFault: {color: "#e05561", kind: contrastComponent},
 	},
@@ -64,6 +83,7 @@ var darkTheme = designTheme{
 	roles: map[string]designRole{
 		roleStatusActive:  {color: "#51b564", kind: contrastText},
 		roleStatusPartial: {color: "#e0a800", kind: contrastText},
+		roleStatusFault:   {color: "#ff8882", kind: contrastText},
 		roleTackFault:     {color: "#e05561", kind: contrastComponent},
 	},
 }

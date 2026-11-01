@@ -184,3 +184,14 @@ func ActionDisabledReason(dockerReachable, busy bool) string {
 	}
 	return ""
 }
+
+// actionReasonText is what the detail writes beside the row of Actions. Before
+// the first snapshot Docker has not been asked yet, so the row claims no reason
+// and never says Docker is unreachable. After it, the reason is the one of the
+// insensitive button.
+func actionReasonText(loading, dockerReachable, busy bool) string {
+	if loading {
+		return ""
+	}
+	return ActionDisabledReason(dockerReachable, busy)
+}

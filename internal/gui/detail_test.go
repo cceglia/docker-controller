@@ -159,3 +159,53 @@ func TestNoServicesText_ExplainsWhyTheProjectHasNoService(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceStateLine_CountsTheRunningContainersOfTheService(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		service compose.Service
+		want    string
+	}{
+		{
+			"all running",
+			compose.Service{Containers: []compose.Container{{State: "running"}, {State: "running"}}},
+			"2/2 in esecuzione",
+		},
+		{
+			"one of two running",
+			compose.Service{Containers: []compose.Container{{State: "running"}, {State: "exited"}}},
+			"1/2 in esecuzione",
+		},
+		{
+			"none running",
+			compose.Service{Containers: []compose.Container{{State: "exited"}}},
+			"0/1 in esecuzione",
+		},
+		{"no container", compose.Service{}, "Nessun Container"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ServiceStateLine(tc.service); got != tc.want {
+				t.Errorf("ServiceStateLine = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGroupLine_NamesTheGroupOrSaysThereIsNone(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		group string
+		want  string
+	}{
+		{"a Group", "Casa", "Gruppo: Casa"},
+		{"spaces around the Group", "  Casa  ", "Gruppo: Casa"},
+		{"no Group", "", "Gruppo: nessuno"},
+		{"blank Group", "   ", "Gruppo: nessuno"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := GroupLine(tc.group); got != tc.want {
+				t.Errorf("GroupLine(%q) = %q, want %q", tc.group, got, tc.want)
+			}
+		})
+	}
+}

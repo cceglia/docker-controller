@@ -50,7 +50,7 @@ Xvfb `:77`, 1280x900, senza window manager, con `QT_QPA_PLATFORM=xcb` e una HOME
 
 - `xwininfo -root -tree`: `0x20000c "Docker Controller" ... 1120x760`, con la classe `("dockercontroller" "io.github.cceglia.DockerController")`.
 - `xprop -id 0x20000c WM_CLASS`: `WM_CLASS(STRING) = "dockercontroller", "io.github.cceglia.DockerController"`. Il secondo campo, la classe, è uguale a `StartupWMClass`. `_NET_WM_NAME` è "Docker Controller" e `WM_NORMAL_HINTS` riporta `user specified size: 1120 by 760`.
-- Con 7 Progetti veri scoperti da Docker: i Gruppi "Casa" e "Lavoro" compaiono in cima, "Senza Gruppo" in fondo, il Nome visualizzato "VAKT" mostra sotto il nome compose "vakt".
+- Con 7 Progetti veri scoperti da Docker: i Gruppi "Casa" e "Lavoro" compaiono in cima, "Senza Gruppo" in fondo, il Nome visualizzato "VAKT" nasconde il nome compose "vakt" nel tooltip. Dal ticket 04 la riga sta su una linea sola.
 - Una modifica al database durante l'esecuzione sposta `sunlinkvpn` sotto "Casa" al refresh successivo, senza riavviare l'app.
 - Con Docker non raggiungibile e nessun Progetto salvato la lista mostra "Nessun Progetto." e i due pulsanti restano visibili.
 - A 800x620 la finestra mostra la lista da sola. Un click su una riga apre la pagina del dettaglio con "Indietro", e "Indietro" torna alla lista con la riga ancora selezionata. Un secondo click sulla stessa riga riapre il dettaglio.

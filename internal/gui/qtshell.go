@@ -34,19 +34,22 @@ type shell struct {
 	detail   *qt6.QWidget
 
 	list     *projectList
+	panel    *detailPanel
 	add      *qt6.QPushButton
 	settings *qt6.QPushButton
 	back     *qt6.QPushButton
 
 	// selected is the compose name of the open Project, "" when none is open.
 	selected string
+	// snapshot is the last one applied: open reads the Project from it, so the
+	// detail shows the row the user clicked.
+	snapshot compose.Snapshot
 	// narrow is true while the window shows one page at a time.
 	narrow bool
 }
 
-// newShell builds the window. The Project chosen in the list only marks the
-// selection: the detail arrives in a later ticket, so the right panel invites
-// the user to choose one.
+// newShell builds the window. The list on the left marks the Project the user
+// chooses; the panel on the right shows it.
 func newShell(app *application, theme designTheme) *shell {
 	s := &shell{app: app, theme: theme}
 
@@ -67,7 +70,8 @@ func newShell(app *application, theme designTheme) *shell {
 	})
 
 	// The tab order follows the reading order: the list, the two actions of the
-	// column, then the way back of the narrow view.
+	// column, the detail, then the way back of the narrow view. The panel adds
+	// its own controls after the entry the width chooses.
 	qt6.QWidget_SetTabOrder(s.list.widget.QWidget, s.add.QWidget)
 	qt6.QWidget_SetTabOrder(s.add.QWidget, s.settings.QWidget)
 	qt6.QWidget_SetTabOrder(s.settings.QWidget, s.back.QWidget)
@@ -126,36 +130,11 @@ func (s *shell) buildSidebar() {
 	layout.AddLayout(actions.QLayout)
 }
 
-// buildDetail builds the panel of the right. It only invites the user to choose
-// a Project: the detail, the panel of the Activities and the Utilizzo risorse
-// arrive in later tickets.
+// buildDetail builds the panel of the right. The panel starts at rest, with the
+// invitation to choose a Project, and fills when the user chooses one.
 func (s *shell) buildDetail() {
-	s.detail = qt6.NewQWidget2()
-	s.detail.SetAccessibleName("Dettaglio del Progetto")
-
-	layout := qt6.NewQVBoxLayout(s.detail)
-	layout.SetContentsMargins(spaceXL, spaceXL, spaceXL, spaceXL)
-	layout.AddStretch()
-
-	// The invite is a block of its own with a bounded width: the sentence fits
-	// on one line at the body size, so the layout never squeezes it.
-	invite := qt6.NewQWidget2()
-	invite.SetMaximumWidth(640)
-	box := qt6.NewQVBoxLayout(invite)
-	box.SetSpacing(spaceS)
-
-	title := qt6.NewQLabel3("Scegli un Progetto")
-	setObjectName(title.QWidget, "placeholderTitle")
-	title.SetAlignment(qt6.AlignCenter)
-	box.AddWidget(title.QWidget)
-
-	body := qt6.NewQLabel3("Seleziona un Progetto dalla lista per vederne i dettagli.")
-	setObjectName(body.QWidget, "placeholderBody")
-	body.SetAlignment(qt6.AlignCenter)
-	box.AddWidget(body.QWidget)
-
-	layout.AddWidget3(invite, 0, qt6.AlignHCenter)
-	layout.AddStretch()
+	s.panel = newDetailPanel(s.theme)
+	s.detail = s.panel.widget
 }
 
 // buildPages puts the two layouts in the stack of the responsive view and
@@ -182,11 +161,12 @@ func (s *shell) buildPages() {
 
 	s.narrowDetailPage = qt6.NewQWidget2()
 	s.narrowDetailLayout = qt6.NewQVBoxLayout(s.narrowDetailPage)
-	s.narrowDetailLayout.SetContentsMargins(0, 0, 0, 0)
+	s.narrowDetailLayout.SetContentsMargins(spaceS, spaceS, spaceS, 0)
 	s.narrowDetailLayout.SetSpacing(0)
 	// The way back sits above the detail and never moves: only the detail
-	// passes from the splitter to this page.
-	s.narrowDetailLayout.AddWidget(s.back.QWidget)
+	// passes from the splitter to this page. It keeps its own width, so the
+	// button reads as an action and not as a title bar.
+	s.narrowDetailLayout.AddWidget3(s.back.QWidget, 0, qt6.AlignLeft)
 
 	s.narrowListPage = qt6.NewQWidget2()
 	s.narrowListLayout = qt6.NewQVBoxLayout(s.narrowListPage)
@@ -218,6 +198,7 @@ func (s *shell) applyWidth() {
 		s.narrowListLayout.AddWidget(s.sidebar)
 		s.narrowDetailLayout.AddWidget(s.detail)
 		s.back.SetVisible(true)
+		s.panel.linkAfter(s.tabEntry())
 		s.showNarrowPage()
 		return
 	}
@@ -226,6 +207,7 @@ func (s *shell) applyWidth() {
 	s.splitter.AddWidget(s.sidebar)
 	s.splitter.AddWidget(s.detail)
 	s.splitter.SetSizes([]int{300, max(s.window.Width()-300, 300)})
+	s.panel.linkAfter(s.tabEntry())
 	s.pages.SetCurrentWidget(s.widePage)
 }
 
@@ -245,37 +227,58 @@ func (s *shell) showList() {
 	s.pages.SetCurrentWidget(s.narrowListPage)
 }
 
-// open marks the Project the user chose. In the narrow view it also moves to
-// the detail page, which is the only page that can show it.
+// open marks the Project the user chose and shows it in the detail. In the
+// narrow view it also moves to the detail page, which is the only page that can
+// show it.
 func (s *shell) open(project compose.Project) {
 	s.selected = project.Name
+	s.panel.set(project, s.snapshot.DockerReachable, s.snapshot.Loading)
+	s.panel.linkAfter(s.tabEntry())
 	if s.narrow {
 		s.showNarrowPage()
 	}
 }
 
-// apply rebuilds the list from a snapshot. A Project that left the snapshot
-// leaves the selection: the list, the detail and the narrow page agree again.
+// apply rebuilds the list and the detail from a snapshot. The detail keeps the
+// Project it shows while the snapshot holds it: the panel rebuilds only when
+// the data it draws changes. A Project that left the snapshot leaves the
+// selection.
 func (s *shell) apply(snapshot compose.Snapshot) {
+	s.snapshot = snapshot
 	s.list.set(snapshot.Projects, s.selected, snapshot.Loading)
 	if s.selected == "" {
+		s.panel.clear()
 		return
 	}
-	if projectNamed(snapshot.Projects, s.selected) {
+	project, ok := projectOf(snapshot.Projects, s.selected)
+	if !ok {
+		s.selected = ""
+		s.panel.clear()
+		if s.narrow {
+			s.showNarrowPage()
+		}
 		return
 	}
-	s.selected = ""
-	if s.narrow {
-		s.showNarrowPage()
-	}
+	s.panel.set(project, snapshot.DockerReachable, snapshot.Loading)
+	s.panel.linkAfter(s.tabEntry())
 }
 
-// projectNamed reports whether the snapshot still holds the Project.
-func projectNamed(projects []compose.Project, name string) bool {
+// tabEntry is the control the tab chain reaches the detail from: the way back
+// of the narrow view, which sits above it, or the last control of the column
+// in the wide one.
+func (s *shell) tabEntry() *qt6.QWidget {
+	if s.narrow {
+		return s.back.QWidget
+	}
+	return s.settings.QWidget
+}
+
+// projectOf finds a Project of the snapshot by its compose name.
+func projectOf(projects []compose.Project, name string) (compose.Project, bool) {
 	for _, project := range projects {
 		if project.Name == name {
-			return true
+			return project, true
 		}
 	}
-	return false
+	return compose.Project{}, false
 }

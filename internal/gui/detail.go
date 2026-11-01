@@ -84,10 +84,37 @@ func ActiveProfilesLine(profiles []string) string {
 // ContainerCountLine is the count of the Containers of a Project. A Project
 // without Container says so instead of counting "0/0".
 func ContainerCountLine(p compose.Project) string {
-	if p.Total == 0 {
+	return containersLine(p.Running, p.Total)
+}
+
+// ServiceStateLine is the count of the Containers of a Service, as its block
+// shows it. A Service without Container says so.
+func ServiceStateLine(service compose.Service) string {
+	running := 0
+	for _, container := range service.Containers {
+		if container.State == "running" {
+			running++
+		}
+	}
+	return containersLine(running, len(service.Containers))
+}
+
+// containersLine spells out the running Containers over the total. A total of
+// zero is no Container, not "0/0".
+func containersLine(running, total int) string {
+	if total == 0 {
 		return "Nessun Container"
 	}
-	return fmt.Sprintf("%d/%d in esecuzione", p.Running, p.Total)
+	return fmt.Sprintf("%d/%d in esecuzione", running, total)
+}
+
+// GroupLine names the Group of the Project. A Project without a Group says so,
+// so the block of the data always carries the line.
+func GroupLine(group string) string {
+	if name := strings.TrimSpace(group); name != "" {
+		return "Gruppo: " + name
+	}
+	return "Gruppo: nessuno"
 }
 
 // NoServicesText explains an empty list of Services. A missing Compose file is

@@ -3,9 +3,10 @@ package gui
 import "fmt"
 
 // The style sheet covers only the roles the desktop theme does not carry: the
-// marker of the state of a Project, the headings of the Groups and the size of
-// the text of a row. Every other colour comes from the palette of the theme,
-// so a window on KDE reads as the rest of the system.
+// markers of the state of a Project and of a Container, the headings of the
+// Groups and of the detail, and the size of the text of a row. Every other
+// colour comes from the palette of the theme, so a window on KDE reads as the
+// rest of the system.
 //
 // The sheet is built from the tokens in designtokens.go: the type scale, the
 // colours of the roles and the spacing rhythm. No colour is written here, so a
@@ -33,9 +34,6 @@ QLabel#listEmpty {
 QLabel#projectName {
     font-size: %dpx;
 }
-QLabel#composeName {
-    font-size: %dpx;
-}
 QLabel#projectCount {
     font-size: %dpx;
 }
@@ -46,11 +44,35 @@ QLabel#placeholderTitle {
     font-size: %dpx;
     font-weight: 600;
 }
+QLabel#detailTitle {
+    font-size: %dpx;
+    font-weight: 600;
+}
+QLabel#detailHeading {
+    font-size: %dpx;
+    font-weight: 600;
+}
+QLabel#serviceName {
+    font-weight: 600;
+}
 QLabel#statusActive {
     color: %s;
 }
 QLabel#statusPartial {
     color: %s;
+}
+QLabel#statusFault {
+    color: %s;
+}
+QListWidget::item:selected {
+    background: palette(highlight);
+    color: palette(highlighted-text);
+}
+QListWidget::item:selected:!active {
+    background: palette(highlight);
+}
+QWidget#projectRowSelected QLabel {
+    color: palette(highlighted-text);
 }
 `,
 		headingFontSize, spaceS,
@@ -59,9 +81,11 @@ QLabel#statusPartial {
 		bodyFontSize,
 		bodyFontSize,
 		bodyFontSize,
-		bodyFontSize,
 		titleFontSize,
+		titleFontSize,
+		headingFontSize,
 		theme.color(roleStatusActive),
 		theme.color(roleStatusPartial),
+		theme.color(roleStatusFault),
 	)
 }
