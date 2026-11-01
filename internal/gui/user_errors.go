@@ -31,7 +31,7 @@ var italianMessages = []struct {
 	{settings.ErrInvalidCloseBehavior, "Comportamento alla chiusura non valido."},
 	{settings.ErrInvalidTerminalCommand, "Comando del terminale non valido: controlla virgolette e backslash, e che non sia vuoto."},
 	{ErrInvalidPort, "Porta non valida."},
-	{ErrNoFolder, "Il Progetto non ha una cartella."},
+	{ErrNoFolder, NoFolderCommandText},
 	{ErrFolderMissing, "La cartella del Progetto non esiste."},
 	{ErrLogOpen, "Flusso dei log già aperto."},
 	{ErrCannotOpen, "Impossibile aprire: xdg-open non è riuscito a partire."},

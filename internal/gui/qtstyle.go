@@ -55,6 +55,9 @@ QLabel#detailHeading {
 QLabel#serviceName {
     font-weight: 600;
 }
+QLabel#fileComposeName {
+    font-weight: 600;
+}
 QLabel#dialogTitle {
     font-size: %dpx;
     font-weight: 600;

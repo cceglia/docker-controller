@@ -44,8 +44,8 @@ type panelControl struct {
 // its Services and the rows of the Actions and of the commands. It reads the
 // snapshot and never changes a Project. The Actions of the Project and of a
 // Service reach the Manager through onAction, which the shell supplies. The
-// commands and the entry that takes a Project off the list stay insensitive
-// until the tickets that open them.
+// commands and the entry that takes a Project off the list reach the desktop and
+// the Manager through the callbacks the shell supplies.
 type detailPanel struct {
 	theme designTheme
 
@@ -82,6 +82,14 @@ type detailPanel struct {
 	// onLogs asks the shell to show the logs of a Project, whole or of one of
 	// its Services. A nil function opens nothing.
 	onLogs func(compose.Project, string)
+	// onFolder, onTerminal, onPort and onRemove make the commands of the detail
+	// act on the desktop and on the list: they open the folder of a Project, a
+	// terminal in it and its first published port, and they take the Project off
+	// the list. A nil function opens nothing.
+	onFolder   func(string)
+	onTerminal func(string)
+	onPort     func(int)
+	onRemove   func(string)
 	// guard stops a second click between a launch and its result.
 	guard startGuard
 	// launching is the command the last click disabled. A render destroys the
@@ -465,8 +473,8 @@ func (p *detailPanel) data() *qt6.QWidget {
 }
 
 // missing is the notice of a Project whose Compose files are gone, with the
-// entry that takes it off the list. The entry is present and insensitive: the
-// ticket that asks the confirmation and reaches the Manager enables it.
+// entry that takes it off the list. The entry is present and follows
+// CanRemoveFromList, so a Project that still has Containers says why it stays.
 func (p *detailPanel) missing() *qt6.QWidget {
 	block, box := detailBlock()
 	block.SetAccessibleName("File compose mancante")
@@ -476,7 +484,9 @@ func (p *detailPanel) missing() *qt6.QWidget {
 	row := qt6.NewQHBoxLayout2()
 	row.SetSpacing(spaceS)
 	reason := RemoveDisabledReason(p.shown.project, p.shown.dockerReachable)
-	remove := detailButton(removeText, "removeButton", reason, false)
+	remove := detailButton(removeText, "removeButton", removeTooltip, CanRemoveFromList(p.shown.project, p.shown.dockerReachable))
+	setCommandReason(remove, reason)
+	remove.OnClicked(p.confirmRemove)
 	row.AddWidget(remove.QWidget)
 	row.AddStretch()
 	box.AddLayout2(row.QLayout, 0)
@@ -525,31 +535,82 @@ func (p *detailPanel) actions() *qt6.QWidget {
 }
 
 // commands is the block of the commands of the Project: its folder, a terminal
-// in it and its first published port. They stay insensitive until the ticket
-// that opens them.
+// in it and its first published port. A command that the Project does not allow
+// stays insensitive, and its reason reaches the tooltip and the screen reader.
 func (p *detailPanel) commands() *qt6.QWidget {
+	project := p.shown.project
 	block, box := detailBlock()
 	block.SetAccessibleName("Comandi del Progetto")
 
+	folderView, terminalView, portView := CommandViews(project)
+
 	row := qt6.NewQHBoxLayout2()
 	row.SetSpacing(spaceS)
-	for _, command := range []struct {
-		text    string
-		name    string
-		tooltip string
-	}{
-		{folderCommandText, "folderButton", folderTooltip},
-		{terminalCommandText, "terminalButton", terminalTooltip},
-		{portCommandText, "portButton", portTooltip},
-	} {
-		button := detailButton(command.text, command.name, command.tooltip, false)
-		row.AddWidget(button.QWidget)
-		p.controls = append(p.controls, panelControl{widget: button.QWidget, label: command.text})
+
+	folder := detailButton(folderCommandText, "folderButton", folderTooltip, folderView.Enabled)
+	setCommandReason(folder, folderView.Reason)
+	folder.OnClicked(func() {
+		if folderView.Enabled && p.onFolder != nil {
+			p.onFolder(project.Name)
+		}
+	})
+	row.AddWidget(folder.QWidget)
+	p.controls = append(p.controls, panelControl{widget: folder.QWidget, label: folderCommandText})
+
+	terminal := detailButton(terminalCommandText, "terminalButton", terminalTooltip, terminalView.Enabled)
+	setCommandReason(terminal, terminalView.Reason)
+	terminal.OnClicked(func() {
+		if terminalView.Enabled && p.onTerminal != nil {
+			p.onTerminal(project.Name)
+		}
+	})
+	row.AddWidget(terminal.QWidget)
+	p.controls = append(p.controls, panelControl{widget: terminal.QWidget, label: terminalCommandText})
+
+	// The port is read from the number, never from the text of the command: the
+	// address that the browser opens is built by PortURL.
+	port := detailButton(portCommandText, "portButton", portTooltip, portView.Enabled)
+	setCommandReason(port, portView.Reason)
+	port.OnClicked(func() {
+		if !portView.Enabled || p.onPort == nil {
+			return
+		}
+		if number, ok := FirstPublishedPort(project); ok {
+			p.onPort(number)
+		}
+	})
+	row.AddWidget(port.QWidget)
+	p.controls = append(p.controls, panelControl{widget: port.QWidget, label: portCommandText})
+
+	// A Rimosso Project with its files still on disk leaves the list here. When
+	// a file is missing the notice above already carries the entry, and one
+	// command per screen is enough.
+	if !project.ComposeMissing {
+		removeKey := removeText + " (comandi)"
+		remove := detailButton(removeText, "removeCommandButton", removeTooltip,
+			CanRemoveFromList(project, p.shown.dockerReachable))
+		setCommandReason(remove, RemoveDisabledReason(project, p.shown.dockerReachable))
+		remove.OnClicked(func() { p.confirmRemoveFrom(removeKey) })
+		row.AddWidget(remove.QWidget)
+		p.controls = append(p.controls, panelControl{widget: remove.QWidget, label: removeKey})
 	}
+
 	row.AddStretch()
 	box.AddLayout2(row.QLayout, 0)
 
 	return block
+}
+
+// setCommandReason writes why a command cannot be pressed on its tooltip and on
+// its accessible description, so a keyboard user and a screen reader read the
+// same reason. A command that is available keeps the tooltip that says what it
+// does.
+func setCommandReason(button *qt6.QPushButton, reason string) {
+	if reason == "" {
+		return
+	}
+	button.SetToolTip(reason)
+	button.SetAccessibleDescription(reason)
 }
 
 // services is the block of the Services: the heading with how many there are,
@@ -686,24 +747,48 @@ func (p *detailPanel) choose(view ActionView, button *qt6.QPushButton, key strin
 		p.launch(view, button)
 		return
 	}
-	p.ask(view, button, key)
+	p.ask(*view.Confirmation, key, func() { p.launch(view, button) })
 }
 
-// ask opens the question of a destructive Action. Annulling, Escape and closing
-// run nothing. When the question closes, the panel draws a snapshot that waited
-// and gives the focus back to the command that asked.
-func (p *detailPanel) ask(view ActionView, button *qt6.QPushButton, key string) {
+// confirmRemove asks the question that takes the Project off the list. A yes
+// hands the name to the shell, which never stops a Container: Docker and the
+// files stay as they are. The entry is present only while the Project may leave.
+func (p *detailPanel) confirmRemove() {
+	p.confirmRemoveFrom(removeText)
+}
+
+// confirmRemoveFrom asks the same question for the entry named by key, so the
+// focus goes back to the entry the user pressed.
+func (p *detailPanel) confirmRemoveFrom(key string) {
+	if p.question != nil || !p.visible {
+		return
+	}
+	if !CanRemoveFromList(p.shown.project, p.shown.dockerReachable) {
+		return
+	}
+	name := p.shown.project.Name
+	p.ask(RemoveConfirmation(p.shown.project), key, func() {
+		if p.onRemove != nil {
+			p.onRemove(name)
+		}
+	})
+}
+
+// ask opens a question. Annulling, Escape and closing run nothing. When the
+// question closes, the panel draws a snapshot that waited and gives the focus
+// back to the command named by key.
+func (p *detailPanel) ask(question Confirmation, key string, run func()) {
 	if p.question != nil {
 		return
 	}
-	question := newConfirmDialog(p.parent(), *view.Confirmation, func() { p.launch(view, button) })
-	question.onClosed = func() {
+	dialog := newConfirmDialog(p.parent(), question, run)
+	dialog.onClosed = func() {
 		p.question = nil
 		p.settle()
 		p.focusControl(key)
 	}
-	p.question = question
-	question.open()
+	p.question = dialog
+	dialog.open()
 }
 
 // launch hands the Action to the shell. The command that launched it stays

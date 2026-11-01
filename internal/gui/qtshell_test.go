@@ -65,6 +65,9 @@ func TestShellOffscreen(t *testing.T) {
 	checkEditForm(t, s)
 	checkActions(t, s)
 	checkConfirmDialog(t, s)
+	checkCommands(t, s)
+	checkPicker(t, s)
+	checkAddForm(t, s)
 	checkBottomPanel(t)
 	checkLogs(t)
 	checkUsage(t, s)
@@ -118,6 +121,10 @@ func checkDetailPanel(t *testing.T, s *shell) {
 	if !hasWidgetNamed(blockNamed(s.panel, "Servizi del Progetto"), "serviceState") {
 		t.Error("no Service shows the state of its Containers")
 	}
+	if !hasWidgetNamed(s.panel.content, "removeCommandButton") &&
+		!hasWidgetNamed(s.panel.content, "removeButton") {
+		t.Error("the detail carries no way to take the Project off the list")
+	}
 
 	// The same data draws the same panel: the blocks are not built again, so
 	// the focus and the place of the scroll stay where the user left them.
@@ -170,15 +177,15 @@ func checkDetailPanel(t *testing.T, s *shell) {
 	if row == nil || row.Layout() == nil {
 		t.Fatal("the notice carries no command")
 	}
-	remove := row.Layout().ItemAt(0).Widget()
-	if remove == nil {
-		t.Fatal("the notice carries no remove entry")
-	}
+	remove := qt6.UnsafeNewQPushButton(row.Layout().ItemAt(0).Widget().UnsafePointer())
 	if got := remove.ObjectName(); got != "removeButton" {
 		t.Errorf("the remove entry is %q, want %q", got, "removeButton")
 	}
 	if remove.IsEnabled() {
-		t.Error("the remove entry is enabled before the ticket that wires it")
+		t.Error("the remove entry is enabled on a Project that still has Containers")
+	}
+	if got := remove.ToolTip(); got != ContainerRefusalText {
+		t.Errorf("the remove entry says %q, want %q", got, ContainerRefusalText)
 	}
 
 	// Before the first snapshot the row of the Actions claims no reason: the
@@ -672,6 +679,354 @@ func checkConfirmDialog(t *testing.T, s *shell) {
 		t.Error("the affirmative answer ran nothing")
 	}
 	settle()
+}
+
+// checkCommands drives the commands of the detail and the entry that takes a
+// Project off the list: the three commands follow the Project, the reason of an
+// insensitive one reaches the tooltip and the screen reader, and the removal asks
+// its question and touches no Docker. It is a step of the smoke test.
+func checkCommands(t *testing.T, s *shell) {
+	t.Helper()
+
+	project := fakeProject()
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{project}})
+	s.open(project)
+	settle()
+
+	block := blockNamed(s.panel, "Comandi del Progetto")
+	if block == nil {
+		t.Fatal("the panel has no block of commands")
+	}
+	for _, name := range []string{"folderButton", "terminalButton", "portButton"} {
+		button := commandButton(t, block, name)
+		if !button.IsEnabled() {
+			t.Errorf("the command %q is insensitive on a complete Project", name)
+		}
+		if got := button.AccessibleDescription(); got != "" {
+			t.Errorf("the command %q says %q on a complete Project", name, got)
+		}
+	}
+
+	// A press reaches the shell with the name of the Project and its first
+	// published port. The callbacks are replaced, so nothing leaves the window.
+	var folder, terminal string
+	var port int
+	folderCallback, terminalCallback, portCallback := s.panel.onFolder, s.panel.onTerminal, s.panel.onPort
+	s.panel.onFolder = func(name string) { folder = name }
+	s.panel.onTerminal = func(name string) { terminal = name }
+	s.panel.onPort = func(number int) { port = number }
+	commandButton(t, block, "folderButton").Click()
+	commandButton(t, block, "terminalButton").Click()
+	commandButton(t, block, "portButton").Click()
+	settle()
+	if folder != project.Name || terminal != project.Name {
+		t.Errorf("the commands opened %q and %q, want %q", folder, terminal, project.Name)
+	}
+	if want, _ := FirstPublishedPort(project); port != want {
+		t.Errorf("the port command opened %d, want %d", port, want)
+	}
+	s.panel.onFolder, s.panel.onTerminal, s.panel.onPort = folderCallback, terminalCallback, portCallback
+
+	// A Project without a folder opens neither the folder nor a terminal, and a
+	// Project without a published port opens no browser.
+	noFolder := project
+	noFolder.Folder = ""
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{noFolder}})
+	s.open(noFolder)
+	settle()
+	block = blockNamed(s.panel, "Comandi del Progetto")
+	for _, name := range []string{"folderButton", "terminalButton"} {
+		button := commandButton(t, block, name)
+		if button.IsEnabled() {
+			t.Errorf("the command %q is sensitive on a Project without a folder", name)
+		}
+		if got := button.AccessibleDescription(); got != NoFolderCommandText {
+			t.Errorf("the command %q says %q, want %q", name, got, NoFolderCommandText)
+		}
+	}
+	if !commandButton(t, block, "portButton").IsEnabled() {
+		t.Error("the port command is insensitive on a Project without a folder")
+	}
+
+	noPort := project
+	noPort.Services = []compose.Service{{
+		Name:       "web",
+		Containers: []compose.Container{{Name: "shop-web-1", State: "running"}},
+	}}
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{noPort}})
+	s.open(noPort)
+	settle()
+	block = blockNamed(s.panel, "Comandi del Progetto")
+	if got := commandButton(t, block, "portButton").AccessibleDescription(); got != NoPortCommandText {
+		t.Errorf("the port command says %q, want %q", got, NoPortCommandText)
+	}
+
+	// A missing File compose closes every command.
+	missing := noPort
+	missing.ComposeMissing = true
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{missing}})
+	s.open(missing)
+	settle()
+	block = blockNamed(s.panel, "Comandi del Progetto")
+	for _, name := range []string{"folderButton", "terminalButton", "portButton"} {
+		button := commandButton(t, block, name)
+		if button.IsEnabled() {
+			t.Errorf("the command %q is sensitive while the File compose is missing", name)
+		}
+		if got := button.AccessibleDescription(); got != MissingComposeText {
+			t.Errorf("the command %q says %q, want %q", name, got, MissingComposeText)
+		}
+	}
+
+	// The removal asks its question, and only a yes hands the name to the shell.
+	removable := compose.Project{
+		Name: "docs", DisplayName: "Documentazione",
+		Folder: "/srv/docs", ComposeFiles: []string{"/srv/docs/docker-compose.yml"},
+		ComposeMissing: true, Status: compose.StatusRemoved,
+	}
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{removable}})
+	s.open(removable)
+	settle()
+
+	var removed string
+	previousRemove := s.panel.onRemove
+	s.panel.onRemove = func(name string) { removed = name }
+	defer func() { s.panel.onRemove = previousRemove }()
+
+	remove := removeCommand(t, s)
+	if !remove.IsEnabled() {
+		t.Fatal("the remove entry is insensitive on a Rimosso Project without Container")
+	}
+	remove.Click()
+	settle()
+	if s.panel.question == nil {
+		t.Fatal("the remove entry opens no question")
+	}
+	want := RemoveConfirmation(removable)
+	if got := s.panel.question.dialog.WindowTitle(); got != want.Title {
+		t.Errorf("the question is titled %q, want %q", got, want.Title)
+	}
+	s.panel.question.dialog.Reject()
+	settle()
+	if removed != "" {
+		t.Errorf("a rejected question removed %q", removed)
+	}
+	if s.panel.guard.waiting() {
+		t.Error("the removal took the guard of the Actions: it launched one")
+	}
+
+	removeCommand(t, s).Click()
+	settle()
+	if s.panel.question == nil {
+		t.Fatal("the remove entry opens no question on the second press")
+	}
+	s.panel.question.dialog.Accept()
+	settle()
+	if removed != removable.Name {
+		t.Errorf("the confirmed removal handed %q, want %q", removed, removable.Name)
+	}
+}
+
+// commandButton is the command of a block with the object name of the style
+// sheet. A block carries one of each.
+func commandButton(t *testing.T, block *qt6.QWidget, name string) *qt6.QPushButton {
+	t.Helper()
+	found := widgetsNamed(block, name)
+	if len(found) != 1 {
+		t.Fatalf("the block carries %d commands named %q, want 1", len(found), name)
+	}
+	return qt6.UnsafeNewQPushButton(found[0].UnsafePointer())
+}
+
+// removeCommand is the entry that takes the Project off the list, from the notice
+// of its missing File compose.
+func removeCommand(t *testing.T, s *shell) *qt6.QPushButton {
+	t.Helper()
+	block := blockNamed(s.panel, "File compose mancante")
+	if block == nil {
+		t.Fatal("the missing File compose shows no notice")
+	}
+	found := widgetsNamed(block, "removeButton")
+	if len(found) != 1 {
+		t.Fatalf("the notice carries %d remove commands, want 1", len(found))
+	}
+	return qt6.UnsafeNewQPushButton(found[0].UnsafePointer())
+}
+
+// checkPicker opens the picker of the File compose and checks the shape the
+// ticket asks for: more than one file, the filter of the compose files and the
+// widget dialog of Qt, which carries the action "Show hidden files". It is a
+// step of the smoke test, so the process still has one QApplication.
+func checkPicker(t *testing.T, s *shell) {
+	t.Helper()
+
+	picked := false
+	pickComposeFiles(s.window.QWidget, func([]string) { picked = true })
+	settle()
+
+	active := qt6.QApplication_ActiveModalWidget()
+	if active == nil {
+		t.Fatal("the picker did not open as a modal dialog")
+	}
+	picker := qt6.UnsafeNewQFileDialog(active.UnsafePointer())
+	if got := picker.WindowTitle(); got != pickFilesText {
+		t.Errorf("the picker is titled %q, want %q", got, pickFilesText)
+	}
+	if got := picker.FileMode(); got != qt6.QFileDialog__ExistingFiles {
+		t.Errorf("the picker accepts %d, want more than one existing file", got)
+	}
+	if !slices.Contains(picker.NameFilters(), composeFilterText) {
+		t.Errorf("the picker offers %q, want %q", picker.NameFilters(), composeFilterText)
+	}
+	if !picker.TestOption(qt6.QFileDialog__DontUseNativeDialog) {
+		t.Error("the picker is the native dialog, which has no action for the hidden files")
+	}
+
+	picker.Reject()
+	settle()
+	if picked {
+		t.Error("a closed picker handed a choice")
+	}
+}
+
+// checkAddForm drives the form of a new Project: the chosen File compose keep the
+// order of the picker, the first one is the main one, a refusal keeps the form
+// open with its Italian text, and a save closes it and names the Project. It is a
+// step of the smoke test.
+func checkAddForm(t *testing.T, s *shell) {
+	t.Helper()
+
+	dir := t.TempDir()
+	main := filepath.Join(dir, "docker-compose.yml")
+	override := filepath.Join(dir, "compose.override.yml")
+	for _, file := range []string{main, override} {
+		if err := os.WriteFile(file, []byte("name: shop\nservices: {}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var form AddProjectForm
+	if _, err := form.Pick([]string{override, main}, compose.ProposeName); err != nil {
+		t.Fatalf("Pick error = %v", err)
+	}
+
+	refusal := error(compose.ErrDuplicateProject)
+	var saved string
+	dialog := newAddDialog(s.window.QWidget, form,
+		func(name string, files []string, done func(error)) {
+			if name != "shop" || !slices.Equal(files, form.Files) {
+				t.Errorf("the form sent %q and %q, want %q and %q", name, files, "shop", form.Files)
+			}
+			done(refusal)
+		},
+		func(name string) { saved = name })
+	dialog.open()
+	settle()
+
+	if got := dialog.dialog.WindowTitle(); got != addProjectTitle {
+		t.Errorf("the form is titled %q, want %q", got, addProjectTitle)
+	}
+	if !dialog.dialog.IsModal() {
+		t.Error("the form of a new Project is not modal")
+	}
+	if got := dialog.name.Text(); got != "shop" {
+		t.Errorf("the name field reads %q, want the proposal %q", got, "shop")
+	}
+	if !dialog.add.IsEnabled() {
+		t.Error("the confirm command is off with a File compose and a name")
+	}
+
+	// The rows follow the order of the picker, and the first file is the main
+	// one whatever its name: compose reads -f in that order.
+	var rows, roles []string
+	for _, label := range widgetsNamed(dialog.list, "fileComposeName") {
+		rows = append(rows, qt6.UnsafeNewQLabel(label.UnsafePointer()).Text())
+	}
+	for _, label := range widgetsNamed(dialog.list, "fileComposeRole") {
+		roles = append(roles, qt6.UnsafeNewQLabel(label.UnsafePointer()).Text())
+	}
+	if !slices.Equal(rows, []string{"compose.override.yml", "docker-compose.yml"}) {
+		t.Errorf("the rows read %q, want the order of the picker", rows)
+	}
+	if !slices.Equal(roles, []string{mainFileRoleText, extraFileRoleText}) {
+		t.Errorf("the roles read %q, want %q then %q", roles, mainFileRoleText, extraFileRoleText)
+	}
+
+	// A name already saved keeps the form open with its text.
+	dialog.submit()
+	settle()
+	if got := errorUnder(dialog.dialog.QWidget); got != "Esiste già un Progetto con questo nome." {
+		t.Errorf("the refusal reads %q, want the text of the duplicate name", got)
+	}
+	if !dialog.add.IsEnabled() {
+		t.Error("the confirm command stays off after a refusal")
+	}
+	if saved != "" {
+		t.Errorf("a refused form saved %q", saved)
+	}
+
+	// A save that compose refuses keeps the form open with its text too.
+	refusal = compose.ErrInvalidProject
+	dialog.submit()
+	settle()
+	if got := errorUnder(dialog.dialog.QWidget); got != "Progetto non valido: i File compose indicati non sono utilizzabili." {
+		t.Errorf("the refusal reads %q, want the text of an unusable Project", got)
+	}
+
+	// A save that works closes the form and names the Project for the shell.
+	refusal = nil
+	dialog.submit()
+	settle()
+	if saved != "shop" {
+		t.Errorf("the saved Project is %q, want %q", saved, "shop")
+	}
+
+	// A form without a File compose asks for one first, and its name field is
+	// insensitive.
+	empty := newAddDialog(s.window.QWidget, AddProjectForm{},
+		func(string, []string, func(error)) { t.Error("an empty form sent a request") },
+		func(string) { t.Error("an empty form saved a Project") })
+	defer empty.dialog.Delete()
+	empty.open()
+	settle()
+	if empty.name.IsEnabled() {
+		t.Error("the name field is sensitive before a File compose is chosen")
+	}
+	if empty.add.IsEnabled() {
+		t.Error("the confirm command is on with no File compose and no name")
+	}
+
+	// Dropping the main file moves the first place down the order and proposes
+	// the name again.
+	var second AddProjectForm
+	if _, err := second.Pick([]string{main, override}, compose.ProposeName); err != nil {
+		t.Fatalf("Pick error = %v", err)
+	}
+	again := newAddDialog(s.window.QWidget, second,
+		func(string, []string, func(error)) {},
+		func(string) {})
+	defer again.dialog.Delete()
+	again.open()
+	settle()
+	again.removeFile(0)
+	settle()
+	rows = nil
+	for _, label := range widgetsNamed(again.list, "fileComposeName") {
+		rows = append(rows, qt6.UnsafeNewQLabel(label.UnsafePointer()).Text())
+	}
+	if !slices.Equal(rows, []string{"compose.override.yml"}) {
+		t.Errorf("the rows read %q after dropping the main file", rows)
+	}
+	roles = nil
+	for _, label := range widgetsNamed(again.list, "fileComposeRole") {
+		roles = append(roles, qt6.UnsafeNewQLabel(label.UnsafePointer()).Text())
+	}
+	if !slices.Equal(roles, []string{mainFileRoleText}) {
+		t.Errorf("the remaining file is %q, want the main role", roles)
+	}
+	if got := again.name.Text(); got != "shop" {
+		t.Errorf("the name field reads %q after the main file changed, want %q", got, "shop")
+	}
 }
 
 // checkBottomPanel builds the panel of the Activities over a log of fake
@@ -1426,6 +1781,14 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	s.panel.cancelEdit()
 	settle()
 
+	// A Rimosso Project with its files still on disk: the way off the list sits
+	// in the row of the commands, because no notice carries it.
+	s.open(projects[3])
+	settle()
+	shot("03b-detail-removed")
+
+	s.open(projects[1])
+	settle()
 	s.showNotice(ActivityRunningText)
 	shot("04-notice")
 	s.notice.hide()
@@ -1433,9 +1796,22 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	missing := projects[1]
 	missing.ComposeMissing = true
 	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{missing}})
+	s.open(missing)
 	shot("05-detail-missing")
 
+	// A Rimosso Project may leave the list: the notice of its missing File
+	// compose carries the removal command, and it can be pressed.
+	removable := compose.Project{
+		Name: "docs", DisplayName: "Documentazione", Group: "Lavoro",
+		Folder: "/srv/docs", ComposeFiles: []string{"/srv/docs/docker-compose.yml"},
+		ComposeMissing: true, Status: compose.StatusRemoved,
+	}
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{removable}})
+	s.open(removable)
+	shot("05b-detail-missing-remove")
+
 	s.apply(compose.Snapshot{DockerReachable: false, Projects: []compose.Project{missing}})
+	s.open(missing)
 	shot("06-detail-unreachable")
 
 	s.apply(compose.Snapshot{DockerReachable: true, Projects: projects})
@@ -1464,6 +1840,11 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	typed.ConfirmLabel = "Down con volumi"
 	typed.TypeToConfirm = projects[0].Name
 	captureDialog(t, s.window.QWidget, dir, "10-confirm-type", typed)
+
+	// The question of "Rimuovi dalla lista" and the form of a new Project, with
+	// two File compose in the order the picker returned them.
+	captureDialog(t, s.window.QWidget, dir, "21-confirm-remove", RemoveConfirmation(projects[3]))
+	captureAddForm(t, s.window.QWidget, dir, "20-add-form")
 
 	// The panel of the Activities: one that runs, one that worked, and one that
 	// failed with the notice that leads to its output.
@@ -1636,6 +2017,33 @@ func captureDialog(t *testing.T, parent *qt6.QWidget, dir, name string, question
 	t.Helper()
 
 	dialog := newConfirmDialog(parent, question, func() {})
+	dialog.dialog.Show()
+	settle()
+	pixmap := dialog.dialog.Grab()
+	if pixmap == nil {
+		t.Fatalf("grab %q: no pixmap", name)
+	}
+	path := filepath.Join(dir, name+".png")
+	if !pixmap.Save(path) {
+		t.Fatalf("save %q", path)
+	}
+	t.Logf("wrote %s", path)
+	dialog.dialog.Delete()
+}
+
+// captureAddForm writes the PNG of the form of a new Project with two File
+// compose, so its layout and the order of the files can be reviewed without a
+// desktop.
+func captureAddForm(t *testing.T, parent *qt6.QWidget, dir, name string) {
+	t.Helper()
+
+	form := AddProjectForm{
+		Files: []string{"/srv/shop/compose.override.yml", "/srv/shop/docker-compose.yml"},
+		Name:  "shop",
+	}
+	dialog := newAddDialog(parent, form,
+		func(string, []string, func(error)) {},
+		func(string) {})
 	dialog.dialog.Show()
 	settle()
 	pixmap := dialog.dialog.Grab()

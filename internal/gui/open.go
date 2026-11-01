@@ -24,6 +24,63 @@ func PortInRange(port int) bool {
 	return port >= 1 && port <= 65535
 }
 
+// The reasons of a command of the detail that cannot be pressed. They are the
+// sentences the notice and the old view use, so one fact has one text.
+const (
+	// NoFolderCommandText explains "Cartella" and "Terminale" on a Project
+	// without a folder.
+	NoFolderCommandText = "Il Progetto non ha una cartella."
+	// NoPortCommandText explains "Porta" on a Project that publishes no port.
+	NoPortCommandText = "Il Progetto non pubblica porte."
+)
+
+// CommandView is one command of the detail: whether it can be pressed and, when
+// it cannot, the reason the user reads in the tooltip and hears from the screen
+// reader.
+type CommandView struct {
+	Enabled bool
+	Reason  string
+}
+
+// CommandViews reports the three commands of the detail: "Cartella",
+// "Terminale" and "Porta". A Project whose File compose are missing opens
+// nothing, because the folder and the ports it would open no longer describe it.
+// Without a folder the first two stay off, and without a published port the
+// third does.
+func CommandViews(project compose.Project) (folder, terminal, port CommandView) {
+	if project.ComposeMissing {
+		missing := CommandView{Reason: MissingComposeText}
+		return missing, missing, missing
+	}
+	folder, terminal = CommandView{Enabled: true}, CommandView{Enabled: true}
+	if project.Folder == "" {
+		noFolder := CommandView{Reason: NoFolderCommandText}
+		folder, terminal = noFolder, noFolder
+	}
+	port = CommandView{Enabled: true}
+	if _, ok := FirstPublishedPort(project); !ok {
+		port = CommandView{Reason: NoPortCommandText}
+	}
+	return folder, terminal, port
+}
+
+// FirstPublishedPort is the port "Porta" opens: the first published port of the
+// Project, in the order the snapshot lists its Services, their Containers and
+// their ports. A number outside the ports the browser can reach is skipped, so a
+// stale row never builds a dead address.
+func FirstPublishedPort(project compose.Project) (int, bool) {
+	for _, service := range project.Services {
+		for _, container := range service.Containers {
+			for _, port := range container.Ports {
+				if PortInRange(port.Published) {
+					return port.Published, true
+				}
+			}
+		}
+	}
+	return 0, false
+}
+
 // openCommand hands a path or an address to the desktop's default handler. The
 // target is one argument, so the shell never reads a space or a quote inside it.
 func openCommand(target string) *exec.Cmd {

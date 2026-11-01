@@ -18,8 +18,8 @@ type detailData struct {
 
 // sameDraw reports whether two sets of data draw the same panel. It compares
 // the fields the panel draws, not the pointer of the snapshot: a change of the
-// Folder or of the Profiles the compose files define reaches the list and the
-// form of the settings, not the detail, so it alone does not rebuild it.
+// Profiles the compose files define reaches the list and the form of the
+// settings, not the detail, so it alone does not rebuild it.
 func (d detailData) sameDraw(other detailData) bool {
 	if d.dockerReachable != other.dockerReachable || d.loading != other.loading {
 		return false
@@ -27,6 +27,7 @@ func (d detailData) sameDraw(other detailData) bool {
 
 	a, b := d.project, other.project
 	if a.Name != b.Name || a.DisplayName != b.DisplayName || a.Group != b.Group ||
+		a.Folder != b.Folder ||
 		a.Status != b.Status || a.Running != b.Running || a.Total != b.Total ||
 		a.ComposeMissing != b.ComposeMissing {
 		return false

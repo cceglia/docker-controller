@@ -183,6 +183,117 @@ func TestProjectFolder_FindsTheFolderOnDisk(t *testing.T) {
 	}
 }
 
+// TestFirstPublishedPort_FindsTheFirstPortInTheOrderOfTheProject checks the
+// port "Porta" opens: the first published one, in the order the snapshot lists
+// the Services, their Containers and their ports. A number that is not a port is
+// not one the browser can reach, so it is skipped.
+func TestFirstPublishedPort_FindsTheFirstPortInTheOrderOfTheProject(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		project compose.Project
+		want    int
+		ok      bool
+	}{
+		{"no Service", compose.Project{}, 0, false},
+		{"no port", projectWithPorts(0), 0, false},
+		{"one port", projectWithPorts(8080), 8080, true},
+		{"two ports of one Container", projectWithPorts(8080, 9090), 8080, true},
+		{
+			name: "the Services keep their order",
+			project: compose.Project{Services: []compose.Service{
+				{Name: "a", Containers: []compose.Container{{Name: "a-1", Ports: []compose.Port{{Published: 3000, Target: 3000}}}}},
+				{Name: "b", Containers: []compose.Container{{Name: "b-1", Ports: []compose.Port{{Published: 4000, Target: 4000}}}}},
+			}},
+			want: 3000,
+			ok:   true,
+		},
+		{
+			name: "a number that is not a port is skipped",
+			project: compose.Project{Services: []compose.Service{{Containers: []compose.Container{{
+				Ports: []compose.Port{{Published: 0, Target: 80}, {Published: 70000, Target: 80}, {Published: 8443, Target: 443}},
+			}}}}},
+			want: 8443,
+			ok:   true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := FirstPublishedPort(tc.project)
+			if ok != tc.ok {
+				t.Fatalf("FirstPublishedPort found = %t, want %t", ok, tc.ok)
+			}
+			if got != tc.want {
+				t.Errorf("FirstPublishedPort = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// projectWithPorts is a Project of one Service with the published ports given.
+func projectWithPorts(ports ...int) compose.Project {
+	var list []compose.Port
+	for _, port := range ports {
+		list = append(list, compose.Port{Published: port, Target: port, Protocol: "tcp"})
+	}
+	return compose.Project{Services: []compose.Service{{Name: "web", Containers: []compose.Container{{Name: "web-1", Ports: list}}}}}
+}
+
+// TestCommandViews_SaysWhichCommandsTheProjectAllows checks the three commands
+// of the detail and the reason of the ones that cannot be pressed.
+func TestCommandViews_SaysWhichCommandsTheProjectAllows(t *testing.T) {
+	complete := projectWithPorts(8080)
+	complete.Folder = "/srv/shop"
+
+	for _, tc := range []struct {
+		name     string
+		project  compose.Project
+		folder   CommandView
+		terminal CommandView
+		port     CommandView
+	}{
+		{
+			name:     "a complete Project opens everything",
+			project:  complete,
+			folder:   CommandView{Enabled: true},
+			terminal: CommandView{Enabled: true},
+			port:     CommandView{Enabled: true},
+		},
+		{
+			name:     "a Project without a folder opens neither the folder nor a terminal",
+			project:  projectWithPorts(8080),
+			folder:   CommandView{Reason: NoFolderCommandText},
+			terminal: CommandView{Reason: NoFolderCommandText},
+			port:     CommandView{Enabled: true},
+		},
+		{
+			name:     "a Project that publishes no port opens no browser",
+			project:  compose.Project{Folder: "/srv/shop"},
+			folder:   CommandView{Enabled: true},
+			terminal: CommandView{Enabled: true},
+			port:     CommandView{Reason: NoPortCommandText},
+		},
+		{
+			name:     "a missing File compose closes every command",
+			project:  compose.Project{Folder: "/srv/shop", ComposeMissing: true, Services: complete.Services},
+			folder:   CommandView{Reason: MissingComposeText},
+			terminal: CommandView{Reason: MissingComposeText},
+			port:     CommandView{Reason: MissingComposeText},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			folder, terminal, port := CommandViews(tc.project)
+			if folder != tc.folder {
+				t.Errorf("folder = %+v, want %+v", folder, tc.folder)
+			}
+			if terminal != tc.terminal {
+				t.Errorf("terminal = %+v, want %+v", terminal, tc.terminal)
+			}
+			if port != tc.port {
+				t.Errorf("port = %+v, want %+v", port, tc.port)
+			}
+		})
+	}
+}
+
 func TestProjectFolder_RefusesAFileInPlaceOfAFolder(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "docker-compose.yml")

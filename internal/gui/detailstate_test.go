@@ -34,9 +34,9 @@ func TestDetailData_SameDrawComparesOnlyWhatThePanelDraws(t *testing.T) {
 	}{
 		{"the same Project", edited(func(*compose.Project) {}), true},
 		{
-			"another Folder only: the detail does not draw it",
+			"another Folder: the commands follow it",
 			edited(func(p *compose.Project) { p.Folder = "/home/me/shop" }),
-			true,
+			false,
 		},
 		{
 			"another set of defined Profiles only: the detail does not draw it",

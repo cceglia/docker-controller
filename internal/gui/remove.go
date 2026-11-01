@@ -5,6 +5,10 @@ import "dockercontroller/internal/compose"
 // removeText is the label of the entry that takes a Project off the list.
 const removeText = "Rimuovi dalla lista"
 
+// removeTooltip says what the entry does while it can be pressed: it leaves
+// Docker and the files of the Project alone.
+const removeTooltip = "Togli il Progetto dalla lista: Docker e i file non vengono toccati."
+
 // ContainerRefusalText explains the entry that cannot be pressed because the
 // Project still has Containers.
 const ContainerRefusalText = "Il Progetto ha Container: fai Down prima di toglierlo dalla lista."

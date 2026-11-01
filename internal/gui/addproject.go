@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"fmt"
 	"strings"
 
 	"dockercontroller/internal/compose"
@@ -125,4 +126,21 @@ func NameTaken(name string, projects []compose.Project) bool {
 		}
 	}
 	return false
+}
+
+// AddRefusal reports why the Manager would refuse a Project added by hand,
+// before the request leaves the window: no File compose, an empty name, a name
+// already saved. nil means the request may go on, and the Manager judges the
+// rest, because only it knows the saved list and the files on disk.
+func AddRefusal(name string, files []string, projects []compose.Project) error {
+	name = strings.TrimSpace(name)
+	switch {
+	case len(files) == 0:
+		return fmt.Errorf("%w: %w", compose.ErrInvalidProject, compose.ErrNoComposeFile)
+	case name == "":
+		return fmt.Errorf("%w: %w: %q", compose.ErrInvalidProject, compose.ErrInvalidName, name)
+	case NameTaken(name, projects):
+		return fmt.Errorf("%w: %q", compose.ErrDuplicateProject, name)
+	}
+	return nil
 }

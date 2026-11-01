@@ -50,6 +50,8 @@ type shell struct {
 	// Action shows its Italian message there, a failed Activity the same with
 	// the way to its output.
 	notice *toast
+	// addForm is the form of a new Project on screen, nil when it is closed.
+	addForm *addDialog
 
 	// selected is the compose name of the open Project, "" when none is open.
 	selected string
@@ -136,7 +138,8 @@ func (s *shell) buildSidebar() {
 
 	s.add = qt6.NewQPushButton3("Aggiungi progetto")
 	s.add.SetAccessibleName("Aggiungi progetto")
-	s.add.SetEnabled(false)
+	s.add.SetToolTip("Scegli i File compose di un Progetto da aggiungere alla lista.")
+	s.add.OnClicked(s.showAddDialog)
 	keepTarget(s.add.QWidget)
 	actions.AddWidget(s.add.QWidget)
 	actions.AddStretch()
@@ -157,6 +160,10 @@ func (s *shell) buildDetail() {
 	s.panel = newDetailPanel(s.theme)
 	s.panel.onAction = s.do
 	s.panel.onSave = s.save
+	s.panel.onFolder = s.openFolder
+	s.panel.onTerminal = s.openTerminal
+	s.panel.onPort = s.openPort
+	s.panel.onRemove = s.removeFromList
 	s.detail = s.panel.widget
 	// The figures of the machine reach the panel on the Qt thread, and only
 	// while the Project on screen has a Container to measure.

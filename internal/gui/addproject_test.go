@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -286,6 +287,111 @@ func TestAddProjectForm_CleanNameTrimsTheName(t *testing.T) {
 			form := AddProjectForm{Name: tc.in}
 			if got := form.CleanName(); got != tc.want {
 				t.Errorf("CleanName = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestAddProjectForm_PickKeepsTheOrderOfThePicker checks that the form keeps
+// the File compose in the order the picker returned them, across more picks and
+// a removal: the first one stays the main one, because compose reads -f in that
+// order.
+func TestAddProjectForm_PickKeepsTheOrderOfThePicker(t *testing.T) {
+	main := "/home/me/shop/docker-compose.yml"
+	override := "/home/me/shop/compose.override.yml"
+	extra := "/home/me/shop/compose.extra.yml"
+
+	propose := func(path string) (string, error) {
+		return filepath.Base(filepath.Dir(path)), nil
+	}
+
+	t.Run("one pick keeps the order of the picker", func(t *testing.T) {
+		var form AddProjectForm
+		if _, err := form.Pick([]string{override, main}, propose); err != nil {
+			t.Fatalf("Pick error = %v", err)
+		}
+		assertStrings(t, "Files", form.Files, []string{override, main})
+		if got := form.MainFile(); got != override {
+			t.Errorf("MainFile = %q, want the first file of the picker: %q", got, override)
+		}
+	})
+
+	t.Run("a later pick appends the files after the chosen ones", func(t *testing.T) {
+		var form AddProjectForm
+		form.Pick([]string{main, override}, propose)
+		form.Pick([]string{extra}, propose)
+		assertStrings(t, "Files", form.Files, []string{main, override, extra})
+	})
+
+	t.Run("removing the main file moves the first place down the order", func(t *testing.T) {
+		var form AddProjectForm
+		form.Pick([]string{main, override, extra}, propose)
+		form.RemoveFile(0)
+		assertStrings(t, "Files", form.Files, []string{override, extra})
+		if got := form.MainFile(); got != override {
+			t.Errorf("MainFile = %q, want %q", got, override)
+		}
+	})
+}
+
+// TestAddRefusal_ExplainsTheRefusalBeforeTheSave checks the three refusals the
+// window can tell before the Manager runs, with the text the user reads.
+func TestAddRefusal_ExplainsTheRefusalBeforeTheSave(t *testing.T) {
+	main := "/home/me/shop/docker-compose.yml"
+	projects := []compose.Project{{Name: "shop"}}
+
+	for _, tc := range []struct {
+		name  string
+		input string
+		files []string
+		err   error
+		text  string
+	}{
+		{
+			name:  "no File compose",
+			input: "shop",
+			err:   compose.ErrNoComposeFile,
+			text:  "Serve almeno un File compose.",
+		},
+		{
+			name:  "no name",
+			files: []string{main},
+			err:   compose.ErrInvalidName,
+			text:  "Nome non valido: usa lettere minuscole, cifre, - e _.",
+		},
+		{
+			name:  "a name with blank space only",
+			input: "   ",
+			files: []string{main},
+			err:   compose.ErrInvalidName,
+			text:  "Nome non valido: usa lettere minuscole, cifre, - e _.",
+		},
+		{
+			name:  "a name already saved",
+			input: "  shop  ",
+			files: []string{main},
+			err:   compose.ErrDuplicateProject,
+			text:  "Esiste già un Progetto con questo nome.",
+		},
+		{
+			name:  "a request the Manager may judge",
+			input: "blog",
+			files: []string{main},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := AddRefusal(tc.input, tc.files, projects)
+			if tc.err == nil {
+				if err != nil {
+					t.Fatalf("AddRefusal error = %v, want none", err)
+				}
+				return
+			}
+			if !errors.Is(err, tc.err) {
+				t.Fatalf("AddRefusal error = %v, want %v", err, tc.err)
+			}
+			if got := UserError(err).Error(); got != tc.text {
+				t.Errorf("the refusal reads %q, want %q", got, tc.text)
 			}
 		})
 	}
