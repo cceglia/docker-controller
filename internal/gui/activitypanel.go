@@ -12,26 +12,19 @@ import (
 )
 
 const (
-	// panelHeight is the height the bottom panel opens at, in pixels.
-	panelHeight = 260
 	// historyWidth is the width of the column of the history.
 	historyWidth = 220
-	// emptyActivityText is the line of the panel before the first Activity.
+	// emptyActivityText is the line of the page before the first Activity.
 	emptyActivityText = "Nessuna Attività in questa sessione."
-	// panelCloseText is the button that hides the panel.
-	panelCloseText = "Chiudi"
-	// panelTabText is the title of the one tab this ticket adds.
-	panelTabText = "Attività"
 )
 
-// activityPanel is the bottom panel of the detail: a stack with its switcher
-// and, for now, the one page of the Activities. It reads the ActivityLog, so it
-// shows the history of the session; it never stops an Activity.
-type activityPanel struct {
-	// body is the end child of the paned, paned the widget it sits in.
-	body  *gtk.Box
-	paned *gtk.Paned
-	list  *gtk.ListBox
+// activityPage is the page of the Activities of the bottom panel: the history
+// on the left and the output of the chosen Activity on the right. It reads the
+// ActivityLog, so it shows the history of the session; it never stops an
+// Activity.
+type activityPage struct {
+	widget *gtk.Box
+	list   *gtk.ListBox
 	// output shows the text of the selected Activity, or the empty notice.
 	output   *gtk.Stack
 	view     *gtk.TextView
@@ -60,10 +53,9 @@ type activityPanel struct {
 	pending    atomic.Bool // a refresh is queued on the main loop
 }
 
-// newActivityPanel builds the panel. It stays hidden until an Activity starts:
-// the first one opens it.
-func newActivityPanel(log *ActivityLog) *activityPanel {
-	p := &activityPanel{
+// newActivityPage builds the page of the Activities.
+func newActivityPage(log *ActivityLog) *activityPage {
+	p := &activityPage{
 		log:      log,
 		notified: map[compose.ActivityID]bool{},
 		rowByID:  map[compose.ActivityID]*gtk.ListBoxRow{},
@@ -113,42 +105,14 @@ func newActivityPanel(log *ActivityLog) *activityPanel {
 	p.output.AddNamed(p.scrolled, "activity")
 	p.output.SetVisibleChildName("empty")
 
-	page := gtk.NewBox(gtk.OrientationHorizontal, 6)
-	page.SetMarginTop(6)
-	page.SetMarginBottom(6)
-	page.SetMarginStart(6)
-	page.SetMarginEnd(6)
-	page.Append(history)
-	page.Append(p.output)
+	p.widget = gtk.NewBox(gtk.OrientationHorizontal, 6)
+	p.widget.SetMarginTop(6)
+	p.widget.SetMarginBottom(6)
+	p.widget.SetMarginStart(6)
+	p.widget.SetMarginEnd(6)
+	p.widget.Append(history)
+	p.widget.Append(p.output)
 	p.output.SetHExpand(true)
-
-	stack := gtk.NewStack()
-	stack.SetTransitionType(gtk.StackTransitionTypeCrossfade)
-	stack.AddTitled(page, "attivita", panelTabText)
-	stack.SetVExpand(true)
-
-	switcher := gtk.NewStackSwitcher()
-	switcher.SetStack(stack)
-	switcher.SetHExpand(true)
-	switcher.SetHAlign(gtk.AlignStart)
-
-	close := gtk.NewButtonWithLabel(panelCloseText)
-	close.AddCSSClass("flat")
-	close.SetTooltipText("Nascondi il pannello. L'Attività in corso continua.")
-	close.ConnectClicked(p.Close)
-
-	head := gtk.NewBox(gtk.OrientationHorizontal, 6)
-	head.SetMarginTop(4)
-	head.SetMarginBottom(2)
-	head.SetMarginStart(8)
-	head.SetMarginEnd(8)
-	head.Append(switcher)
-	head.Append(close)
-
-	p.body = gtk.NewBox(gtk.OrientationVertical, 0)
-	p.body.Append(head)
-	p.body.Append(stack)
-	p.body.SetVisible(false)
 
 	log.OnChange(p.schedule)
 
@@ -156,8 +120,8 @@ func newActivityPanel(log *ActivityLog) *activityPanel {
 }
 
 // schedule queues one refresh on the main loop. Lines arrive in bursts, so the
-// panel reads the log once per burst, not once per line.
-func (p *activityPanel) schedule() {
+// page reads the log once per burst, not once per line.
+func (p *activityPage) schedule() {
 	if !p.pending.CompareAndSwap(false, true) {
 		return
 	}
@@ -169,7 +133,7 @@ func (p *activityPanel) schedule() {
 
 // refresh moves the log into the widgets: new Activities as rows, the state of
 // the known ones, the failure toast, and the output of the selected Activity.
-func (p *activityPanel) refresh() {
+func (p *activityPage) refresh() {
 	activities := p.log.Activities()
 
 	added := 0
@@ -202,16 +166,16 @@ func (p *activityPanel) refresh() {
 	switch {
 	case added > 0:
 		// An Action started: show its output without being asked.
-		p.Show(activities[0].ID)
+		p.Select(activities[0].ID)
 	case p.selected == "" && len(activities) > 0:
-		p.Show(activities[0].ID)
+		p.Select(activities[0].ID)
 	default:
 		p.renderOutput()
 	}
 }
 
 // insertRow adds the row of one Activity at the top of the history.
-func (p *activityPanel) insertRow(a Activity) {
+func (p *activityPage) insertRow(a Activity) {
 	label := gtk.NewLabel(ActivityHeader(a))
 	label.SetXAlign(0)
 	label.SetEllipsize(pango.EllipsizeEnd)
@@ -227,7 +191,7 @@ func (p *activityPanel) insertRow(a Activity) {
 }
 
 // rowSelected shows the output of the Activity of the chosen row.
-func (p *activityPanel) rowSelected(row *gtk.ListBoxRow) {
+func (p *activityPage) rowSelected(row *gtk.ListBoxRow) {
 	if row == nil {
 		return
 	}
@@ -239,9 +203,8 @@ func (p *activityPanel) rowSelected(row *gtk.ListBoxRow) {
 	p.renderOutput()
 }
 
-// Show selects an Activity of the history and opens the panel on it.
-func (p *activityPanel) Show(id compose.ActivityID) {
-	p.Open()
+// Select shows the output of an Activity of the history.
+func (p *activityPage) Select(id compose.ActivityID) {
 	p.selected = id
 	if row, known := p.rowByID[id]; known {
 		// Selecting a row emits row-selected, which sets selected again.
@@ -250,41 +213,10 @@ func (p *activityPanel) Show(id compose.ActivityID) {
 	p.renderOutput()
 }
 
-// Open shows the panel at its height. The Activity on screen keeps running.
-func (p *activityPanel) Open() {
-	if p.body.Visible() {
-		return
-	}
-	p.body.SetVisible(true)
-	p.fit()
-}
-
-// Close hides the panel. It stops no Activity and keeps the history.
-func (p *activityPanel) Close() {
-	p.body.SetVisible(false)
-}
-
-// fit puts the handle of the paned panelHeight above the bottom.
-func (p *activityPanel) fit() {
-	paned := p.paned
-	if paned == nil {
-		return
-	}
-	// The new child is laid out after this call, so the position is set when
-	// the main loop is idle.
-	glib.IdleAdd(func() {
-		position := paned.Height() - panelHeight
-		if position < 0 {
-			position = 0
-		}
-		paned.SetPosition(position)
-	})
-}
-
 // renderOutput puts the output of the selected Activity in the buffer. Only the
 // new lines are appended: the text is rebuilt when the Activity or the lines
 // the cap dropped changed.
-func (p *activityPanel) renderOutput() {
+func (p *activityPage) renderOutput() {
 	a, ok := p.log.Activity(p.selected)
 	if !ok {
 		p.output.SetVisibleChildName("empty")
@@ -321,7 +253,7 @@ func (p *activityPanel) renderOutput() {
 }
 
 // scrollToEnd follows the live output, as the old view did.
-func (p *activityPanel) scrollToEnd() {
+func (p *activityPage) scrollToEnd() {
 	scrolled := p.scrolled
 	glib.IdleAdd(func() {
 		adjustment := scrolled.VAdjustment()

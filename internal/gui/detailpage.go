@@ -19,6 +19,8 @@ const (
 	detailWidth = 700
 	// detailSpacing is the space between the blocks of the detail.
 	detailSpacing = 18
+	// showLogsText is the button of the head that opens the Log page.
+	showLogsText = "Mostra log"
 )
 
 // detailView is the content side of the split view: the header of the chosen
@@ -32,7 +34,7 @@ type detailView struct {
 	content  *gtk.Box
 	// paned splits the detail from the bottom panel; panel is the panel itself.
 	paned *gtk.Paned
-	panel *activityPanel
+	panel *bottomPanel
 	// shown is the Project the detail is built from, shownDocker and
 	// shownLoading the state of Docker it was built for, and visible says
 	// whether the detail is on screen at all.
@@ -75,7 +77,7 @@ func newDetailView(activities *ActivityLog) *detailView {
 	d.stack.AddNamed(scrolled, "detail")
 	d.stack.SetVisibleChildName("empty")
 
-	d.panel = newActivityPanel(activities)
+	d.panel = newBottomPanel(activities)
 	d.paned = gtk.NewPaned(gtk.OrientationVertical)
 	d.paned.SetStartChild(d.stack)
 	d.paned.SetEndChild(d.panel.body)
@@ -100,6 +102,10 @@ func (d *detailView) set(project compose.Project, dockerReachable, loading bool)
 		reflect.DeepEqual(d.shown, project) {
 		return
 	}
+	// Another Project: the stream of the one before must not write into it.
+	if d.visible && d.shown.Name != project.Name {
+		d.panel.closeLogs()
+	}
 	d.visible = true
 	d.shown = project
 	d.shownDocker = dockerReachable
@@ -114,7 +120,7 @@ func (d *detailView) set(project compose.Project, dockerReachable, loading bool)
 	if notice := DockerNotice(loading, dockerReachable); notice != "" {
 		d.content.Append(noticeBanner(notice))
 	}
-	d.content.Append(projectHeader(project, actionBar(ProjectActions(project, dockerReachable), reason, true, d.choose)))
+	d.content.Append(projectHeader(project, actionBar(ProjectActions(project, dockerReachable), reason, true, d.choose), func() { d.showLogs(project) }))
 	if project.ComposeMissing {
 		d.content.Append(missingBanner())
 	}
@@ -134,9 +140,16 @@ func (d *detailView) set(project compose.Project, dockerReachable, loading bool)
 // clear goes back to the invitation, for when the open Project is gone.
 func (d *detailView) clear() {
 	d.visible = false
+	d.panel.closeLogs()
 	removeAll(d.content)
 	d.page.SetTitle(windowTitle)
 	d.stack.SetVisibleChildName("empty")
+}
+
+// showLogs opens the Log page on the logs of the Project, whole or of one of
+// its Services.
+func (d *detailView) showLogs(project compose.Project) {
+	d.panel.ShowLogs(project, "")
 }
 
 // choose runs an Action, or asks for its confirmation first. A disabled Action
@@ -212,8 +225,8 @@ func removeAll(box *gtk.Box) {
 
 // projectHeader is the head of the detail: the name of the Project, its status
 // with the count of its Containers, its Actions, its Compose files and its
-// active Profiles.
-func projectHeader(project compose.Project, actions *gtk.Box) *gtk.Box {
+// active Profiles. onLogs, when set, opens the Log page on the Project.
+func projectHeader(project compose.Project, actions *gtk.Box, onLogs func()) *gtk.Box {
 	box := gtk.NewBox(gtk.OrientationVertical, 6)
 
 	name := gtk.NewLabel(ProjectName(project))
@@ -235,6 +248,13 @@ func projectHeader(project compose.Project, actions *gtk.Box) *gtk.Box {
 	line.Append(count)
 	box.Append(line)
 
+	if onLogs != nil {
+		logs := gtk.NewButtonWithLabel(showLogsText)
+		logs.AddCSSClass("flat")
+		logs.SetTooltipText("Mostra i log del Progetto.")
+		logs.ConnectClicked(onLogs)
+		actions.Append(logs)
+	}
 	box.Append(actions)
 
 	if files := ComposeFilesLine(project.ComposeFiles); files != "" {

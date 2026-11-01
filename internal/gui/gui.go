@@ -127,6 +127,8 @@ func newShell(app *adw.Application, activities *ActivityLog) *shell {
 	s.window.AddBreakpoint(breakpoint)
 	s.window.SetContent(s.toasts)
 	s.detail.parent = &s.window.ApplicationWindow.Window
+	// A window that goes away must not leave `docker compose logs` running.
+	s.window.ConnectDestroy(func() { s.detail.panel.logs.StopAll() })
 	return s
 }
 
@@ -171,6 +173,9 @@ func contentPlaceholder() *adw.StatusPage {
 func (s *shell) watch(ctx context.Context, manager *compose.Manager) {
 	s.ctx = ctx
 	s.manager = manager
+	// The Log page streams through the Manager, and stops with the application.
+	s.detail.panel.logs.source = manager.Logs
+	s.detail.panel.logs.ctx = ctx
 	go func() {
 		for snapshot := range manager.Watch(ctx) {
 			glib.IdleAdd(func() { s.apply(snapshot) })

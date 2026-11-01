@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -81,7 +82,7 @@ func TestLogStreams_AddRefusesADuplicateID(t *testing.T) {
 func TestLogStreams_StoppedIDsAreBounded(t *testing.T) {
 	var l LogStreams
 	for i := 0; i < 10*maxStoppedLogIDs; i++ {
-		l.Stop(string(rune('a'+i%26)) + string(rune(i)))
+		l.Stop(strconv.Itoa(i))
 	}
 	if n := len(l.stopped); n > maxStoppedLogIDs {
 		t.Errorf("%d remembered ids, want at most %d", n, maxStoppedLogIDs)
@@ -101,35 +102,62 @@ func TestAppendLastLines_KeepsOnlyTheLastN(t *testing.T) {
 	}
 }
 
-func TestStreamLogs_EndedEventCarriesTheStderrDetailOfCompose(t *testing.T) {
+func TestStreamLogs_EndCarriesTheStderrDetailOfCompose(t *testing.T) {
 	source := func(_ context.Context, _ compose.LogRequest, onLine func(compose.LogLine)) error {
-		onLine(compose.LogLine{Text: "web  | hello"})
+		onLine(compose.LogLine{Service: "web", Text: "hello"})
 		onLine(compose.LogLine{Text: "no configuration file provided: not found", Stderr: true})
 		return errors.New("exit status 1")
 	}
-	var events []LogEvent
-	emit := func(e LogEvent) { events = append(events, e) }
+	var lines []compose.LogLine
+	onLine := func(l compose.LogLine) { lines = append(lines, l) }
 
-	StreamLogs(context.Background(), "s1", compose.LogRequest{Project: "p"}, source, emit)
+	end := StreamLogs(context.Background(), compose.LogRequest{Project: "p"}, source, onLine)
 
-	if len(events) != 3 {
-		t.Fatalf("%d events, want 3: %v", len(events), events)
+	if end.Stopped {
+		t.Error("the stream ended on its own, not on a stop")
 	}
-	last := events[2]
-	if last.Type != LogEndedEvent || !strings.Contains(last.Error, "no configuration file provided") {
-		t.Errorf("ended event = %+v, want the stderr detail", last)
+	if !strings.Contains(end.Error, "no configuration file provided") {
+		t.Errorf("end = %+v, want the stderr detail", end)
+	}
+	if len(lines) != 2 {
+		t.Fatalf("%d lines, want 2: %v", len(lines), lines)
+	}
+	if !lines[1].Stderr {
+		t.Error("the second line lost its stderr mark")
 	}
 }
 
-func TestStreamLogs_StoppedStreamSendsNoEndedEvent(t *testing.T) {
+func TestStreamLogs_CleanEndHasNoError(t *testing.T) {
+	source := func(_ context.Context, _ compose.LogRequest, onLine func(compose.LogLine)) error {
+		onLine(compose.LogLine{Service: "web", Text: "bye"})
+		return nil
+	}
+	var lines int
+	end := StreamLogs(context.Background(), compose.LogRequest{}, source, func(compose.LogLine) { lines++ })
+
+	if end.Stopped {
+		t.Error("a stream that compose closed is not stopped by the view")
+	}
+	if end.Error != "" {
+		t.Errorf("end error = %q, want none", end.Error)
+	}
+	if lines != 1 {
+		t.Errorf("%d lines, want 1", lines)
+	}
+}
+
+func TestStreamLogs_StoppedStreamReportsNoEnd(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	source := func(context.Context, compose.LogRequest, func(compose.LogLine)) error {
 		cancel()
 		return nil
 	}
 	n := 0
-	StreamLogs(ctx, "s1", compose.LogRequest{}, source, func(LogEvent) { n++ })
+	end := StreamLogs(ctx, compose.LogRequest{}, source, func(compose.LogLine) { n++ })
 	if n != 0 {
-		t.Errorf("%d events after a stop, want none", n)
+		t.Errorf("%d lines after a stop, want none", n)
+	}
+	if !end.Stopped || end.Error != "" {
+		t.Errorf("end = %+v, want a stop without an error", end)
 	}
 }

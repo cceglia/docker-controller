@@ -10,36 +10,30 @@ import (
 	"dockercontroller/internal/compose"
 )
 
-// LogEventType tells what a LogEvent reports.
-type LogEventType string
+// LogSource opens the log stream of a Project, or of one of its Services, and
+// delivers each line to onLine, which is never called concurrently. It blocks
+// until ctx is cancelled or until compose ends the stream.
+// compose.Manager.Logs satisfies it.
+type LogSource func(ctx context.Context, req compose.LogRequest, onLine func(compose.LogLine)) error
 
-const (
-	// LogLineEvent delivers one line of a stream.
-	LogLineEvent LogEventType = "line"
-	// LogEndedEvent is the last event of a stream that ended on its own
-	// (compose failed or exited); Error says why. A stream the view stopped
-	// with StopLogs sends nothing more.
-	LogEndedEvent LogEventType = "ended"
-)
-
-// LogEvent is one event of the log stream the view named ID.
-type LogEvent struct {
-	ID   string          `json:"id"`
-	Type LogEventType    `json:"type"`
-	Line compose.LogLine `json:"line"`
-	// Error is set for a LogEndedEvent that is a failure.
-	Error string `json:"error"`
+// LogEnd tells how a stream ended by itself.
+type LogEnd struct {
+	// Stopped is true when the view stopped the stream: no line follows.
+	Stopped bool
+	// Error is the reason compose ended the stream, in Italian, and is empty
+	// when it ended without a failure.
+	Error string
 }
 
-// ErrLogStopped reports that StopLogs for the id came before StartLogs
-// registered it: the stream must not start.
+// ErrLogStopped reports that a stream was stopped before it registered: it
+// must not start.
 var ErrLogStopped = errors.New("log stream already stopped")
 
 // ErrLogOpen reports a stream id that is already in use.
 var ErrLogOpen = errors.New("log stream already open")
 
-// ErrLogsClosed reports that StopAllLogs ran: the window is gone and no
-// stream may start until resume.
+// ErrLogsClosed reports that StopAll ran: the window is gone and no stream may
+// start until Resume.
 var ErrLogsClosed = errors.New("log streams stopped with the window")
 
 // maxStoppedLogIDs bounds the ids remembered by LogStreams.Stop.
@@ -53,8 +47,8 @@ type LogStreams struct {
 	// again and Resume runs.
 	closed bool
 	// stopped holds the latest ids stopped while not registered (oldest first),
-	// so a StopLogs that overtakes its StartLogs is not lost. Bounded: the
-	// view also stops streams that already ended on their own.
+	// so a Stop that overtakes its Add is not lost. Bounded: the view also
+	// stops streams that already ended on their own.
 	stopped []string
 }
 
@@ -115,7 +109,7 @@ func (l *LogStreams) Release(id string) {
 
 // StopAll cancels every open stream and forgets it. The ids are not
 // remembered: they belong to the window that is going away. Until Resume, no
-// new stream starts, so a StartLogs still in flight cannot outlive the window.
+// new stream starts, so an opening still in flight cannot outlive the window.
 func (l *LogStreams) StopAll() {
 	l.mu.Lock()
 	l.closed = true
@@ -134,7 +128,8 @@ func (l *LogStreams) Resume() {
 	l.mu.Unlock()
 }
 
-// maxEndedStderrLines bounds the stderr lines kept to explain how a stream ended.
+// maxEndedStderrLines bounds the stderr lines kept to explain how a stream
+// ended.
 const maxEndedStderrLines = 20
 
 // appendLastLines appends line to lines, keeping only the last n.
@@ -146,29 +141,29 @@ func appendLastLines(lines []string, line string, n int) []string {
 	return lines
 }
 
-// StreamLogs runs the stream, emitting each line, and when it ends on its own
-// (ctx not cancelled) a LogEndedEvent that explains why, with the last stderr
-// lines of compose as detail.
+// StreamLogs runs the stream and returns how it ended. When the view stopped
+// it with ctx, the result says so and carries no error: a stop is not a
+// failure. When compose ended it on its own, the result carries the Italian
+// reason, with the last stderr lines of compose as detail.
 func StreamLogs(
 	ctx context.Context,
-	id string,
 	req compose.LogRequest,
-	logs func(context.Context, compose.LogRequest, func(compose.LogLine)) error,
-	emit func(LogEvent),
-) {
+	source LogSource,
+	onLine func(compose.LogLine),
+) LogEnd {
 	var stderr []string // only touched by the callback, which is never concurrent
-	err := logs(ctx, req, func(l compose.LogLine) {
+	err := source(ctx, req, func(l compose.LogLine) {
 		if l.Stderr {
 			stderr = appendLastLines(stderr, l.Text, maxEndedStderrLines)
 		}
-		emit(LogEvent{ID: id, Type: LogLineEvent, Line: l})
+		onLine(l)
 	})
 	if ctx.Err() != nil {
-		return // stopped: nothing more is sent
+		return LogEnd{Stopped: true}
 	}
-	e := LogEvent{ID: id, Type: LogEndedEvent}
+	end := LogEnd{}
 	if err != nil {
-		e.Error = logEndedMessage(err, stderr)
+		end.Error = logEndedMessage(err, stderr)
 	}
-	emit(e)
+	return end
 }
