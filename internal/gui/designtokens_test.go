@@ -4,6 +4,7 @@ import (
 	"math"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -218,5 +219,23 @@ func TestThemeForLightness(t *testing.T) {
 				t.Errorf("themeForLightness(%d) = %q, want %q", tt.lightness, got.name, tt.want.name)
 			}
 		})
+	}
+}
+
+// TestPrimaryActionShowsItsStates guards the one control the sheet redraws: a
+// background of its own takes the native focus and hover away, so the sheet
+// must draw them back.
+func TestPrimaryActionShowsItsStates(t *testing.T) {
+	for _, theme := range themes {
+		sheet := applicationStyleSheet(theme)
+		for _, state := range []string{
+			"QPushButton#primaryAction:hover",
+			"QPushButton#primaryAction:focus",
+			"QPushButton#primaryAction:pressed",
+		} {
+			if !strings.Contains(sheet, state) {
+				t.Errorf("%s: the sheet has no rule %s", theme.name, state)
+			}
+		}
 	}
 }

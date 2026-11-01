@@ -109,11 +109,25 @@ QLabel#fieldLabel {
 QPushButton#primaryAction {
     background: palette(highlight);
     color: palette(highlighted-text);
+    border: 2px solid palette(highlight);
+    /* The border belongs to the sheet, so the padding keeps the height of
+       the buttons the desktop draws. */
+    padding: 4px 12px;
     font-weight: 600;
+}
+QPushButton#primaryAction:hover {
+    border-color: palette(highlighted-text);
+}
+QPushButton#primaryAction:focus {
+    border: 2px solid palette(highlighted-text);
+}
+QPushButton#primaryAction:pressed {
+    border-color: palette(mid);
 }
 QPushButton#primaryAction:disabled {
     background: palette(button);
     color: palette(mid);
+    border-color: palette(mid);
     font-weight: 600;
 }
 QListWidget::item:selected {
