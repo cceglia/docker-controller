@@ -200,6 +200,15 @@ func (p *detailPanel) linkAfter(prev *qt6.QWidget) {
 	qt6.QWidget_SetTabOrder(prev, p.controls[0].widget)
 }
 
+// lastControl is the control the tab chain leaves the detail from, nil while
+// the panel shows nothing.
+func (p *detailPanel) lastControl() *qt6.QWidget {
+	if len(p.controls) == 0 {
+		return nil
+	}
+	return p.controls[len(p.controls)-1].widget
+}
+
 // render builds the blocks of the detail from the data on screen. It reads the
 // value of the scroll bar first, so the panel can give it back once the new
 // range is known.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mappu/miqt/qt6"
@@ -60,6 +61,7 @@ func TestShellOffscreen(t *testing.T) {
 	checkDetailPanel(t, s)
 	checkActions(t, s)
 	checkConfirmDialog(t, s)
+	checkBottomPanel(t)
 	if dir := os.Getenv("SHOT_DIR"); dir != "" {
 		captureScreens(t, dir, app)
 	}
@@ -361,6 +363,171 @@ func checkConfirmDialog(t *testing.T, s *shell) {
 	settle()
 }
 
+// checkBottomPanel builds the panel of the Activities over a log of fake
+// Activities and checks the two tabs, the history, the output that grows while
+// the command runs, the scroll the history keeps, and the notice of a failure
+// with its way to the output.
+func checkBottomPanel(t *testing.T) {
+	t.Helper()
+
+	log := NewActivityLog()
+	s := newShell(&application{activities: log}, lightTheme)
+	defer s.window.Delete()
+	s.show()
+	settle()
+
+	if s.bottom == nil || s.bottom.widget == nil {
+		t.Fatal("the bottom panel is not wired")
+	}
+	if got := s.column.Orientation(); got != qt6.Vertical {
+		t.Fatalf("the column is %d, want a vertical splitter", got)
+	}
+	if got := s.column.Count(); got != 2 {
+		t.Fatalf("the column carries %d widgets, want the detail and the panel", got)
+	}
+	if got := s.column.Widget(0); got == nil || got.UnsafePointer() != s.detail.UnsafePointer() {
+		t.Error("the column does not start with the detail")
+	}
+	if got := s.column.Widget(1); got == nil || got.UnsafePointer() != s.bottom.widget.UnsafePointer() {
+		t.Error("the column does not hold the panel under the detail")
+	}
+	if got := s.bottom.tabs.Count(); got != 2 {
+		t.Fatalf("the panel carries %d tabs, want 2", got)
+	}
+	for i, want := range []string{activityPageTitle, logPageTitle} {
+		if got := s.bottom.tabs.TabText(i); got != want {
+			t.Errorf("tab %d is %q, want %q", i, got, want)
+		}
+	}
+	// The Log tab is a placeholder until the ticket that streams it.
+	if page := s.bottom.tabs.Widget(logTab); page == nil || !hasWidgetNamed(page, "logEmpty") {
+		t.Error("the Log tab carries no placeholder")
+	}
+	if s.bottom.showing() || s.bottom.widget.IsVisible() {
+		t.Fatal("the panel takes room before the first Activity")
+	}
+	if got := s.bottom.page.output.PlaceholderText(); got != emptyActivityText {
+		t.Errorf("the empty output reads %q, want %q", got, emptyActivityText)
+	}
+
+	up := Activity{ID: "act-1", Project: "shop", Kind: compose.ActionUp, State: ActivityRunning}
+	log.Push(started(up.ID, up.Project, "", up.Kind))
+	for i := 0; i < 3; i++ {
+		log.Push(output(up.ID, up.Project, "", up.Kind, fmt.Sprintf("step %d", i), false))
+	}
+	settle()
+
+	if !s.bottom.showing() || !s.bottom.widget.IsVisible() {
+		t.Fatal("the first Activity does not open the panel")
+	}
+	if got := s.bottom.tabs.CurrentIndex(); got != activityTab {
+		t.Errorf("the panel opens on tab %d, want the Activities", got)
+	}
+	if got := s.bottom.page.list.Count(); got != 1 {
+		t.Fatalf("the history carries %d rows, want 1", got)
+	}
+	if got := s.bottom.page.list.Item(0).Text(); got != ActivityHeader(up) {
+		t.Errorf("the row reads %q, want %q", got, ActivityHeader(up))
+	}
+	if got := s.bottom.page.list.Item(0).ToolTip(); got != runningActivityText {
+		t.Errorf("the row says %q, want %q", got, runningActivityText)
+	}
+	if got := s.bottom.page.selected; got != up.ID {
+		t.Errorf("the panel shows %q, want the running Activity", got)
+	}
+	if out := s.bottom.page.output.ToPlainText(); !strings.Contains(out, "step 2") {
+		t.Errorf("the output is %q, want the lines of the Activity", out)
+	}
+
+	// The output grows while the command runs: the row stays, the text grows.
+	log.Push(output(up.ID, up.Project, "", up.Kind, "step 3", false))
+	settle()
+	if got := s.bottom.page.list.Count(); got != 1 {
+		t.Errorf("a new line rebuilt the history: %d rows, want 1", got)
+	}
+	if out := s.bottom.page.output.ToPlainText(); !strings.Contains(out, "step 3") {
+		t.Errorf("the output is %q, want the line that arrived while the command runs", out)
+	}
+
+	// The history keeps its scroll while the output changes.
+	for i := 0; i < 40; i++ {
+		log.Push(started(compose.ActivityID(fmt.Sprintf("bulk-%02d", i)), "shop", "", compose.ActionStop))
+	}
+	settle()
+	bar := s.bottom.page.list.VerticalScrollBar()
+	if bar == nil || bar.Maximum() == 0 {
+		t.Fatal("the history of forty Activities does not scroll")
+	}
+	bar.SetValue(bar.Maximum() / 2)
+	value := bar.Value()
+	log.Push(output("bulk-39", "shop", "", compose.ActionStop, "late line", false))
+	settle()
+	if got := bar.Value(); got != value {
+		t.Errorf("scroll = %d after a new line, want %d", got, value)
+	}
+
+	// A failed Activity shows its message in the notice, with the way to its
+	// output.
+	log.Push(started("act-bad", "blog", "db", compose.ActionStart))
+	log.Push(output("act-bad", "blog", "db", compose.ActionStart, "creating", false))
+	log.Push(finished("act-bad", "blog", "db", compose.ActionStart, "error: no such image\n", "error: no such image"))
+	settle()
+
+	bad := Activity{
+		ID:      "act-bad",
+		Project: "blog",
+		Service: "db",
+		Kind:    compose.ActionStart,
+		State:   ActivityFailed,
+		Error:   "error: no such image\n",
+		Summary: "error: no such image",
+	}
+
+	if s.notice == nil || !s.notice.frame.IsVisible() {
+		t.Fatal("a failed Activity shows no notice")
+	}
+	if got, want := s.notice.label.Text(), ActivityToastText(bad); got != want {
+		t.Errorf("the notice reads %q, want %q", got, want)
+	}
+	if !s.notice.action.IsVisible() {
+		t.Fatal("the notice of a failure carries no way to the output")
+	}
+	if got := s.notice.action.Text(); got != showOutputText {
+		t.Errorf("the action reads %q, want %q", got, showOutputText)
+	}
+
+	// The action leads to the output: it opens the panel on its tab and on the
+	// Activity that failed.
+	s.bottom.Close()
+	settle()
+	s.notice.action.Click()
+	settle()
+	if !s.bottom.showing() {
+		t.Error("the action of the notice leaves the panel closed")
+	}
+	if got := s.bottom.tabs.CurrentIndex(); got != activityTab {
+		t.Errorf("the action opens tab %d, want the Activities", got)
+	}
+	if got := s.bottom.page.selected; got != bad.ID {
+		t.Errorf("the action selects %q, want %q", got, bad.ID)
+	}
+	if out := s.bottom.page.output.ToPlainText(); !strings.Contains(out, "error: no such image") {
+		t.Errorf("the output is %q, want the error of the Activity", out)
+	}
+
+	// A message without an action keeps the notice as it was: no button.
+	s.showNotice(ActivityRunningText)
+	settle()
+	if s.notice.action.IsVisible() {
+		t.Error("a notice without an action shows the button of the previous one")
+	}
+	if got := s.notice.label.Text(); got != ActivityRunningText {
+		t.Errorf("the notice reads %q, want %q", got, ActivityRunningText)
+	}
+
+	checkMinimumTargets(t, s.window)
+}
+
 // hasWidgetNamed reports whether a widget or one of its children carries the
 // object name of the style sheet. The blocks nest layouts, so the walk goes
 // through them.
@@ -457,7 +624,10 @@ func fakeProject() compose.Project {
 
 // checkMinimumTargets fails for every interactive control of the window whose
 // smallest side is under the token. A control without a size hint counts as
-// zero, so a widget that loses its layout fails too.
+// zero, so a widget that loses its layout fails too. A hidden control is
+// checked as well, because the window can show it later: the way back of the
+// narrow view waits hidden at wide width. The chrome Qt hides inside its own
+// containers is not a control of this window, so it stays out.
 func checkMinimumTargets(t *testing.T, window *qt6.QMainWindow) {
 	t.Helper()
 
@@ -467,6 +637,10 @@ func checkMinimumTargets(t *testing.T, window *qt6.QMainWindow) {
 			continue
 		}
 		if widget.FocusPolicy() == qt6.NoFocus {
+			continue
+		}
+		if parent := widget.Parent(); parent != nil && !widget.IsVisible() &&
+			strings.HasPrefix(parent.ObjectName(), "qt_") {
 			continue
 		}
 		widget.EnsurePolished()
@@ -563,6 +737,10 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	typed.TypeToConfirm = projects[0].Name
 	captureDialog(t, s.window.QWidget, dir, "10-confirm-type", typed)
 
+	// The panel of the Activities: one that runs, one that worked, and one that
+	// failed with the notice that leads to its output.
+	captureActivities(t, dir, lightTheme, "13-activities-light")
+
 	// The dark desktop: the same blocks with the palette of Breeze Dark, so a
 	// role that reads on white and disappears on black shows here.
 	qt6.QApplication_SetPalette(testDarkPalette())
@@ -576,6 +754,49 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	settle()
 	saveGrab(t, dark.window, dir, "11-detail-dark")
 	captureDialog(t, dark.window.QWidget, dir, "12-confirm-dark", confirm)
+	captureActivities(t, dir, darkTheme, "15-activities-dark")
+}
+
+// captureActivities writes the PNGs of the panel of the Activities in one
+// theme: an Activity that runs with its output growing, one that worked, and
+// one that failed with the notice over the window.
+func captureActivities(t *testing.T, dir string, theme designTheme, name string) {
+	t.Helper()
+
+	log := NewActivityLog()
+	s := newShell(&application{activities: log}, theme)
+	defer s.window.Delete()
+	s.show()
+	settle()
+
+	projects := screenshotProjects()
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: projects})
+	s.open(projects[1])
+	settle()
+
+	log.Push(started("cap-run", "shop", "", compose.ActionUp))
+	for _, line := range []string{
+		"[+] Running 2/2",
+		" ✔ Container shop-db-1  Started",
+		" ✔ Container shop-web-1  Started",
+	} {
+		log.Push(output("cap-run", "shop", "", compose.ActionUp, line, false))
+	}
+	log.Push(started("cap-ok", "vakt", "web", compose.ActionRestart))
+	log.Push(output("cap-ok", "vakt", "web", compose.ActionRestart, " ✔ Container vakt-web-1  Restarted", false))
+	log.Push(finished("cap-ok", "vakt", "web", compose.ActionRestart, "", ""))
+	// The running Activity is the one on screen: it is what the user follows
+	// while the command runs. The pushes queue their refresh, so the page must
+	// have its rows before the choice.
+	settle()
+	s.bottom.Show("cap-run")
+	saveGrab(t, s.window, dir, name)
+
+	log.Push(started("cap-bad", "blog", "", compose.ActionPull))
+	log.Push(output("cap-bad", "blog", "", compose.ActionPull, "Pulling web...", false))
+	log.Push(output("cap-bad", "blog", "", compose.ActionPull, "error: no such image", true))
+	log.Push(finished("cap-bad", "blog", "", compose.ActionPull, "error: no such image\n", "error: no such image"))
+	saveGrab(t, s.window, dir, name+"-failure")
 }
 
 // testDarkPalette is the palette of Breeze Dark: the offscreen backend has no

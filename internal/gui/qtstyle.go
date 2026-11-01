@@ -67,6 +67,9 @@ QFrame#toast {
 QLabel#toastText {
     padding: %dpx %dpx;
 }
+QPlainTextEdit#activityOutput {
+    padding: %dpx %dpx;
+}
 QLabel#statusActive {
     color: %s;
 }
@@ -99,6 +102,7 @@ QWidget#projectRowSelected QLabel {
 		headingFontSize,
 		spaceXS,
 		spaceS, spaceM,
+		spaceS, spaceS,
 		theme.color(roleStatusActive),
 		theme.color(roleStatusPartial),
 		theme.color(roleStatusFault),

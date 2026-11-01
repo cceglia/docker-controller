@@ -34,14 +34,19 @@ type shell struct {
 	splitter *qt6.QSplitter
 	sidebar  *qt6.QWidget
 	detail   *qt6.QWidget
+	// column is the vertical splitter of the detail and of the bottom panel: the
+	// two share the right column, and the panel takes no room while it is closed.
+	column *qt6.QSplitter
 
 	list     *projectList
 	panel    *detailPanel
+	bottom   *bottomPanel
 	add      *qt6.QPushButton
 	settings *qt6.QPushButton
 	back     *qt6.QPushButton
 	// notice shows a message in sovrimpressione, off the commands. A refused
-	// Action shows its Italian message there.
+	// Action shows its Italian message there, a failed Activity the same with
+	// the way to its output.
 	notice *toast
 
 	// selected is the compose name of the open Project, "" when none is open.
@@ -168,21 +173,44 @@ func (s *shell) do(action compose.Action) {
 }
 
 // showNotice puts a message in the notice of the window. A refused Action shows
-// its reason here, and the failed Activity of the next ticket uses the same one.
+// its reason here.
 func (s *shell) showNotice(message string) {
+	s.showNoticeAction(message, "", nil)
+}
+
+// showNoticeAction puts a message in the notice together with a button that
+// runs action. A failed Activity uses it to lead to its output. An empty label
+// or a nil action shows the message alone.
+func (s *shell) showNoticeAction(message, label string, action func()) {
 	if s.notice == nil {
 		return
 	}
-	s.notice.show(message)
+	s.notice.showAction(message, label, action)
 }
 
 // buildPages puts the two layouts in the stack of the responsive view and
 // starts on the wide one.
 func (s *shell) buildPages() {
+	// The detail and the bottom panel share the right column: the splitter is
+	// vertical, so the handle between them sets how much of the output the user
+	// wants without leaving the Project.
+	s.column = qt6.NewQSplitter3(qt6.Vertical)
+	s.column.SetChildrenCollapsible(false)
+	s.column.AddWidget(s.detail)
+	s.bottom = newBottomPanel(s.app.activities, s.column)
+	s.bottom.onFailure = func(a Activity) {
+		s.showNoticeAction(ActivityToastText(a), showOutputText, func() { s.bottom.Show(a.ID) })
+	}
+	s.column.AddWidget(s.bottom.widget)
+	s.column.SetStretchFactor(0, 1)
+	// The panel is built closed: Qt shows the children of a splitter, so the
+	// state of the panel must win.
+	s.bottom.Close()
+
 	s.splitter = qt6.NewQSplitter3(qt6.Horizontal)
 	s.splitter.SetChildrenCollapsible(false)
 	s.splitter.AddWidget(s.sidebar)
-	s.splitter.AddWidget(s.detail)
+	s.splitter.AddWidget(s.column.QWidget)
 	s.splitter.SetStretchFactor(1, 1)
 	s.splitter.SetSizes([]int{300, windowWidth - 300})
 
@@ -202,9 +230,9 @@ func (s *shell) buildPages() {
 	s.narrowDetailLayout = qt6.NewQVBoxLayout(s.narrowDetailPage)
 	s.narrowDetailLayout.SetContentsMargins(spaceS, spaceS, spaceS, 0)
 	s.narrowDetailLayout.SetSpacing(0)
-	// The way back sits above the detail and never moves: only the detail
-	// passes from the splitter to this page. It keeps its own width, so the
-	// button reads as an action and not as a title bar.
+	// The way back sits above the detail and never moves: only the column of the
+	// detail and of the panel passes from the splitter to this page. It keeps
+	// its own width, so the button reads as an action and not as a title bar.
 	s.narrowDetailLayout.AddWidget3(s.back.QWidget, 0, qt6.AlignLeft)
 
 	s.narrowListPage = qt6.NewQWidget2()
@@ -235,18 +263,18 @@ func (s *shell) applyWidth() {
 
 	if narrow {
 		s.narrowListLayout.AddWidget(s.sidebar)
-		s.narrowDetailLayout.AddWidget(s.detail)
+		s.narrowDetailLayout.AddWidget(s.column.QWidget)
 		s.back.SetVisible(true)
-		s.panel.linkAfter(s.tabEntry())
+		s.linkTabChain()
 		s.showNarrowPage()
 		return
 	}
 
 	s.back.SetVisible(false)
 	s.splitter.AddWidget(s.sidebar)
-	s.splitter.AddWidget(s.detail)
+	s.splitter.AddWidget(s.column.QWidget)
 	s.splitter.SetSizes([]int{300, max(s.window.Width()-300, 300)})
-	s.panel.linkAfter(s.tabEntry())
+	s.linkTabChain()
 	s.pages.SetCurrentWidget(s.widePage)
 }
 
@@ -272,7 +300,7 @@ func (s *shell) showList() {
 func (s *shell) open(project compose.Project) {
 	s.selected = project.Name
 	s.panel.set(project, s.snapshot.DockerReachable, s.snapshot.Loading)
-	s.panel.linkAfter(s.tabEntry())
+	s.linkTabChain()
 	if s.narrow {
 		s.showNarrowPage()
 	}
@@ -299,7 +327,7 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 		return
 	}
 	s.panel.set(project, snapshot.DockerReachable, snapshot.Loading)
-	s.panel.linkAfter(s.tabEntry())
+	s.linkTabChain()
 }
 
 // tabEntry is the control the tab chain reaches the detail from: the way back
@@ -310,6 +338,18 @@ func (s *shell) tabEntry() *qt6.QWidget {
 		return s.back.QWidget
 	}
 	return s.settings.QWidget
+}
+
+// linkTabChain puts the detail and the panel after the entry the width chooses,
+// so the keyboard reaches them in the reading order and not in the order of
+// creation.
+func (s *shell) linkTabChain() {
+	s.panel.linkAfter(s.tabEntry())
+	prev := s.panel.lastControl()
+	if prev == nil {
+		prev = s.tabEntry()
+	}
+	s.bottom.linkAfter(prev)
 }
 
 // projectOf finds a Project of the snapshot by its compose name.

@@ -9,6 +9,10 @@ const (
 	activityPageTitle = "Attività"
 	// logPageTitle is the title of the page of the logs.
 	logPageTitle = "Log"
+	// emptyLogText is the line of the Log tab until the ticket that streams it.
+	emptyLogText = "Nessun log aperto."
+	// panelAccessibleName is what a screen reader calls the bottom panel.
+	panelAccessibleName = "Attività e Log"
 )
 
 // panelActivity returns the Activity the bottom panel must open on after a

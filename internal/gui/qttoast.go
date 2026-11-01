@@ -10,6 +10,10 @@ import (
 // the message.
 const noticeAccessibleName = "Avviso"
 
+// showOutputText is the button of the notice of a failure: it opens the output
+// of the failed Activity.
+const showOutputText = "Mostra output"
+
 // toastDuration is how long a message stays on screen: the six seconds of the
 // old view, long enough to read it without a click.
 const toastDuration = 6 * time.Second
@@ -23,16 +27,22 @@ const toastMargin = spaceL
 
 // toast is the notice in sovrimpressione of the shell: one text over the
 // content, at the top right of the window. It sits clear of the commands at the
-// bottom of the column and of the way back at the top left. It takes no focus,
-// and a click passes through it, so it never takes a command away.
+// bottom of the column and of the way back at the top left.
+//
+// A message alone takes no focus and lets a click through, so it never takes a
+// command away. A message with an action carries a button: the button takes the
+// focus and the click, because it is the one control of the notice.
 //
 // The shell owns one toast. A refused Action shows its Italian message here,
-// and the failed Activity of the next ticket uses the same notice.
+// and a failed Activity shows the message with the way to its output.
 type toast struct {
-	host  *qt6.QWidget
-	frame *qt6.QFrame
-	label *qt6.QLabel
-	timer *qt6.QTimer
+	host   *qt6.QWidget
+	frame  *qt6.QFrame
+	label  *qt6.QLabel
+	action *qt6.QPushButton
+	timer  *qt6.QTimer
+	// run is what the button of the notice does, nil for a message alone.
+	run func()
 }
 
 // newToast builds the notice over host. The notice stays hidden until a message
@@ -44,20 +54,35 @@ func newToast(host *qt6.QWidget) *toast {
 	setObjectName(t.frame.QWidget, "toast")
 	t.frame.SetAccessibleName(noticeAccessibleName)
 	t.frame.SetFocusPolicy(qt6.NoFocus)
-	// A click on the notice reaches the content under it: the notice must not
-	// take a click away from a command.
+	// A click on a message alone reaches the content under it: the notice must
+	// not take a click away from a command.
 	t.frame.SetAttribute(qt6.WA_TransparentForMouseEvents)
 	t.frame.SetMaximumWidth(toastWidthLimit)
 	t.frame.SetVisible(false)
 
 	layout := qt6.NewQHBoxLayout(t.frame.QWidget)
-	layout.SetContentsMargins(0, 0, 0, 0)
-	layout.SetSpacing(0)
+	layout.SetContentsMargins(spaceXS, spaceXS, spaceXS, spaceXS)
+	layout.SetSpacing(spaceS)
 
 	t.label = qt6.NewQLabel3("")
 	setObjectName(t.label.QWidget, "toastText")
 	t.label.SetWordWrap(true)
-	layout.AddWidget(t.label.QWidget)
+	layout.AddWidget2(t.label.QWidget, 1)
+
+	t.action = qt6.NewQPushButton3("")
+	setObjectName(t.action.QWidget, "toastAction")
+	t.action.SetVisible(false)
+	// The handler is registered once: a message that arrives while the previous
+	// one is on screen must not stack a second handler on the button.
+	t.action.OnClicked(func() {
+		run := t.run
+		t.hide()
+		if run != nil {
+			run()
+		}
+	})
+	keepTarget(t.action.QWidget)
+	layout.AddWidget3(t.action.QWidget, 0, qt6.AlignVCenter)
 
 	t.timer = qt6.NewQTimer2(t.frame.QWidget.QObject)
 	t.timer.SetSingleShot(true)
@@ -66,12 +91,31 @@ func newToast(host *qt6.QWidget) *toast {
 	return t
 }
 
-// show puts message in the notice for the duration and moves it out of the way
-// of the commands. An empty message shows nothing.
+// show puts message in the notice for the duration, without an action.
 func (t *toast) show(message string) {
+	t.showAction(message, "", nil)
+}
+
+// showAction puts message in the notice for the duration together with a button
+// that runs action. An empty label or a nil action shows the message alone. An
+// empty message shows nothing.
+func (t *toast) showAction(message, label string, action func()) {
 	if t.frame == nil || message == "" {
 		return
 	}
+
+	t.run = nil
+	if label != "" && action != nil {
+		t.run = action
+		t.action.SetText(label)
+		t.action.SetAccessibleName(label)
+		t.action.SetVisible(true)
+		t.frame.SetAttribute2(qt6.WA_TransparentForMouseEvents, false)
+	} else {
+		t.action.SetVisible(false)
+		t.frame.SetAttribute2(qt6.WA_TransparentForMouseEvents, true)
+	}
+
 	t.label.SetText(message)
 	t.frame.SetAccessibleDescription(message)
 	t.frame.AdjustSize()

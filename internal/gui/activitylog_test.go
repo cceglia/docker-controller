@@ -100,6 +100,24 @@ func TestActivityToastText(t *testing.T) {
 			Activity{State: ActivityFailed, Project: "shop", Service: "db", Kind: compose.ActionDownService, Summary: "exit 1"},
 			"Down su shop/db non riuscito: exit 1",
 		},
+		{
+			"an unknown kind keeps its name",
+			Activity{State: ActivityFailed, Project: "shop", Kind: compose.ActionKind("inspect"), Summary: "boom"},
+			"inspect su shop non riuscito: boom",
+		},
+		{
+			// The notice carries one line: the summary the backend chose, not
+			// the whole stderr that the output of the Activity keeps.
+			"the notice shows the summary and not the error",
+			Activity{
+				State:   ActivityFailed,
+				Project: "shop",
+				Kind:    compose.ActionBuild,
+				Error:   "progress 1\nprogress 2\nerror: no such image\n",
+				Summary: "error: no such image",
+			},
+			"Build su shop non riuscito: error: no such image",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := ActivityToastText(tc.activity); got != tc.want {
@@ -119,6 +137,7 @@ func TestActivityOutcome(t *testing.T) {
 		{"a success names the Action", Activity{State: ActivityOK, Project: "shop", Kind: compose.ActionUp}, "Up su shop riuscito."},
 		{"a failure shows the error", Activity{State: ActivityFailed, Project: "shop", Kind: compose.ActionUp, Error: "boom"}, "boom"},
 		{"the error loses its last newline", Activity{State: ActivityFailed, Project: "shop", Kind: compose.ActionUp, Error: "a\nb\n"}, "a\nb"},
+		{"a state the view does not know has none", Activity{State: ActivityState("queued"), Project: "shop", Kind: compose.ActionUp}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := ActivityOutcome(tc.activity); got != tc.want {
