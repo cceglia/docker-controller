@@ -8,6 +8,7 @@ require (
 	github.com/diamondburned/gotk4/pkg v0.4.2-0.20261031093702-169e0f82bca8
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/golang-migrate/migrate/v4 v4.20.1
+	github.com/mappu/miqt v0.15.0
 	modernc.org/sqlite v1.61.0
 )
 

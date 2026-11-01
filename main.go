@@ -17,7 +17,7 @@ func main() {
 	}
 }
 
-// run wires the database, the compose Manager and the GTK4 shell, then blocks
+// run wires the database, the compose Manager and the Qt shell, then blocks
 // until the application quits.
 func run() error {
 	dbPath, err := db.DefaultPath()
@@ -33,7 +33,7 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// The log of the session lives in the GUI package, without GTK: the Manager
+	// The log of the session lives in the GUI package, without Qt: the Manager
 	// pushes its events into it and never waits for the window. The notifier
 	// reads the same events and shows the notifications they deserve.
 	activities := gui.NewActivityLog()

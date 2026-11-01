@@ -196,6 +196,24 @@ func (e *ProjectEdit) SetGroupOption(choices []string, index int) {
 	e.Group = groupAt(choices, index)
 }
 
+// groupLabels is the text of each option of the Group field: no Group reads as
+// a sentence, every Group keeps its name, and the last option asks for a new
+// Group.
+func groupLabels(choices []string) []string {
+	labels := make([]string, 0, len(choices)+1)
+	for _, choice := range choices {
+		if choice == "" {
+			labels = append(labels, NoGroupText)
+			continue
+		}
+		labels = append(labels, choice)
+	}
+	if len(labels) == 0 {
+		labels = append(labels, NoGroupText)
+	}
+	return append(labels, NewGroupText)
+}
+
 // ProfileChoices lists the Profiles the form offers: the ones the compose files
 // of the Project define, in their order, without blanks and duplicates. It
 // never returns nil.

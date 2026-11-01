@@ -10,15 +10,15 @@ import (
 
 // Notifier turns Activity events into desktop notifications. It feeds
 // tray.Notifier, which decides what deserves one, names the Project as the list
-// does and hands the result to the Sender. It has no GTK, so a test drives it
+// does and hands the result to the Sender. It has no Qt, so a test drives it
 // with synthetic events and a Sender that is not D-Bus. It is safe for
-// concurrent use: the Manager delivers the events and the GTK loop launches the
-// tray Actions.
+// concurrent use: the Manager delivers the events and the Qt thread writes the
+// names of the last snapshot.
 type Notifier struct {
 	// policy decides which events deserve a notification.
 	policy tray.Notifier
 	sender notify.Sender
-	// mu guards labels, which the GTK loop writes and the Manager reads.
+	// mu guards labels, which the Qt thread writes and the Manager reads.
 	mu     sync.Mutex
 	labels map[string]string // Display name by Project
 }
