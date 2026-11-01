@@ -45,7 +45,10 @@ type shell struct {
 	usage    *usageFeed
 	add      *qt6.QPushButton
 	settings *qt6.QPushButton
-	back     *qt6.QPushButton
+	// quit closes the application. Without a tray it is the way out of a window
+	// that has no other one.
+	quit *qt6.QPushButton
+	back *qt6.QPushButton
 	// notice shows a message in sovrimpressione, off the commands. A refused
 	// Action shows its Italian message there, a failed Activity the same with
 	// the way to its output.
@@ -88,12 +91,13 @@ func newShell(app *application, theme designTheme) *shell {
 		s.notice.place()
 	})
 
-	// The tab order follows the reading order: the list, the two actions of the
-	// column, the detail, then the way back of the narrow view. The panel adds
-	// its own controls after the entry the width chooses.
+	// The tab order follows the reading order: the list, the actions of the
+	// column, then the way back of the narrow view. The panel adds its own
+	// controls after the entry the width chooses.
 	qt6.QWidget_SetTabOrder(s.list.widget.QWidget, s.add.QWidget)
 	qt6.QWidget_SetTabOrder(s.add.QWidget, s.settings.QWidget)
-	qt6.QWidget_SetTabOrder(s.settings.QWidget, s.back.QWidget)
+	qt6.QWidget_SetTabOrder(s.settings.QWidget, s.quit.QWidget)
+	qt6.QWidget_SetTabOrder(s.quit.QWidget, s.back.QWidget)
 
 	return s
 }
@@ -110,8 +114,17 @@ func (s *shell) show() {
 	s.applyWidth()
 }
 
+// present shows the window and brings it to the front: the left click of the
+// tray icon and "Mostra finestra" land here. The window manager may still
+// refuse the focus, so the window is at least restored and raised.
+func (s *shell) present() {
+	s.window.ShowNormal()
+	s.window.Raise()
+	s.window.ActivateWindow()
+}
+
 // buildSidebar builds the column of the Projects: the title, the list that
-// takes the height and the two actions of later tickets.
+// takes the height and the actions of the column, the way out last.
 func (s *shell) buildSidebar() {
 	s.sidebar = qt6.NewQWidget2()
 	s.sidebar.SetMinimumWidth(260)
@@ -151,6 +164,22 @@ func (s *shell) buildSidebar() {
 	actions.AddWidget(s.settings.QWidget)
 
 	layout.AddLayout(actions.QLayout)
+
+	// "Esci" has a row of its own, so the three labels never squeeze the column
+	// and the list keeps its width. A later ticket may make the close of the
+	// window hide it, so the application needs one plain way out of its own.
+	quitRow := qt6.NewQHBoxLayout2()
+	quitRow.SetSpacing(spaceS)
+	quitRow.AddStretch()
+
+	s.quit = qt6.NewQPushButton3("Esci")
+	s.quit.SetAccessibleName("Esci")
+	s.quit.SetToolTip("Chiude l'applicazione.")
+	s.quit.OnClicked(func() { s.app.quit() })
+	keepTarget(s.quit.QWidget)
+	quitRow.AddWidget(s.quit.QWidget)
+
+	layout.AddLayout(quitRow.QLayout)
 }
 
 // buildDetail builds the panel of the right. The panel starts at rest, with the
@@ -401,7 +430,7 @@ func (s *shell) tabEntry() *qt6.QWidget {
 	if s.narrow {
 		return s.back.QWidget
 	}
-	return s.settings.QWidget
+	return s.quit.QWidget
 }
 
 // linkTabChain puts the detail and the panel after the entry the width chooses,

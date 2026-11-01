@@ -15,6 +15,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/tray"
 )
 
 // TestShellOffscreen builds the empty window, shows it with the offscreen
@@ -53,7 +54,7 @@ func TestShellOffscreen(t *testing.T) {
 	if s.list == nil || s.list.widget == nil {
 		t.Fatal("the list of the Projects is not wired")
 	}
-	if s.add == nil || s.settings == nil || s.back == nil {
+	if s.add == nil || s.settings == nil || s.quit == nil || s.back == nil {
 		t.Fatal("an action button is not wired")
 	}
 	if got := app.StyleSheet(); got == "" {
@@ -71,6 +72,7 @@ func TestShellOffscreen(t *testing.T) {
 	checkBottomPanel(t)
 	checkLogs(t)
 	checkUsage(t, s)
+	checkTray(t)
 	if dir := os.Getenv("SHOT_DIR"); dir != "" {
 		captureScreens(t, dir, app)
 	}
@@ -1698,6 +1700,106 @@ func fakeProject() compose.Project {
 // checked as well, because the window can show it later: the way back of the
 // narrow view waits hidden at wide width. The chrome Qt hides inside its own
 // containers is not a control of this window, so it stays out.
+// checkTray builds the adapter of the tray without showing the icon, so the
+// menu, the tooltip, the icon and the two commands run with no desktop. It also
+// checks the guard of the availability and the rule that rebuilds the menu only
+// when the tree changes.
+func checkTray(t *testing.T) {
+	t.Helper()
+
+	// The offscreen backend has no tray: the application must start without one.
+	if got := startTray(compose.Snapshot{Loading: true}, nil, nil, nil); got != nil {
+		got.icon.Hide()
+		t.Error("startTray() found a tray with no desktop")
+	}
+
+	var shown, quit int
+	var chosen trayNode
+	adapter := newTrayAdapter(
+		func() { shown++ },
+		func() { quit++ },
+		func(node trayNode) { chosen = node },
+	)
+	defer adapter.icon.Delete()
+	defer adapter.menu.Delete()
+
+	snapshot := compose.Snapshot{
+		DockerReachable: true,
+		Projects: []compose.Project{{
+			Name:     "shop",
+			Status:   compose.StatusActive,
+			Services: []compose.Service{{Name: "web"}},
+		}},
+	}
+	adapter.apply(snapshot)
+
+	if got := adapter.icon.ToolTip(); got != "Docker Controller · Docker risponde" {
+		t.Errorf("tooltip = %q, want the state of Docker in words", got)
+	}
+	if got := adapter.icon.Icon(); got == nil || got.IsNull() {
+		t.Error("the tray has no icon")
+	}
+
+	// The Project, a separator, "Mostra finestra" and "Esci".
+	actions := adapter.menu.Actions()
+	if len(actions) != 4 {
+		t.Fatalf("menu = %d entries, want 4", len(actions))
+	}
+	if got := actions[0].Text(); got != "● shop" {
+		t.Errorf("first entry = %q, want the Project", got)
+	}
+	if !actions[1].IsSeparator() {
+		t.Error("second entry is not a separator")
+	}
+	if got := actions[2].Text(); got != "Mostra finestra" {
+		t.Errorf("third entry = %q, want Mostra finestra", got)
+	}
+	if got := actions[3].Text(); got != "Esci" {
+		t.Errorf("last entry = %q, want Esci", got)
+	}
+
+	actions[2].Trigger()
+	if shown != 1 {
+		t.Errorf("Mostra finestra ran %d times, want 1", shown)
+	}
+	actions[3].Trigger()
+	if quit != 1 {
+		t.Errorf("Esci ran %d times, want 1", quit)
+	}
+
+	// A leaf of the tree reaches its handler the same way the menu does.
+	adapter.choose(trayNode{
+		Label:   "Up",
+		Enabled: true,
+		Action:  &compose.Action{Project: "shop", Kind: compose.ActionUp},
+	})
+	if chosen.Action == nil || *chosen.Action != (compose.Action{Project: "shop", Kind: compose.ActionUp}) {
+		t.Errorf("chosen entry = %+v, want Up on shop", chosen)
+	}
+
+	// The same snapshot keeps the menu: a rebuild would replace its entries.
+	first := actions[0].UnsafePointer()
+	adapter.apply(snapshot)
+	if got := adapter.menu.Actions()[0].UnsafePointer(); got != first {
+		t.Error("an unchanged snapshot rebuilt the menu")
+	}
+
+	// A Docker that stops answering changes the icon, the tooltip and the menu.
+	adapter.apply(compose.Snapshot{DockerReachable: false})
+	if adapter.iconKind != tray.IconOffline {
+		t.Errorf("icon = %d, want the offline variant", adapter.iconKind)
+	}
+	if got := adapter.icon.ToolTip(); got != "Docker Controller · Docker non risponde" {
+		t.Errorf("tooltip = %q, want the offline state", got)
+	}
+	if got := adapter.menu.Actions()[0].UnsafePointer(); got == first {
+		t.Error("a changed snapshot kept the old menu")
+	}
+	if len(adapter.submenus) != 0 {
+		t.Errorf("an offline tree left %d submenus behind, want none", len(adapter.submenus))
+	}
+}
+
 func checkMinimumTargets(t *testing.T, window *qt6.QMainWindow) {
 	t.Helper()
 

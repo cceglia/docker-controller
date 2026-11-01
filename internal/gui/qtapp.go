@@ -41,8 +41,8 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 	qt6.QGuiApplication_SetDesktopFileName(appID)
 	// The display name is what the window list of the desktop reads.
 	qt6.QGuiApplication_SetApplicationDisplayName(windowTitle)
-	// Closing the window ends the application. The tray, and the choice to hide
-	// the window instead, arrive in a later ticket.
+	// Closing the window ends the application. Hiding it in the tray, and the
+	// choice of what the close does, arrive in a later ticket.
 	qt6.QGuiApplication_SetQuitOnLastWindowClosed(true)
 
 	// The window colour of the desktop palette picks the palette of the roles
@@ -53,6 +53,10 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 	a.qt.SetStyleSheet(applicationStyleSheet(theme))
 
 	a.shell = newShell(a, theme)
+	// The tray comes before the first snapshot and before the window shows, so
+	// the icon is on the panel while the list is still loading. Without a tray
+	// the field stays nil and the window keeps "Esci" and "Impostazioni".
+	a.tray = startTray(a.snapshot, a.present, a.quit, a.chooseTray)
 	a.watch(ctx)
 	a.shell.show()
 
@@ -87,6 +91,11 @@ type application struct {
 	notifier   *Notifier
 	// shell is the window of the application.
 	shell *shell
+	// tray is the icon on the panel, nil when the desktop has no tray.
+	tray *trayAdapter
+	// question is the modal question of a destructive Action chosen in the tray
+	// while it is open, so a second click cannot open a second one.
+	question *confirmDialog
 	// snapshot is the last one applied.
 	snapshot compose.Snapshot
 }
@@ -128,4 +137,9 @@ func (a *application) apply(snapshot compose.Snapshot) {
 		a.notifier.SetProjects(snapshot.Projects)
 	}
 	a.shell.apply(snapshot)
+	// The tray follows the same snapshot as the window: the icon, the tooltip
+	// and, only when the tree changed, the menu.
+	if a.tray != nil {
+		a.tray.apply(snapshot)
+	}
 }
