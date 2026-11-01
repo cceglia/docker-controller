@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -61,6 +62,7 @@ func TestShellOffscreen(t *testing.T) {
 
 	checkMinimumTargets(t, s.window)
 	checkDetailPanel(t, s)
+	checkEditForm(t, s)
 	checkActions(t, s)
 	checkConfirmDialog(t, s)
 	checkBottomPanel(t)
@@ -317,6 +319,303 @@ func actionKind(views []ActionView, kind compose.ActionKind) (ActionView, bool) 
 		}
 	}
 	return ActionView{}, false
+}
+
+// checkEditForm drives the form of the settings: the command of the data opens
+// it with the saved values, the Group field proposes the Groups in use, a
+// snapshot that arrives while it is open keeps the text the user typed, a
+// refusal writes its message under the field, and Salva and Annulla leave the
+// form. It is a step of the smoke test, so the process still has one
+// QApplication.
+func checkEditForm(t *testing.T, s *shell) {
+	t.Helper()
+
+	shop := fakeProject()
+	shop.Profiles = []string{"debug", "metrics"}
+	other := shop
+	other.Name = "vakt"
+	other.DisplayName = ""
+	other.Group = "Lavoro"
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{shop, other}})
+	s.open(shop)
+	settle()
+
+	// The command of the data opens the form in its place.
+	data := blockNamed(s.panel, dataTitle)
+	if data == nil {
+		t.Fatal("the detail shows no data of the Project")
+	}
+	commands := widgetsNamed(data, "editButton")
+	if len(commands) != 1 {
+		t.Fatalf("the data carries %d commands to open the form, want 1", len(commands))
+	}
+	qt6.UnsafeNewQPushButton(commands[0].UnsafePointer()).Click()
+	settle()
+
+	if blockNamed(s.panel, editTitle) == nil {
+		t.Fatal("the command opens no form")
+	}
+	if blockNamed(s.panel, dataTitle) != nil {
+		t.Error("the form does not replace the data of the Project")
+	}
+
+	// The form starts on the saved values: the Display name, the Group and the
+	// active Profiles.
+	if got := s.panel.edit.name.Text(); got != shop.DisplayName {
+		t.Errorf("the Display name field holds %q, want the saved %q", got, shop.DisplayName)
+	}
+	if got := s.panel.edit.group.CurrentText(); got != shop.Group {
+		t.Errorf("the Group field holds %q, want the saved %q", got, shop.Group)
+	}
+	// The box proposes the Groups in use, without the empty option: an empty box
+	// is no Group, and the hint of the box says so.
+	group := s.panel.edit.group
+	if got, want := itemsOf(group), GroupSuggestions(GroupChoices(shop.Group, []compose.Project{shop, other})); !slices.Equal(got, want) {
+		t.Errorf("the Group field proposes %v, want %v", got, want)
+	}
+	if !slices.Contains(itemsOf(group), other.Group) {
+		t.Errorf("the Group field does not propose the Group in use %q", other.Group)
+	}
+	if got := group.PlaceholderText(); got != NoGroupText {
+		t.Errorf("an empty Group box says %q, want %q", got, NoGroupText)
+	}
+	if !s.panel.edit.checks["debug"].IsChecked() {
+		t.Error("the form leaves the active Profile debug off")
+	}
+	if s.panel.edit.checks["metrics"].IsChecked() {
+		t.Error("the form turns the idle Profile metrics on")
+	}
+
+	// The form is one step of the keyboard: the tab order follows the reading
+	// order, and the focus starts on its first field.
+	if got, want := formOrder(s.panel, shop), []string{
+		displayNameLabelText, groupLabelText, "debug", "metrics", cancelText, saveText,
+	}; !slices.Equal(got, want) {
+		t.Errorf("the tab order of the form is %v, want %v", got, want)
+	}
+	if got := s.window.FocusWidget(); got == nil || got.UnsafePointer() != s.panel.edit.name.QWidget.UnsafePointer() {
+		t.Error("the form does not start with the focus on its first field")
+	}
+
+	// A snapshot that arrives while the form is open never overwrites the text
+	// the user typed: the form stays and the data waits.
+	s.panel.edit.name.SetText("Negozio nuovo")
+	s.panel.edit.checks["metrics"].SetChecked(true)
+	group.SetCurrentText("Lavoro")
+	settle()
+	moved := shop
+	moved.Group = "Magazzino"
+	moved.Running = shop.Running - 1
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{moved, other}})
+	settle()
+	if blockNamed(s.panel, editTitle) == nil {
+		t.Fatal("the snapshot closes the form")
+	}
+	if got := s.panel.edit.name.Text(); got != "Negozio nuovo" {
+		t.Errorf("the snapshot overwrote the Display name with %q", got)
+	}
+	if got := s.panel.edit.group.CurrentText(); got != "Lavoro" {
+		t.Errorf("the snapshot overwrote the Group with %q", got)
+	}
+	if !s.panel.edit.edit.ProfileOn("metrics") {
+		t.Error("the snapshot turned the Profile the user checked off")
+	}
+
+	// A refused save keeps the form open and writes the Italian reason under the
+	// Display name field, which repeats it in its accessible name.
+	var savedName string
+	var saved compose.Settings
+	s.panel.onSave = func(name string, settings compose.Settings) {
+		savedName, saved = name, settings
+		s.panel.saveDone(compose.ErrUnknownProject)
+	}
+	s.panel.edit.save.Click()
+	settle()
+
+	if savedName != shop.Name {
+		t.Errorf("the save reaches %q, want %q", savedName, shop.Name)
+	}
+	if saved.DisplayName == nil || *saved.DisplayName != "Negozio nuovo" {
+		t.Errorf("the save sends %v, want %q", saved.DisplayName, "Negozio nuovo")
+	}
+	if saved.Group == nil || *saved.Group != "Lavoro" {
+		t.Errorf("the save sends %v, want %q", saved.Group, "Lavoro")
+	}
+	if want := []string{"debug", "metrics"}; !slices.Equal(saved.Profiles, want) {
+		t.Errorf("the save sends the Profiles %v, want %v", saved.Profiles, want)
+	}
+	form := blockNamed(s.panel, editTitle)
+	if form == nil {
+		t.Fatal("a refused save closes the form")
+	}
+	message := UserError(compose.ErrUnknownProject).Error()
+	if got := errorUnder(form); got != message {
+		t.Errorf("the refusal reads %q under the field, want %q", got, message)
+	}
+	if got := s.panel.edit.name.AccessibleName(); !strings.Contains(got, message) {
+		t.Errorf("the field is named %q, want it to repeat %q", got, message)
+	}
+
+	// A save that works closes the form and gives the focus back to the command
+	// that opened it.
+	s.panel.onSave = func(string, compose.Settings) { s.panel.saveDone(nil) }
+	s.panel.edit.save.Click()
+	settle()
+	if blockNamed(s.panel, editTitle) != nil {
+		t.Error("a save that worked leaves the form open")
+	}
+	modify := widgetsNamed(blockNamed(s.panel, dataTitle), "editButton")
+	if len(modify) != 1 {
+		t.Fatal("the data carries no command to open the form")
+	}
+	if got := s.window.FocusWidget(); got == nil || got.UnsafePointer() != modify[0].UnsafePointer() {
+		t.Error("the closing form does not give the focus back to the command that opened it")
+	}
+
+	// The snapshot after the save brings the new values, so the list and the
+	// detail never need a restart.
+	after := moved
+	after.DisplayName = "Negozio nuovo"
+	after.Group = "Lavoro"
+	after.ActiveProfiles = []string{"debug", "metrics"}
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{after, other}})
+	settle()
+	if got := s.panel.shown.project.DisplayName; got != "Negozio nuovo" {
+		t.Errorf("the detail shows the Display name %q after the save, want %q", got, "Negozio nuovo")
+	}
+	if !slices.Contains(listNames(s.list.widget), "Negozio nuovo") {
+		t.Error("the list does not show the new Display name after the save")
+	}
+
+	// Annulla leaves the form and the saved values as they are.
+	s.panel.startEdit()
+	settle()
+	if blockNamed(s.panel, editTitle) == nil {
+		t.Fatal("the form does not open on the saved values")
+	}
+	s.panel.edit.name.SetText("Scartato")
+	s.panel.cancelEdit()
+	settle()
+	if blockNamed(s.panel, editTitle) != nil {
+		t.Error("Annulla leaves the form open")
+	}
+	if got := s.panel.shown.project.DisplayName; got != "Negozio nuovo" {
+		t.Errorf("Annulla changed the Project to %q", got)
+	}
+
+	// A blank Display name clears the setting, so the compose name comes back to
+	// the list and to the detail, as DisplayNameOf says.
+	s.panel.onSave = func(_ string, settings compose.Settings) {
+		saved = settings
+		s.panel.saveDone(nil)
+	}
+	s.panel.startEdit()
+	settle()
+	s.panel.edit.name.SetText("   ")
+	s.panel.edit.save.Click()
+	settle()
+	if saved.DisplayName == nil || *saved.DisplayName != "" {
+		t.Errorf("a blank Display name sends %v, want an empty value", saved.DisplayName)
+	}
+	cleared := after
+	cleared.DisplayName = ""
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{cleared, other}})
+	settle()
+	if got := ProjectName(s.panel.shown.project); got != cleared.Name {
+		t.Errorf("the detail names the Project %q, want the compose name %q", got, cleared.Name)
+	}
+	if !slices.Contains(listNames(s.list.widget), cleared.Name) {
+		t.Errorf("the list does not fall back to the compose name %q", cleared.Name)
+	}
+
+	// The form answers the keyboard: Return saves and Escape cancels from its
+	// fields, without the pointer.
+	s.panel.onSave = func(string, compose.Settings) { s.panel.saveDone(nil) }
+	s.panel.startEdit()
+	settle()
+	s.panel.edit.group.SetFocus()
+	pressKey(s, qt6.Key_Return)
+	settle()
+	if blockNamed(s.panel, editTitle) != nil {
+		t.Error("Return in the Group field does not save the form")
+	}
+	if blockNamed(s.panel, dataTitle) == nil {
+		t.Error("Return leaves no data of the Project")
+	}
+
+	s.panel.startEdit()
+	settle()
+	pressKey(s, qt6.Key_Escape)
+	settle()
+	if blockNamed(s.panel, editTitle) != nil {
+		t.Error("Escape does not cancel the form")
+	}
+
+	s.panel.onSave = s.save
+	checkMinimumTargets(t, s.window)
+}
+
+// pressKey sends a key press to the window, as the keyboard would.
+func pressKey(s *shell, key qt6.Key) {
+	handle := s.window.WindowHandle()
+	if handle == nil {
+		return
+	}
+	event := qt6.NewQKeyEvent(qt6.QEvent__KeyPress, int(key), qt6.NoModifier)
+	qt6.QCoreApplication_SendEvent(handle.QObject, event.QInputEvent.QEvent)
+	event.Delete()
+}
+
+// listNames lists the names the rows of the list show, in their order.
+func listNames(list *qt6.QListWidget) []string {
+	var names []string
+	for i := 0; ; i++ {
+		item := list.Item(i)
+		if item == nil {
+			return names
+		}
+		row := list.ItemWidget(item)
+		for _, label := range widgetsNamed(row, "projectName") {
+			names = append(names, qt6.UnsafeNewQLabel(label.UnsafePointer()).Text())
+		}
+	}
+}
+
+// itemsOf lists the options of an editable box, in their order.
+func itemsOf(box *qt6.QComboBox) []string {
+	items := make([]string, 0, box.Count())
+	for i := 0; i < box.Count(); i++ {
+		items = append(items, box.ItemText(i))
+	}
+	return items
+}
+
+// formOrder is the order the keyboard walks the form in: the labels of the
+// controls that belong to the form, in the order the tab chain follows.
+func formOrder(p *detailPanel, project compose.Project) []string {
+	fields := map[string]bool{
+		displayNameLabelText: true,
+		groupLabelText:       true,
+		cancelText:           true,
+		saveText:             true,
+	}
+	var order []string
+	for _, control := range p.controls {
+		if fields[control.label] || HasProfile(project.Profiles, control.label) {
+			order = append(order, control.label)
+		}
+	}
+	return order
+}
+
+// errorUnder is the message the form shows under the field it concerns.
+func errorUnder(form *qt6.QWidget) string {
+	for _, label := range widgetsNamed(form, "fieldError") {
+		if text := qt6.UnsafeNewQLabel(label.UnsafePointer()).Text(); text != "" {
+			return text
+		}
+	}
+	return ""
 }
 
 // checkConfirmDialog builds the question of Down con volumi and checks the
@@ -1118,6 +1417,15 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	s.panel.setUsage(screenshotUsage(projects[1]))
 	shot("03-detail")
 
+	// The form of the settings, with the Italian reason of a refused save under
+	// its first field: the light theme and the dark one have a shot each.
+	s.panel.startEdit()
+	s.panel.edit.message = UserError(compose.ErrUnknownProject).Error()
+	s.panel.render()
+	shot("18-form-light")
+	s.panel.cancelEdit()
+	settle()
+
 	s.showNotice(ActivityRunningText)
 	shot("04-notice")
 	s.notice.hide()
@@ -1176,6 +1484,13 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	settle()
 	dark.panel.setUsage(screenshotUsage(projects[1]))
 	saveGrab(t, dark.window, dir, "11-detail-dark")
+	// The form of the settings in the dark palette: the message of a refused
+	// save must read on the dark surface too.
+	dark.panel.startEdit()
+	dark.panel.edit.message = UserError(compose.ErrUnknownProject).Error()
+	dark.panel.render()
+	saveGrab(t, dark.window, dir, "19-form-dark")
+	dark.panel.cancelEdit()
 	captureDialog(t, dark.window.QWidget, dir, "12-confirm-dark", confirm)
 	captureActivities(t, dir, darkTheme, "15-activities-dark")
 	captureLogs(t, dir, darkTheme, "17-log-dark")
@@ -1408,6 +1723,8 @@ func screenshotProjects() []compose.Project {
 				service("web", "running"),
 				service("worker", "exited"),
 			},
+			Profiles:       []string{"debug", "metrics", "trace"},
+			ActiveProfiles: []string{"debug", "metrics"},
 		},
 		{
 			Name: "blog", Group: "Lavoro",

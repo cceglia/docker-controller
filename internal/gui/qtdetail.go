@@ -69,6 +69,16 @@ type detailPanel struct {
 	// onAction hands an Action to the shell, which reaches the Manager off the
 	// Qt thread. A nil function launches nothing.
 	onAction func(compose.Action)
+	// onSave hands the values of the form to the shell, which reaches the
+	// Manager off the Qt thread. A nil function closes the form at once.
+	onSave func(string, compose.Settings)
+	// projects are the Projects of the last snapshot: the Group field proposes
+	// the Groups they use.
+	projects []compose.Project
+	// edit is the form of the settings on screen, nil while the detail shows the
+	// data of the Project. A snapshot that arrives while it is open waits, so the
+	// form keeps what the user typed.
+	edit *editForm
 	// onLogs asks the shell to show the logs of a Project, whole or of one of
 	// its Services. A nil function opens nothing.
 	onLogs func(compose.Project, string)
@@ -192,9 +202,9 @@ func (p *detailPanel) set(project compose.Project, dockerReachable, loading bool
 	// The bar of the machine belongs to the detail: with no Project open there
 	// is nothing to measure it for.
 	p.strip.widget.SetVisible(true)
-	if p.question != nil {
-		// The question belongs to the command on screen: the panel keeps it
-		// until the answer, then draws the data that arrived.
+	if p.question != nil || p.edit != nil {
+		// The question belongs to the command on screen and the form holds what
+		// the user typed: the panel keeps both, then draws the data that arrived.
 		p.waitingDraw = true
 		return
 	}
@@ -213,6 +223,9 @@ func (p *detailPanel) clear() {
 	p.waitingDraw = false
 	p.controls = p.controls[:0]
 	p.launching = nil
+	// The form belongs to the Project on screen: it goes with it, so a render of
+	// the next Project never builds it again.
+	p.edit = nil
 	// The figures of a Project that left the screen go with it: the stream
 	// stops, and nothing may stay behind as if it were current.
 	p.usage = nil
@@ -262,7 +275,13 @@ func (p *detailPanel) render() {
 	p.usageRows = make(map[string]*serviceUsageRow)
 
 	p.layout.AddWidget(p.header())
-	p.layout.AddWidget(p.data())
+	// The form of the settings takes the place of the data of the Project: the
+	// rest of the detail stays where the user left it.
+	if p.edit != nil {
+		p.layout.AddWidget(p.editBlock())
+	} else {
+		p.layout.AddWidget(p.data())
+	}
 	if p.shown.project.ComposeMissing {
 		p.layout.AddWidget(p.missing())
 	}
@@ -410,12 +429,23 @@ func (p *detailPanel) header() *qt6.QWidget {
 }
 
 // data is the block of the data of the Project: the Group, the active Profiles
-// and the Compose files. A line without a value stays hidden, so the block
-// never shows a fact with nothing after it.
+// and the Compose files, with the command that opens the form of the settings. A
+// line without a value stays hidden, so the block never shows a fact with
+// nothing after it.
 func (p *detailPanel) data() *qt6.QWidget {
 	project := p.shown.project
 	block, box := detailBlock()
-	block.SetAccessibleName("Dati del Progetto")
+	block.SetAccessibleName(dataTitle)
+
+	heading := qt6.NewQHBoxLayout2()
+	heading.SetSpacing(spaceS)
+	heading.AddWidget3(detailLabel(dataTitle, "detailHeading").QWidget, 0, qt6.AlignVCenter)
+	heading.AddStretch()
+	edit := detailButton(editText, "editButton", "Modifica Nome visualizzato, Gruppo e Profili attivi.", true)
+	edit.OnClicked(func() { p.startEdit() })
+	heading.AddWidget3(edit.QWidget, 0, qt6.AlignVCenter)
+	box.AddLayout2(heading.QLayout, 0)
+	p.controls = append(p.controls, panelControl{widget: edit.QWidget, label: editText})
 
 	box.AddWidget(detailLabel(GroupLine(project.Group), "detailData").QWidget)
 
@@ -714,9 +744,11 @@ func (p *detailPanel) commandLaunched(enabled bool) {
 	p.launching = nil
 }
 
-// settle draws a snapshot that arrived while a question was open.
+// settle draws a snapshot that arrived while a question was open. A form of the
+// settings keeps its place: closing it draws the data that arrived, so a render
+// never takes the form away with the text the user typed.
 func (p *detailPanel) settle() {
-	if !p.visible || !p.waitingDraw {
+	if !p.visible || !p.waitingDraw || p.edit != nil {
 		return
 	}
 	p.render()

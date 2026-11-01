@@ -156,6 +156,7 @@ func (s *shell) buildSidebar() {
 func (s *shell) buildDetail() {
 	s.panel = newDetailPanel(s.theme)
 	s.panel.onAction = s.do
+	s.panel.onSave = s.save
 	s.detail = s.panel.widget
 	// The figures of the machine reach the panel on the Qt thread, and only
 	// while the Project on screen has a Container to measure.
@@ -181,6 +182,23 @@ func (s *shell) do(action compose.Action) {
 			}
 			s.panel.actionDone()
 		})
+	}()
+}
+
+// save hands the settings of the form to the Manager off the Qt thread: the
+// database write must not freeze the window. The result comes back on the Qt
+// thread, where the panel keeps the form open on a refusal or closes it, and the
+// snapshot the Manager publishes brings the new values to the list and the
+// detail.
+func (s *shell) save(name string, settings compose.Settings) {
+	manager := s.app.manager
+	if manager == nil {
+		s.panel.saveDone(nil)
+		return
+	}
+	go func() {
+		err := manager.UpdateSettings(s.app.ctx, name, settings)
+		mainthread.Start(func() { s.panel.saveDone(err) })
 	}()
 }
 
@@ -328,6 +346,7 @@ func (s *shell) showList() {
 // show it.
 func (s *shell) open(project compose.Project) {
 	s.selected = project.Name
+	s.panel.setProjects(s.snapshot.Projects)
 	s.panel.set(project, s.snapshot.DockerReachable, s.snapshot.Loading)
 	s.usage.Follow(project, s.snapshot.DockerReachable)
 	s.bottom.setProject(project)
@@ -344,6 +363,7 @@ func (s *shell) open(project compose.Project) {
 func (s *shell) apply(snapshot compose.Snapshot) {
 	s.snapshot = snapshot
 	s.list.set(snapshot.Projects, s.selected, snapshot.Loading)
+	s.panel.setProjects(snapshot.Projects)
 	if s.selected == "" {
 		s.panel.clear()
 		s.usage.Follow(compose.Project{}, false)

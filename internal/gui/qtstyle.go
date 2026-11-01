@@ -97,6 +97,12 @@ QLabel#statusPartial {
 QLabel#statusFault {
     color: %s;
 }
+QLabel#fieldError {
+    color: %s;
+}
+QLabel#fieldLabel {
+    font-weight: 600;
+}
 QPushButton#primaryAction {
     background: palette(highlight);
     color: palette(highlighted-text);
@@ -138,6 +144,7 @@ QWidget#projectRowSelected QLabel {
 		spaceXS,
 		theme.color(roleStatusActive),
 		theme.color(roleStatusPartial),
+		theme.color(roleStatusFault),
 		theme.color(roleStatusFault),
 	)
 }

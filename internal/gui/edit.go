@@ -41,8 +41,13 @@ func NewProjectEdit(p compose.Project) ProjectEdit {
 	}
 }
 
-// SetProfile turns one Profile on or off and keeps the set sorted.
+// SetProfile turns one Profile on or off and keeps the set sorted. The name
+// comes trimmed, and a blank name changes nothing: a Profile always has a name.
 func (e *ProjectEdit) SetProfile(name string, on bool) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
 	kept := make([]string, 0, len(e.Profiles)+1)
 	for _, p := range e.Profiles {
 		if p != name {
@@ -212,6 +217,19 @@ func groupLabels(choices []string) []string {
 		labels = append(labels, NoGroupText)
 	}
 	return append(labels, NewGroupText)
+}
+
+// GroupSuggestions lists the options of the editable box of the Group: the
+// Groups of the choices, without the empty option, which the box shows as its
+// hint instead of as a value. It never returns nil.
+func GroupSuggestions(choices []string) []string {
+	out := []string{}
+	for _, choice := range choices {
+		if choice != "" {
+			out = append(out, choice)
+		}
+	}
+	return out
 }
 
 // ProfileChoices lists the Profiles the form offers: the ones the compose files

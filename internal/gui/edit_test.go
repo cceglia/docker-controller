@@ -68,6 +68,10 @@ func TestProjectEdit_SetProfile_KeepsTheOtherProfiles(t *testing.T) {
 		{"turns one off", []string{"debug", "metrics"}, "debug", false, []string{"metrics"}},
 		{"turning off a Profile that is off changes nothing", []string{"debug"}, "metrics", false, []string{"debug"}},
 		{"turning on a Profile that is on changes nothing", []string{"debug"}, "debug", true, []string{"debug"}},
+		{"surrounding spaces go", []string{"debug"}, "  metrics  ", true, []string{"debug", "metrics"}},
+		{"turning off a name with spaces finds it", []string{"debug", "metrics"}, " debug ", false, []string{"metrics"}},
+		{"a blank name changes nothing", []string{"debug"}, "   ", true, []string{"debug"}},
+		{"a blank name does not turn off a Profile", []string{"debug"}, "", false, []string{"debug"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			edit := ProjectEdit{Profiles: append([]string{}, tc.start...)}
@@ -224,6 +228,17 @@ func TestProjectEdit_Settings_DropsBlankAndDuplicateProfiles(t *testing.T) {
 	}
 }
 
+// TestProjectEdit_Settings_KeepsAProfileTheComposeFilesNoLongerDefine checks the
+// complete set: a Profile the compose files stopped defining stays as it was,
+// like the old view kept it.
+func TestProjectEdit_Settings_KeepsAProfileTheComposeFilesNoLongerDefine(t *testing.T) {
+	edit := ProjectEdit{DisplayName: "Negozio", Profiles: []string{"debug", "gone"}}
+	got := edit.Settings()
+	if want := []string{"debug", "gone"}; !reflect.DeepEqual(got.Profiles, want) {
+		t.Errorf("Profiles = %v, want %v", got.Profiles, want)
+	}
+}
+
 func TestDisplayNameOf_FallsBackToTheComposeName(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
@@ -276,6 +291,11 @@ func TestGroupChoices_OffersNoGroupThenTheGroupsInUse(t *testing.T) {
 			want:     []string{"", "Casa"},
 		},
 		{
+			name:     "the spaces around a Group go",
+			projects: []compose.Project{{Group: " Casa "}, {Group: "Casa"}},
+			want:     []string{"", "Casa"},
+		},
+		{
 			name:     "the current Group joins the ones in use",
 			current:  "Vecchio",
 			projects: []compose.Project{{Group: "Casa"}},
@@ -310,6 +330,7 @@ func TestGroupIndex_FindsTheOptionOfAGroup(t *testing.T) {
 	}{
 		{"no Group", "", 0},
 		{"a Group of the list", "Lavoro", 2},
+		{"the spaces around the Group go", " Lavoro ", 2},
 		{"a Group outside the list falls back to no Group", "Vecchio", 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -446,11 +467,37 @@ func TestProfileChoices_OffersTheProfilesOfTheProject(t *testing.T) {
 		{"the defined order", []string{"debug", "metrics"}, []string{"debug", "metrics"}},
 		{"a Profile appears once", []string{"debug", "debug"}, []string{"debug"}},
 		{"blank names go", []string{"debug", " "}, []string{"debug"}},
+		{"the spaces around a name go", []string{" debug ", "metrics"}, []string{"debug", "metrics"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := ProfileChoices(compose.Project{Profiles: tc.profiles})
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("ProfileChoices = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestGroupSuggestions_DropsTheEmptyOption checks the options of the editable
+// box of the Group: every Group of the choices, never the empty one, which the
+// box shows as its hint instead.
+func TestGroupSuggestions_DropsTheEmptyOption(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		choices []string
+		want    []string
+	}{
+		{"no Group to propose", []string{""}, []string{}},
+		{"no choice at all", nil, []string{}},
+		{"the Groups of the choices keep their order", []string{"", "Casa", "Lavoro"}, []string{"Casa", "Lavoro"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := GroupSuggestions(tc.choices)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("GroupSuggestions(%v) = %v, want %v", tc.choices, got, tc.want)
+			}
+			if got == nil {
+				t.Error("GroupSuggestions returned nil, want an empty list")
 			}
 		})
 	}
