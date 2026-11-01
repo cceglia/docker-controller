@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// The expected strings are the output of the old frontend (frontend/src/lib/
-// format.ts) for the same input, so the view of today and the new one agree.
+// The expected strings are the output of the old TypeScript view for the same
+// input, so the figures of the GTK view and the old ones agree.
 
 func TestFormatBytes_BinaryUnits(t *testing.T) {
 	for _, tc := range []struct {

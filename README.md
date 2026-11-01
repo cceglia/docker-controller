@@ -1,26 +1,41 @@
 # Docker Controller
 
-Applicazione desktop (Wails v3, Go + Svelte) per gestire i Progetti docker-compose della macchina: avvio, stop, log e stato dei Servizi.
+Applicazione desktop in Go con GUI GTK4 (`gotk4` e `libadwaita`) per gestire i
+Progetti `docker-compose` della macchina: avvio, stop, log, stato dei Servizi,
+tray di sistema e notifiche desktop.
 
 ## Prerequisiti di build
 
 Su Debian/Ubuntu (KDE Plasma incluso):
 
 ```sh
-sudo apt install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+sudo apt install build-essential pkg-config libgtk-4-dev libadwaita-1-dev gobject-introspection
 ```
 
-- `build-essential`, `pkg-config`: toolchain C/CGO richiesta da Wails.
-- `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`: librerie GTK3 e WebKitGTK 4.1. L'app usa solo GTK3, quindi il build richiede il tag `gtk3`.
-- Go (1.26 o successiva), Node.js 24 e npm, per Go e per il frontend Svelte.
-- Docker con il plugin `docker compose` per eseguire l'app (non serve per compilare i test).
-- CLI `wails3`, versione fissata `v3.0.0-beta.34`:
+- `build-essential`, `pkg-config`: toolchain C e cgo, che `gotk4` richiede.
+- `libgtk-4-dev`: intestazioni e librerie di GTK4.
+- `libadwaita-1-dev`: intestazioni e librerie di libadwaita.
+- `gobject-introspection`: fornisce la voce `pkg-config` `gobject-introspection-1.0`
+  e `libgirepository-1.0.so`, che `gotk4` cerca in fase di build.
+- Go 1.26 o successiva.
+- Docker con il plugin `docker compose` per eseguire l'app. Non serve per
+  compilare i test.
+
+## Build
 
 ```sh
-go install -tags gtk3 github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.34
+make build
 ```
 
-Il binario finisce in `$(go env GOPATH)/bin`; il `Makefile` aggiunge questa cartella al `PATH`.
+Il binario di produzione finisce in `bin/dockercontroller`.
+
+## Test e verifica
+
+```sh
+make test        # go test ./...
+make vet         # go vet ./...
+make check       # vet + test + build
+```
 
 ## Installazione
 
@@ -28,13 +43,15 @@ Il binario finisce in `$(go env GOPATH)/bin`; il `Makefile` aggiunge questa cart
 make install
 ```
 
-Compila l'app in modalità produzione e installa in `~/.local`:
+Compila l'app e installa in `~/.local`:
 
 - `~/.local/bin/docker-controller`
-- `~/.local/share/applications/docker-controller.desktop`
-- `~/.local/share/icons/hicolor/{256x256,512x512}/apps/docker-controller.png`
+- `~/.local/share/applications/io.github.cceglia.DockerController.desktop`
+- `~/.local/share/icons/hicolor/{256x256,512x512}/apps/io.github.cceglia.DockerController.png`
 
-Dopo l'installazione l'app compare nel menu di KDE. Per un altro percorso: `make install PREFIX=/usr/local` (con `DESTDIR=` per i pacchetti).
+Dopo l'installazione l'app compare nel menu di KDE con nome e icona corretti.
+Per un altro percorso: `make install PREFIX=/usr/local`. Per i pacchetti:
+`make install DESTDIR=/tmp/pkg`.
 
 ## Disinstallazione
 
@@ -42,15 +59,9 @@ Dopo l'installazione l'app compare nel menu di KDE. Per un altro percorso: `make
 make uninstall
 ```
 
-Rimuove i file installati sopra. **Non rimuove il database** in `~/.local/share/docker-controller/`: i dati dei Progetti restano.
+Rimuove i file installati sopra. Rimuove anche la voce `docker-controller.desktop`
+e le icone `docker-controller.png` della versione precedente, così non restano
+due voci nel menu.
 
-## Sviluppo e test
-
-```sh
-make test        # test Go (con tag gtk3)
-make check       # vet + test + typecheck e build del frontend
-make dev         # app con hot reload (wails3 dev)
-make build       # binario di produzione in bin/
-```
-
-`make dev` e `make build` richiedono `wails3` nel `PATH`.
+**Non rimuove il database** in `~/.local/share/docker-controller/`: i Progetti e
+le impostazioni restano.

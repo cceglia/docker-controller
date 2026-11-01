@@ -11,12 +11,11 @@ Interrogalo con una domanda in linguaggio naturale o con i nomi dei file e dei s
 
 ### Interrogarlo bene
 
-L'indice copre il backend Go e il frontend Svelte/TypeScript. L'output di `explore` è limitato (circa 12 file di default). Quindi:
+L'indice copre il sorgente Go del progetto. L'output di `explore` è limitato (circa 12 file di default). Quindi:
 
-- Metti nella query nomi di simboli, di file o di package (`internal/compose Manager Do Attività`, `frontend/src/lib/store.ts`), non parole generiche come "handler" o "service": una query vaga trova simboli omonimi dell'altro linguaggio e manca quello cercato.
+- Metti nella query nomi di simboli, di file o di package (`internal/compose Manager Do Attività`, `internal/gui shell`), non parole generiche come "handler" o "service": una query vaga trova simboli omonimi e manca quello cercato.
 - Quando la risposta è troncata o mostra solo frammenti (`... (gap) ...`), allargala con `codegraph explore --max-files <n> "…"` o restringi la query; non ripiegare su Grep.
 - Per un intervallo di righe preciso o un intero simbolo usa la CLI invece di Read, `sed` o `cat` (il server MCP espone solo `explore`): `codegraph node -f <file relativo al repo> --offset <riga> --limit <n>` (modalità file, con numeri di riga) oppure `codegraph node <Simbolo> [-f <file>]` (il simbolo completo con chiamanti e chiamati).
-- Ignora le voci "used by" tra linguaggi diversi (per esempio un file `.ts` del frontend elencato come dipendente di un file Go): sono collisioni di nomi, non dipendenze reali. I binding TypeScript generati da Wails sono esclusi dall'indice (`codegraph.json`).
 
 CodeGraph aggiorna l'indice da solo tramite il server MCP. **Non eseguire mai `codegraph update`, ricostruzioni manuali o altri aggiornamenti dell'indice** dopo aver modificato il sorgente. Senza server MCP attivo, `codegraph sync` è l'unico comando ammesso per allineare l'indice.
 

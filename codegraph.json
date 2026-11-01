@@ -6,8 +6,6 @@
     "/.scratch/",
     "/bin/",
     "/build/",
-    "/frontend/dist/",
-    "/frontend/bindings/",
     "**/.git/",
     "**/node_modules/",
     "**/dist/",
