@@ -34,6 +34,13 @@ type activityPage struct {
 	// onFailure, when set, is called once for each failed Activity: the shell
 	// turns it into a toast with a link to the output.
 	onFailure func(Activity)
+	// onNew, when set, is called with an Activity the page has not shown yet:
+	// the bottom panel opens on it. It is not called for an output line of an
+	// Activity that already has a row.
+	onNew func(compose.ActivityID)
+	// shownIDs is the Activity of each row. It is what decides whether a change
+	// opens the panel.
+	shownIDs map[compose.ActivityID]bool
 	// notified remembers the Activities that already raised the toast.
 	notified map[compose.ActivityID]bool
 	// rowByID and rowText give the row and its label of each Activity; rowIDs
@@ -57,6 +64,7 @@ type activityPage struct {
 func newActivityPage(log *ActivityLog) *activityPage {
 	p := &activityPage{
 		log:      log,
+		shownIDs: map[compose.ActivityID]bool{},
 		notified: map[compose.ActivityID]bool{},
 		rowByID:  map[compose.ActivityID]*gtk.ListBoxRow{},
 		rowText:  map[compose.ActivityID]*gtk.Label{},
@@ -132,20 +140,19 @@ func (p *activityPage) schedule() {
 }
 
 // refresh moves the log into the widgets: new Activities as rows, the state of
-// the known ones, the failure toast, and the output of the selected Activity.
+// the known ones, the failure toast, and the output of the selected Activity. A
+// new Activity also opens the panel on its output, as the old drawer did.
 func (p *activityPage) refresh() {
 	activities := p.log.Activities()
 
-	added := 0
-	for _, a := range activities {
-		if _, known := p.rowByID[a.ID]; !known {
-			added++
-		}
-	}
+	// The decision comes before the rows go in, so the Activities already shown
+	// are the rows on screen.
+	newID, open := panelActivity(p.shownIDs, activities)
+
 	// A new Activity goes to the front of the history, so the rows are inserted
 	// oldest first and each one lands above the one before.
 	for i := len(activities) - 1; i >= 0; i-- {
-		if _, known := p.rowByID[activities[i].ID]; !known {
+		if !p.shownIDs[activities[i].ID] {
 			p.insertRow(activities[i])
 		}
 	}
@@ -164,9 +171,14 @@ func (p *activityPage) refresh() {
 	}
 
 	switch {
-	case added > 0:
-		// An Action started: show its output without being asked.
-		p.Select(activities[0].ID)
+	case open:
+		// An Action started: show its output without being asked. The panel
+		// shows the Activity and renders the output itself.
+		if p.onNew != nil {
+			p.onNew(newID)
+			return
+		}
+		p.Select(newID)
 	case p.selected == "" && len(activities) > 0:
 		p.Select(activities[0].ID)
 	default:
@@ -188,6 +200,7 @@ func (p *activityPage) insertRow(a Activity) {
 	p.rowByID[a.ID] = row
 	p.rowText[a.ID] = label
 	p.rowIDs = append([]compose.ActivityID{a.ID}, p.rowIDs...)
+	p.shownIDs[a.ID] = true
 }
 
 // rowSelected shows the output of the Activity of the chosen row.

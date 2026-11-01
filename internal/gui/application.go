@@ -64,6 +64,10 @@ type application struct {
 	// window is the window on screen, nil while the application sits in the
 	// tray.
 	window *shell
+	// confirmations are the questions of the tray that are on screen while no
+	// window hosts them. The application owns them: it never builds a window
+	// just to ask one.
+	confirmations dialogList
 	// prefs is the settings window while it exists, nil otherwise.
 	prefs *prefsWindow
 	// snapshot is the last one applied: a new window starts from it.

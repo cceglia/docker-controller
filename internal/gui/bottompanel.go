@@ -46,6 +46,8 @@ func newBottomPanel(log *ActivityLog) *bottomPanel {
 			p.onFailure(a)
 		}
 	}
+	// A new Activity opens the panel on its output, as the old drawer did.
+	p.activities.onNew = p.Show
 
 	p.logs = newLogPanel()
 	p.logs.onClose = p.closeLogs
@@ -81,6 +83,19 @@ func newBottomPanel(log *ActivityLog) *bottomPanel {
 	p.body.SetVisible(false)
 
 	return p
+}
+
+// panelActivity returns the Activity the bottom panel must open on after a
+// change: the newest Activity of the history it has not shown yet. It reports
+// false when every Activity of the history is already shown, so an output line
+// never reopens the panel. It reads no widget, so a test drives it.
+func panelActivity(shown map[compose.ActivityID]bool, activities []Activity) (compose.ActivityID, bool) {
+	for _, a := range activities {
+		if !shown[a.ID] {
+			return a.ID, true
+		}
+	}
+	return "", false
 }
 
 // Show selects an Activity of the history and opens the panel on it.

@@ -2,6 +2,7 @@ package gui
 
 import (
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
+	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/tray"
@@ -55,22 +56,30 @@ func (a *application) doTray(action compose.Action) {
 
 // confirmTray asks the question of an entry that carries Confirm and launches
 // its Action only when the answer is "run". Cancelling or closing the dialog
-// launches nothing. The dialog lives in the window while it is open, and the
-// window is built first when the application is in the tray.
+// launches nothing. The question goes on the window when there is one. With the
+// application in the tray it has no parent, because a tray command builds no
+// window and so loses no Activity history.
 func (a *application) confirmTray(node trayadapter.Node) {
-	s := a.present()
-	if s == nil {
+	if a.quitting {
 		return
 	}
-	dialog := adw.NewMessageDialog(&s.window.ApplicationWindow.Window, windowTitle, node.Confirm)
-	s.confirmations = append(s.confirmations, dialog)
+	parent := (*gtk.Window)(nil)
+	host := &a.confirmations
+	if a.window != nil {
+		a.window.show()
+		parent = &a.window.window.ApplicationWindow.Window
+		host = &a.window.confirmations
+	}
+
+	dialog := adw.NewMessageDialog(parent, windowTitle, node.Confirm)
+	host.add(dialog)
 	dialog.AddResponse("cancel", "Annulla")
 	dialog.AddResponse("run", node.Label)
 	dialog.SetCloseResponse("cancel")
 	dialog.SetDefaultResponse("cancel")
 	dialog.SetResponseAppearance("run", adw.ResponseDestructive)
 	dialog.ConnectResponse(func(response string) {
-		s.dropConfirmation(dialog)
+		host.drop(dialog)
 		if response == "run" {
 			a.doTray(*node.Action)
 		}
@@ -78,13 +87,22 @@ func (a *application) confirmTray(node trayadapter.Node) {
 	dialog.Present()
 }
 
-// dropConfirmation takes a dialog that answered off the window.
-func (s *shell) dropConfirmation(dialog *adw.MessageDialog) {
-	for i, open := range s.confirmations {
-		if open != dialog {
-			continue
+// dialogList keeps the questions of the tray that are on screen, so GTK does
+// not free a dialog before it answers. A window keeps the ones it hosts; the
+// application keeps the ones with no parent.
+type dialogList []*adw.MessageDialog
+
+// add keeps a dialog that just went on screen.
+func (list *dialogList) add(dialog *adw.MessageDialog) {
+	*list = append(*list, dialog)
+}
+
+// drop takes a dialog that answered off the list.
+func (list *dialogList) drop(dialog *adw.MessageDialog) {
+	for i, open := range *list {
+		if open == dialog {
+			*list = append((*list)[:i], (*list)[i+1:]...)
+			return
 		}
-		s.confirmations = append(s.confirmations[:i], s.confirmations[i+1:]...)
-		return
 	}
 }

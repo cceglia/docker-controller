@@ -48,8 +48,9 @@ type shell struct {
 	// content is the page of the detail in the split view.
 	content *adw.NavigationPage
 	detail  *detailView
-	// confirmations are the questions of the tray that are on screen.
-	confirmations []*adw.MessageDialog
+	// confirmations are the questions of the tray that are on screen in this
+	// window.
+	confirmations dialogList
 	// ask is the dialog of "Chiedi ogni volta" while it is on screen.
 	ask *adw.MessageDialog
 	// closing is true once the window is about to be destroyed, so a second
