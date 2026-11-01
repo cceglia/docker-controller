@@ -54,32 +54,72 @@ senza display e girano anche in `make check`.
 
 ```sh
 make tools       # installa gremlins v0.6.0 in $(go env GOPATH)/bin
-make mutate      # mutation testing su tray, gui e compose
+make mutate      # mutation testing su tray, gui e compose, con le soglie
 ```
 
 `make tools` installa gli strumenti di sviluppo fuori dal repository. Basta
 lanciarlo una volta per macchina.
 
-`make mutate` esegue gremlins con la configurazione in `.gremlins.yaml`. Il
-comando parte tre volte, un package per volta, perché gremlins accetta un solo
-percorso per lancio. I package sono `internal/tray`, `internal/gui` e
-`internal/compose`.
-
-Un giro completo dura circa sei minuti su questa macchina. Il package `gui`
-pesa più degli altri, perché i suoi test compilano Qt con cgo. Lancia
-`make mutate` dopo una modifica ai test, non a ogni salvataggio.
+`make mutate` esegue gremlins tre volte, un package per volta, perché gremlins
+accetta un solo percorso per lancio. Ogni lancio legge il suo file di
+configurazione sotto `.gremlins/`. Un giro completo dura circa otto minuti su
+questa macchina. Il package `gui` pesa più degli altri, perché i suoi test
+compilano Qt con cgo. Lancia `make mutate` dopo una modifica ai test, non a ogni
+salvataggio.
 
 Il target resta fuori da `make check`. `make check` dura secondi, `make mutate`
 dura minuti, e il repository non ha integrazione continua.
-
-Questo giro non ha soglie. Un risultato debole non ferma il comando: gremlins
-esce con codice 0 ed elenca i mutanti sopravvissuti. Il ticket 16 aggiunge le
-soglie.
 
 Gremlins stampa per ogni package l'efficacia dei test e la copertura dei
 mutanti. L'efficacia vale `KILLED / (KILLED + LIVED)`. La copertura vale
 `(KILLED + LIVED) / totale`. I mutanti `TIMED OUT` restano fuori da entrambe le
 percentuali.
+
+### Le soglie
+
+Ogni package ha la sua coppia di soglie. Il valore è la misura del ticket 15
+meno cinque punti.
+
+| Package            | File                     | Efficacia misurata | Soglia efficacia | Copertura misurata | Soglia copertura |
+| ------------------ | ------------------------ | -----------------: | ---------------: | -----------------: | ---------------: |
+| `internal/tray`    | `.gremlins/tray.yaml`    |             89,66% |           84,66% |             93,55% |           88,55% |
+| `internal/gui`     | `.gremlins/gui.yaml`     |             90,33% |           85,33% |             41,90% |           36,90% |
+| `internal/compose` | `.gremlins/compose.yaml` |             76,85% |           71,85% |             91,53% |           86,53% |
+
+Le tre coppie sono diverse, quindi un solo `.gremlins.yaml` non basta. Gremlins
+legge un solo file per lancio, e `make mutate` passa il file del package con
+`--config`. I flag `--threshold-efficacy` e `--threshold-mcover` non applicano la
+soglia in gremlins v0.6.0: la prova con un file vuoto e il flag a 99,9 esce con
+codice 0. Per questo le soglie vivono nei file.
+
+I file ripetono il blocco condiviso: `workers`, `timeout-coefficient` e
+`exclude-files`. Se cambi uno di questi valori, cambialo in tutti e tre.
+
+Sotto soglia il target esce con errore e nomina la soglia mancata e il valore
+misurato:
+
+```
+SOGLIA MANCATA: ./internal/compose, efficacia 71,20%, soglia 71,85%
+```
+
+Il report sopra il messaggio elenca i mutanti sopravvissuti, con posizione
+`file:riga:colonna`. La ricetta esce con codice 10 per l'efficacia e 11 per la
+copertura dei mutanti. Make riporta il codice e a sua volta esce con 2.
+
+### Aggiornare una soglia
+
+La soglia nasce da una misura, non da un giro fallito.
+
+1. Cambia i test o il codice del package.
+2. Lancia `make mutate` e leggi `Test efficacy` e `Mutator coverage` del package.
+3. Scrivi nel ticket la data e i due valori nuovi.
+4. Porta la soglia al valore misurato meno cinque punti, nel file
+   `.gremlins/<package>.yaml`.
+
+La soglia non si sposta per far passare il giro. Un giro rosso dice che i test
+hanno perso forza: il rimedio sono asserzioni nuove, non un numero più basso.
+Una soglia alzata a mano, sopra il misurato, blocca ogni cambiamento. Per questo
+ogni movimento vuole una misura nuova, scritta nel ticket.
 
 ## Installazione
 

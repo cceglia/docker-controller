@@ -8,9 +8,18 @@ APP_BIN := docker-controller
 ICON_SIZES := 256x256 512x512
 
 # Mutation testing: gremlins accepts one package per run, so `make mutate`
-# runs it three times. The version is pinned together with .gremlins.yaml.
+# runs it three times. The version is pinned together with the config files.
 GREMLINS_VERSION := v0.6.0
 MUTATE_PACKAGES := ./internal/tray ./internal/gui ./internal/compose
+# One config file per package: the three threshold pairs differ, and a single
+# .gremlins.yaml cannot hold them. --config replaces the default file, so each
+# file in .gremlins/ repeats the shared settings (workers, timeout, exclusions).
+MUTATE_CONFIG_DIR := .gremlins
+# -count=1 disables the Go test cache for the coverage run. Gremlins sets the
+# timeout of each mutant to the coverage time times the coefficient. A cached
+# coverage run reports a few hundred milliseconds, the timeout falls under the
+# compile time of the gui tests, and most mutants end as TIMED OUT.
+MUTATE_GOFLAGS := -count=1
 
 PREFIX ?= $(HOME)/.local
 DESTDIR ?=
@@ -47,11 +56,24 @@ test-ui:
 tools:
 	go install github.com/go-gremlins/gremlins/cmd/gremlins@$(GREMLINS_VERSION)
 
-## mutate: mutation testing with gremlins on tray, gui and compose (minutes, outside `make check`)
+## mutate: mutation testing with gremlins on tray, gui and compose, with the thresholds of each package (minutes, outside `make check`)
 mutate:
 	@for pkg in $(MUTATE_PACKAGES); do \
-		echo "== $$pkg"; \
-		gremlins unleash $$pkg || exit $$?; \
+		conf="$(MUTATE_CONFIG_DIR)/$${pkg##*/}.yaml"; \
+		min_efficacy=$$(sed -n 's/^[[:space:]]*efficacy:[[:space:]]*//p' "$$conf"); \
+		min_mcover=$$(sed -n 's/^[[:space:]]*mutant-coverage:[[:space:]]*//p' "$$conf"); \
+		echo "== $$pkg (soglie: efficacia $$min_efficacy%, copertura dei mutanti $$min_mcover%)"; \
+		out=$$(GOFLAGS="$${GOFLAGS:+$$GOFLAGS }$(MUTATE_GOFLAGS)" gremlins unleash --config "$$conf" "$$pkg" 2>&1); \
+		status=$$?; \
+		printf '%s\n' "$$out"; \
+		efficacy=$$(printf '%s\n' "$$out" | sed -n 's/^Test efficacy: //p'); \
+		mcover=$$(printf '%s\n' "$$out" | sed -n 's/^Mutator coverage: //p'); \
+		case $$status in \
+		0) echo "SOGLIE RISPETTATE: $$pkg, efficacia $$efficacy, copertura dei mutanti $$mcover" ;; \
+		10) echo "SOGLIA MANCATA: $$pkg, efficacia $$efficacy, soglia $$min_efficacy%"; exit 10 ;; \
+		11) echo "SOGLIA MANCATA: $$pkg, copertura dei mutanti $$mcover, soglia $$min_mcover%"; exit 11 ;; \
+		*) echo "GREMLINS FALLITO: $$pkg, codice $$status"; exit $$status ;; \
+		esac; \
 	done
 
 vet:

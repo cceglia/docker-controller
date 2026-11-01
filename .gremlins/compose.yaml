@@ -1,0 +1,28 @@
+# Cancello di mutation testing per internal/compose.
+# `make mutate` passa questo file con --config. Gremlins legge un solo file di
+# configurazione: --config sostituisce il vecchio .gremlins.yaml.
+# Il blocco condiviso (workers, timeout-coefficient, exclude-files) è identico
+# negli altri due file .gremlins/*.yaml. Se lo cambi, cambialo in tutti e tre.
+
+silent: false
+
+unleash:
+  # 0 usa tutti i core della macchina.
+  workers: 0
+  # Il timeout di ogni giro di test vale 20 volte la durata del giro di copertura.
+  # 5 volte non basta: la compilazione parallela supera il limite, e i mutanti
+  # scadono invece di essere uccisi. Misurato nel ticket 15.
+  timeout-coefficient: 20
+  # Le regole sono espressioni regolari sul percorso del file.
+  # I test sono esclusi da gremlins per default.
+  exclude-files:
+    - "internal/db/"
+    - "internal/compose/composefake/"
+    - "(_gen|_generated)\\.go$"
+    - "\\.gen\\.go$"
+    - "/generated/"
+  # Efficacia e copertura dei mutanti misurate nel ticket 15: 76,85% e 91,53%.
+  # L'efficacia è la più bassa dei tre package.
+  threshold:
+    efficacy: 71.85
+    mutant-coverage: 86.53

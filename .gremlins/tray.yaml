@@ -1,6 +1,8 @@
-# Configurazione della mutation testing con gremlins.
-# `make mutate` esegue gremlins su internal/tray, internal/gui e internal/compose.
-# Le soglie arrivano nel ticket 16: qui non ci sono cancelli.
+# Cancello di mutation testing per internal/tray.
+# `make mutate` passa questo file con --config. Gremlins legge un solo file di
+# configurazione: --config sostituisce il vecchio .gremlins.yaml.
+# Il blocco condiviso (workers, timeout-coefficient, exclude-files) è identico
+# negli altri due file .gremlins/*.yaml. Se lo cambi, cambialo in tutti e tre.
 
 silent: false
 
@@ -19,3 +21,8 @@ unleash:
     - "(_gen|_generated)\\.go$"
     - "\\.gen\\.go$"
     - "/generated/"
+  # Efficacia e copertura dei mutanti misurate nel ticket 15: 89,66% e 93,55%.
+  # Il cancello sta cinque punti sotto il misurato.
+  threshold:
+    efficacy: 84.66
+    mutant-coverage: 88.55
