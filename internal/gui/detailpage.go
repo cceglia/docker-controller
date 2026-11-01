@@ -22,13 +22,17 @@ const (
 )
 
 // detailView is the content side of the split view: the header of the chosen
-// Project, its Actions and its Services. It rebuilds from the snapshot it is
-// given, so it never holds a copy that is out of date.
+// Project, its Actions and its Services, with the bottom panel of the
+// Activities under them. It rebuilds from the snapshot it is given, so it never
+// holds a copy that is out of date.
 type detailView struct {
 	page     *adw.NavigationPage
 	stack    *gtk.Stack
 	scrolled *gtk.ScrolledWindow
 	content  *gtk.Box
+	// paned splits the detail from the bottom panel; panel is the panel itself.
+	paned *gtk.Paned
+	panel *activityPanel
 	// shown is the Project the detail is built from, shownDocker and
 	// shownLoading the state of Docker it was built for, and visible says
 	// whether the detail is on screen at all.
@@ -44,8 +48,10 @@ type detailView struct {
 }
 
 // newDetailView builds the content side: the invitation until a Project is
-// chosen, and the detail in its place after.
-func newDetailView() *detailView {
+// chosen, the detail in its place after, and the bottom panel of the Activities
+// under both. activities is the log of the session, so the panel shows the
+// history of every Project.
+func newDetailView(activities *ActivityLog) *detailView {
 	d := &detailView{content: gtk.NewBox(gtk.OrientationVertical, detailSpacing)}
 	d.content.SetMarginTop(18)
 	d.content.SetMarginBottom(24)
@@ -69,9 +75,18 @@ func newDetailView() *detailView {
 	d.stack.AddNamed(scrolled, "detail")
 	d.stack.SetVisibleChildName("empty")
 
+	d.panel = newActivityPanel(activities)
+	d.paned = gtk.NewPaned(gtk.OrientationVertical)
+	d.paned.SetStartChild(d.stack)
+	d.paned.SetEndChild(d.panel.body)
+	d.paned.SetResizeStartChild(true)
+	d.paned.SetShrinkStartChild(true)
+	d.paned.SetShrinkEndChild(true)
+	d.panel.paned = d.paned
+
 	view := adw.NewToolbarView()
 	view.AddTopBar(adw.NewHeaderBar())
-	view.SetContent(d.stack)
+	view.SetContent(d.paned)
 
 	d.page = adw.NewNavigationPage(view, windowTitle)
 	return d

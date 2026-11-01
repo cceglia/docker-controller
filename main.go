@@ -31,9 +31,14 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// The log of the session lives in the GUI package, without GTK: the Manager
+	// pushes its events into it and never waits for the window.
+	activities := gui.NewActivityLog()
+
 	manager, err := compose.New(compose.Config{
-		Docker: compose.ExecDocker{},
-		DB:     conn,
+		Docker:     compose.ExecDocker{},
+		DB:         conn,
+		OnActivity: activities.Push,
 	})
 	if err != nil {
 		return err
@@ -41,5 +46,5 @@ func run() error {
 
 	go manager.Run(ctx, func(err error) { log.Printf("compose refresh: %v", err) })
 
-	return gui.Run(ctx, manager)
+	return gui.Run(ctx, manager, activities)
 }

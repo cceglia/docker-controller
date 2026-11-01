@@ -30,12 +30,16 @@ const (
 	emptyListText = "Nessun Progetto."
 	// toastTimeout is how long a message stays on screen, in seconds.
 	toastTimeout = 6
+	// showOutputText is the button of the toast of a failure: it opens the
+	// output of the failed Activity.
+	showOutputText = "Vedi output"
 )
 
 // Run opens the window and blocks until the application quits. The snapshot of
 // the Manager is read through Watch, so a Project added or removed appears
-// without a restart.
-func Run(ctx context.Context, manager *compose.Manager) error {
+// without a restart. activities is the log of the session: the bottom panel
+// reads it and the Manager pushes its events into it.
+func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog) error {
 	app := adw.NewApplication(appID, gio.ApplicationDefaultFlags)
 	var window *shell
 	app.ConnectActivate(func() {
@@ -43,7 +47,7 @@ func Run(ctx context.Context, manager *compose.Manager) error {
 			window.window.Present()
 			return
 		}
-		window = newShell(app)
+		window = newShell(app, activities)
 		window.watch(ctx, manager)
 		window.window.Present()
 	})
@@ -75,7 +79,7 @@ type shell struct {
 
 // newShell builds the window: the list on the left, the content on the right,
 // and the breakpoint that collapses the two into pages under 900 sp.
-func newShell(app *adw.Application) *shell {
+func newShell(app *adw.Application, activities *ActivityLog) *shell {
 	// Until the first snapshot arrives Docker has not been asked yet, so the
 	// detail must not call it unreachable.
 	s := &shell{rows: map[int]compose.Project{}, loading: true}
@@ -97,8 +101,9 @@ func newShell(app *adw.Application) *shell {
 	sidebar.SetContent(scrolled)
 	sidebar.AddBottomBar(sidebarActions())
 
-	s.detail = newDetailView()
+	s.detail = newDetailView(activities)
 	s.detail.onAction = s.do
+	s.detail.panel.onFailure = s.activityFailed
 	s.content = s.detail.page
 
 	s.split = adw.NewNavigationSplitView()
@@ -188,6 +193,16 @@ func (s *shell) do(action compose.Action) {
 func (s *shell) toast(message string) {
 	toast := adw.NewToast(message)
 	toast.SetTimeout(toastTimeout)
+	s.toasts.AddToast(toast)
+}
+
+// activityFailed tells the user a failed Activity with the Italian message and
+// a link to its output, as the old view did.
+func (s *shell) activityFailed(a Activity) {
+	toast := adw.NewToast(ActivityToastText(a))
+	toast.SetTimeout(toastTimeout)
+	toast.SetButtonLabel(showOutputText)
+	toast.ConnectButtonClicked(func() { s.detail.panel.Show(a.ID) })
 	s.toasts.AddToast(toast)
 }
 
