@@ -35,10 +35,7 @@ func StatusOf(status compose.Status) StatusView {
 // ProjectName is the Display name of the Project, or its compose name when the
 // Display name is unset.
 func ProjectName(p compose.Project) string {
-	if p.DisplayName != "" {
-		return p.DisplayName
-	}
-	return p.Name
+	return DisplayNameOf(p.DisplayName, p.Name)
 }
 
 // ProjectCount is the count of the running Containers over the total, as the

@@ -72,6 +72,9 @@ type shell struct {
 	// pointer cannot be the key.
 	rows     map[int]compose.Project
 	selected string
+	// projects is the whole snapshot: the form of the settings reads the Groups
+	// in use from it, so a Group of another Project is one click away.
+	projects []compose.Project
 	// reachable and loading are the state of Docker of the last snapshot, so
 	// the detail keeps it while no new snapshot arrives.
 	reachable bool
@@ -109,6 +112,7 @@ func newShell(app *adw.Application, activities *ActivityLog) *shell {
 
 	s.detail = newDetailView(activities)
 	s.detail.onAction = s.do
+	s.detail.onSave = s.saveSettings
 	s.detail.panel.onFailure = s.activityFailed
 	s.content = s.detail.page
 
@@ -263,6 +267,21 @@ func (s *shell) do(action compose.Action) {
 	}
 }
 
+// saveSettings writes the settings of a Project and publishes the new snapshot,
+// so the detail and the list refresh by themselves. The write runs off the GTK
+// loop; a refusal comes back as the Italian message. The form already went back
+// to rest, so a refusal leaves the saved values on screen.
+func (s *shell) saveSettings(name string, settings compose.Settings) {
+	if s.manager == nil {
+		return
+	}
+	go func() {
+		if err := s.manager.UpdateSettings(s.ctx, name, settings); err != nil {
+			glib.IdleAdd(func() { s.toast(UserError(err).Error()) })
+		}
+	}()
+}
+
 // toast shows a short message over the content.
 func (s *shell) toast(message string) {
 	toast := adw.NewToast(message)
@@ -285,6 +304,7 @@ func (s *shell) activityFailed(a Activity) {
 func (s *shell) apply(snapshot compose.Snapshot) {
 	s.reachable = snapshot.DockerReachable
 	s.loading = snapshot.Loading
+	s.projects = snapshot.Projects
 	s.rows = map[int]compose.Project{}
 	s.list.RemoveAll()
 
@@ -312,7 +332,7 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 
 	if selected != nil {
 		s.list.SelectRow(selected)
-		s.detail.set(opened, s.reachable, s.loading)
+		s.detail.set(opened, s.reachable, s.loading, GroupChoices(opened.Group, s.projects))
 		return
 	}
 	// The open Project is gone: the content side has nothing to show.
@@ -331,7 +351,7 @@ func (s *shell) activateRow(row *gtk.ListBoxRow) {
 		return
 	}
 	s.selected = project.Name
-	s.detail.set(project, s.reachable, s.loading)
+	s.detail.set(project, s.reachable, s.loading, GroupChoices(project.Group, s.projects))
 	s.split.SetShowContent(true)
 }
 

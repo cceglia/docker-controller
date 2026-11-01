@@ -3,6 +3,7 @@ package gui
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -48,9 +49,17 @@ type detailView struct {
 	shownDocker  bool
 	shownLoading bool
 	visible      bool
-	// onAction launches an Action; parent hosts the confirmation dialog. GTK
-	// must keep the last dialog alive while it is on screen.
+	// edit is the form of the settings, nil when the detail is at rest. It
+	// holds only what the user typed, so the snapshot stays the truth of the
+	// saved values. groups are the Groups the form offers, from the whole
+	// snapshot.
+	edit   *ProjectEdit
+	groups []string
+	// onAction launches an Action; onSave hands the settings of the form to the
+	// Manager. parent hosts the confirmation dialog. GTK must keep the last
+	// dialog alive while it is on screen.
 	onAction func(compose.Action)
+	onSave   func(name string, settings compose.Settings)
 	parent   *gtk.Window
 	dialog   *adw.MessageDialog
 }
@@ -109,34 +118,59 @@ func newDetailView(activities *ActivityLog) *detailView {
 }
 
 // set shows one Project in the state of Docker the snapshot reports. A
-// snapshot that changes neither is a no-op, so the detail keeps its place while
-// the user reads it.
-func (d *detailView) set(project compose.Project, dockerReachable, loading bool) {
+// snapshot that changes none of them is a no-op, so the detail keeps its place
+// while the user reads it and the form keeps what the user typed. groups are the
+// Groups of the whole snapshot, which the form of the settings offers.
+func (d *detailView) set(project compose.Project, dockerReachable, loading bool, groups []string) {
 	if d.visible && d.shownDocker == dockerReachable && d.shownLoading == loading &&
-		reflect.DeepEqual(d.shown, project) {
+		reflect.DeepEqual(d.shown, project) && slices.Equal(d.groups, groups) {
 		return
 	}
-	// Another Project: the stream of the one before must not write into it.
+	// Another Project: the stream of the one before must not write into it, and
+	// the form of the one before must not save on it.
 	if d.visible && d.shown.Name != project.Name {
 		d.panel.closeLogs()
+		d.edit = nil
 	}
 	d.visible = true
 	d.shown = project
 	d.shownDocker = dockerReachable
 	d.shownLoading = loading
+	d.groups = groups
 	d.page.SetTitle(ProjectName(project))
 	d.stack.SetVisibleChildName("detail")
+	// The form of the settings keeps what the user typed and its place: a
+	// snapshot that arrives while the user edits waits for the save or the
+	// cancel, which render the latest state.
+	if d.edit != nil {
+		return
+	}
+	d.render()
+}
 
-	reason := ActionDisabledReason(dockerReachable, project.Activity != nil)
+// render builds the content of the detail from the Project it holds. The offset
+// of the scroll comes back, so a refresh does not move the text under the eyes
+// of the user.
+func (d *detailView) render() {
+	project := d.shown
+	reason := ActionDisabledReason(d.shownDocker, project.Activity != nil)
 
 	offset := d.scrolled.VAdjustment().Value()
 	removeAll(d.content)
-	if notice := DockerNotice(loading, dockerReachable); notice != "" {
+	if notice := DockerNotice(d.shownLoading, d.shownDocker); notice != "" {
 		d.content.Append(noticeBanner(notice))
 	}
-	d.content.Append(projectHeader(project, actionBar(ProjectActions(project, dockerReachable), reason, true, d.choose), func() { d.showLogs(project) }))
+	d.content.Append(projectHeader(project, actionBar(ProjectActions(project, d.shownDocker), reason, true, d.choose), func() { d.showLogs(project) }))
 	if project.ComposeMissing {
 		d.content.Append(missingBanner())
+	}
+	if d.edit != nil {
+		d.content.Append(projectForm(project, d.groups, d.edit, d.saveEdit, d.cancelEdit))
+	} else {
+		d.content.Append(projectData(project, func() { d.startEdit(project) }))
+		if profiles := projectProfiles(project); profiles != nil {
+			d.content.Append(profiles)
+		}
 	}
 	d.content.Append(servicesHeading(len(project.Services)))
 	if len(project.Services) == 0 {
@@ -144,7 +178,7 @@ func (d *detailView) set(project compose.Project, dockerReachable, loading bool)
 	}
 	d.blocks = make(map[string]*serviceUsageBlock, len(project.Services))
 	for _, service := range project.Services {
-		group, block := serviceGroup(project, service, dockerReachable, d.choose)
+		group, block := serviceGroup(project, service, d.shownDocker, d.choose)
 		d.content.Append(group)
 		d.blocks[project.Name+"/"+service.Name] = block
 	}
@@ -153,6 +187,39 @@ func (d *detailView) set(project compose.Project, dockerReachable, loading bool)
 	// when the main loop is idle.
 	scrolled := d.scrolled
 	glib.IdleAdd(func() { scrolled.VAdjustment().SetValue(offset) })
+}
+
+// startEdit opens the form on the saved values of the Project. The list and the
+// header keep the saved values until the form is confirmed.
+func (d *detailView) startEdit(project compose.Project) {
+	edit := NewProjectEdit(project)
+	d.edit = &edit
+	d.render()
+}
+
+// cancelEdit leaves the form and shows the saved values again. Nothing was sent
+// to the Manager, so there is nothing to undo.
+func (d *detailView) cancelEdit() {
+	if d.edit == nil {
+		return
+	}
+	d.edit = nil
+	d.render()
+}
+
+// saveEdit hands the values of the form to the Manager and goes back to rest.
+// A refusal leaves the saved values on screen and shows its message, so a save
+// that did not happen is never shown as done.
+func (d *detailView) saveEdit() {
+	if d.edit == nil {
+		return
+	}
+	name, settings := d.edit.Project, d.edit.Settings()
+	d.edit = nil
+	d.render()
+	if d.onSave != nil {
+		d.onSave(name, settings)
+	}
 }
 
 // setUsage shows a sample in the global bar and in the blocks of the Services.
@@ -185,6 +252,7 @@ func (d *detailView) applyUsage() {
 // clear goes back to the invitation, for when the open Project is gone.
 func (d *detailView) clear() {
 	d.visible = false
+	d.edit = nil
 	d.panel.closeLogs()
 	d.blocks = nil
 	removeAll(d.content)
