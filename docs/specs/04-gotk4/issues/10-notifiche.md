@@ -12,3 +12,4 @@
 - [ ] Una sola notifica per Attività
 - [ ] Titolo e testo coincidono con quelli di oggi
 - [ ] Se il servizio di notifica non risponde, l'app registra l'errore e continua
+- [ ] I test del `Notifier` restano invariati e verdi

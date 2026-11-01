@@ -17,3 +17,4 @@
 - [ ] Chiudere la scheda termina il processo `docker compose logs`
 - [ ] I log di un Servizio con Profilo non attivo si leggono lo stesso
 - [ ] Un Progetto con Attività in corso mostra il suo output separato dai log
+- [ ] Test da tavolo per il tetto delle 5.000 righe e per la mappatura delle righe nei tag del log

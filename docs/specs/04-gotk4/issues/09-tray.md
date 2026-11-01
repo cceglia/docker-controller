@@ -17,3 +17,4 @@
 - [ ] Il menu si aggiorna a ogni snapshot senza voci stantie
 - [ ] L'icona cambia quando Docker è irraggiungibile
 - [ ] "Esci" chiude l'app
+- [ ] Test da tavolo per la mappatura dalla descrizione del menu alle voci di `systray`

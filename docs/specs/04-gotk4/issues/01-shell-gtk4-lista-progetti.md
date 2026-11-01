@@ -18,4 +18,5 @@
 - [ ] Entrambi i pulsanti restano visibili con la lista vuota
 - [ ] Il pannello di destra senza Progetto selezionato mostra un invito a sceglierne uno
 - [ ] Sotto i 900 px la finestra mostra una pagina alla volta con il pulsante indietro
+- [ ] Test da tavolo per l'ordine delle sezioni e per lo stato dei Container, tacche comprese
 - [ ] Verifica manuale: la lista coincide con quella dell'app Wails sullo stesso database

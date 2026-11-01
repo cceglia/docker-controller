@@ -13,4 +13,5 @@
 - [ ] Lo stream si ferma quando la finestra si nasconde e riparte quando torna
 - [ ] Nessun valore vecchio resta a schermo dopo lo stop
 - [ ] Con Docker irraggiungibile compare un avviso e la barra resta vuota
+- [ ] Test da tavolo per byte, percentuali, core e rate
 - [ ] Verifica manuale: i numeri si muovono e somigliano a `docker stats`
