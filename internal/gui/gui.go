@@ -51,22 +51,27 @@ func Run(ctx context.Context, manager *compose.Manager) error {
 
 // shell owns the window and the two sides of its split view.
 type shell struct {
-	window   *adw.ApplicationWindow
-	split    *adw.NavigationSplitView
-	list     *gtk.ListBox
-	content  *adw.NavigationPage
-	names    map[*gtk.ListBoxRow]string
+	window  *adw.ApplicationWindow
+	split   *adw.NavigationSplitView
+	list    *gtk.ListBox
+	content *adw.NavigationPage
+	detail  *detailView
+	// rows maps the index of a row of the list to its Project. GTK hands the
+	// handler a wrapper of the row, not the pointer it was built with, so the
+	// pointer cannot be the key.
+	rows     map[int]compose.Project
 	selected string
 }
 
 // newShell builds the window: the list on the left, the content on the right,
 // and the breakpoint that collapses the two into pages under 900 sp.
 func newShell(app *adw.Application) *shell {
-	s := &shell{names: map[*gtk.ListBoxRow]string{}}
+	s := &shell{rows: map[int]compose.Project{}}
 
 	s.list = gtk.NewListBox()
 	s.list.SetSelectionMode(gtk.SelectionSingle)
 	s.list.SetShowSeparators(false)
+	s.list.SetActivateOnSingleClick(true)
 	s.list.AddCSSClass("navigation-sidebar")
 	s.list.ConnectRowActivated(s.activateRow)
 
@@ -80,7 +85,8 @@ func newShell(app *adw.Application) *shell {
 	sidebar.SetContent(scrolled)
 	sidebar.AddBottomBar(sidebarActions())
 
-	s.content = contentPage()
+	s.detail = newDetailView()
+	s.content = s.detail.page
 
 	s.split = adw.NewNavigationSplitView()
 	s.split.SetSidebar(adw.NewNavigationPage(sidebar, "Progetti"))
@@ -130,17 +136,7 @@ func sidebarActions() *gtk.ActionBar {
 	return bar
 }
 
-// contentPage is the right side of the split view. Its header bar carries the
-// window controls and, under the breakpoint, the back button to the list.
-func contentPage() *adw.NavigationPage {
-	view := adw.NewToolbarView()
-	view.AddTopBar(adw.NewHeaderBar())
-	view.SetContent(contentPlaceholder())
-	return adw.NewNavigationPage(view, windowTitle)
-}
-
-// contentPlaceholder invites the user to choose a Project. The detail of the
-// chosen one arrives in a later ticket.
+// contentPlaceholder invites the user to choose a Project, until one is open.
 func contentPlaceholder() *adw.StatusPage {
 	page := adw.NewStatusPage()
 	page.SetIconName("view-list-symbolic")
@@ -158,12 +154,14 @@ func (s *shell) watch(ctx context.Context, manager *compose.Manager) {
 	}()
 }
 
-// apply rebuilds the list from a snapshot, keeping the open Project selected.
+// apply rebuilds the list from a snapshot, keeping the open Project selected
+// and refreshing its detail in place.
 func (s *shell) apply(snapshot compose.Snapshot) {
-	s.names = map[*gtk.ListBoxRow]string{}
+	s.rows = map[int]compose.Project{}
 	s.list.RemoveAll()
 
 	var selected *gtk.ListBoxRow
+	var opened compose.Project
 	for _, section := range Sections(snapshot.Projects) {
 		if len(section.Projects) == 0 {
 			continue
@@ -175,6 +173,7 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 			row := s.appendProject(project)
 			if project.Name == s.selected {
 				selected = row
+				opened = project
 			}
 		}
 	}
@@ -185,20 +184,26 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 
 	if selected != nil {
 		s.list.SelectRow(selected)
+		s.detail.set(opened)
 		return
 	}
 	// The open Project is gone: the content side has nothing to show.
 	s.selected = ""
+	s.detail.clear()
 	s.split.SetShowContent(false)
 }
 
 // activateRow opens the content side of the split view on the chosen Project.
+// A single click is enough: the list activates on one, like the old view.
 func (s *shell) activateRow(row *gtk.ListBoxRow) {
-	name, ok := s.names[row]
+	// GTK hands the handler a wrapper of the row, not the pointer it was
+	// built with, so the row is found by its place in the list.
+	project, ok := s.rows[row.Index()]
 	if !ok {
 		return
 	}
-	s.selected = name
+	s.selected = project.Name
+	s.detail.set(project)
 	s.split.SetShowContent(true)
 }
 
@@ -296,8 +301,8 @@ func (s *shell) appendProject(project compose.Project) *gtk.ListBoxRow {
 	row.SetChild(box)
 	row.SetTooltipText(fmt.Sprintf("%s, %s, %d Container in esecuzione su %d",
 		ProjectName(project), status.Label, project.Running, project.Total))
-	s.names[row] = project.Name
 	s.list.Append(row)
+	s.rows[row.Index()] = project
 	return row
 }
 
