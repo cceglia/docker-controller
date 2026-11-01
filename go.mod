@@ -3,9 +3,6 @@ module dockercontroller
 go 1.26.0
 
 require (
-	fyne.io/systray v1.12.2
-	github.com/diamondburned/gotk4-adwaita/pkg v0.0.0-20261031204147-41c057c79b39
-	github.com/diamondburned/gotk4/pkg v0.4.2-0.20261031093702-169e0f82bca8
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/mappu/miqt v0.15.0
@@ -18,7 +15,6 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	modernc.org/libc v1.79.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

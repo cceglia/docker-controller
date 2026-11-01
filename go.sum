@@ -1,11 +1,5 @@
-fyne.io/systray v1.12.2 h1:Y8DZxgLHsVQt6rY9Zrkkg+j67S7vv/1F2viOWKPpVeA=
-fyne.io/systray v1.12.2/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/diamondburned/gotk4-adwaita/pkg v0.0.0-20261031204147-41c057c79b39 h1:HHjqiQdenUolB652OV8akZYxMKIaADJijVs7Zt3q/dA=
-github.com/diamondburned/gotk4-adwaita/pkg v0.0.0-20261031204147-41c057c79b39/go.mod h1:Nl+CqqQj2EoLnieVZQyUtbRs1jLpbIB7qY/pCZBFiEw=
-github.com/diamondburned/gotk4/pkg v0.4.2-0.20261031093702-169e0f82bca8 h1:PAjHfU8YbA6xP24O86RG5lAiZ3F8lStkQddWn7glBgU=
-github.com/diamondburned/gotk4/pkg v0.4.2-0.20261031093702-169e0f82bca8/go.mod h1:BAEEDXtj5srQ1S2++5HX2K1s9c6CtuWSa60dAywrkRM=
 github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2xWg=
 github.com/dustin/go-humanize v1.1.0/go.mod h1:hc1CvRkJMsgxqjmjMQF3QNRAZBwY8AXBAzKYoSX9sFI=
 github.com/godbus/dbus/v5 v5.1.0 h1:4KLkAxT3aOY8Li4FRJe/KvhoNFFxo0m6fNuFUO8QJUk=

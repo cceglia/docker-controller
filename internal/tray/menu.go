@@ -1,8 +1,8 @@
 // Package tray describes the menu of the system tray and decides which Activity
 // outcomes deserve a desktop notification. It turns a compose.Snapshot into a
 // plain menu description and holds no domain logic and does no polling. It has
-// no GTK, no D-Bus and no systray: the systray adapter lives in
-// internal/trayadapter, and the GUI applies the result.
+// no Qt and no D-Bus: the GUI applies the menu to QSystemTrayIcon, and notify
+// carries the notifications.
 package tray
 
 import "dockercontroller/internal/compose"

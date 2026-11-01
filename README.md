@@ -1,22 +1,21 @@
 # Docker Controller
 
-Applicazione desktop in Go con GUI GTK4 (`gotk4` e `libadwaita`) per gestire i
-Progetti `docker-compose` della macchina: avvio, stop, log, stato dei Servizi,
-tray di sistema e notifiche desktop.
+Applicazione desktop in Go con GUI Qt 6 tramite `miqt` (binding Qt per Go) per
+gestire i Progetti `docker-compose` della macchina: avvio, stop, log, stato dei
+Servizi, tray di sistema e notifiche desktop.
 
 ## Prerequisiti di build
 
 Su Debian/Ubuntu (KDE Plasma incluso):
 
 ```sh
-sudo apt install build-essential pkg-config libgtk-4-dev libadwaita-1-dev gobject-introspection
+sudo apt install build-essential pkg-config qt6-base-dev
 ```
 
-- `build-essential`, `pkg-config`: toolchain C e cgo, che `gotk4` richiede.
-- `libgtk-4-dev`: intestazioni e librerie di GTK4.
-- `libadwaita-1-dev`: intestazioni e librerie di libadwaita.
-- `gobject-introspection`: fornisce la voce `pkg-config` `gobject-introspection-1.0`
-  e `libgirepository-1.0.so`, che `gotk4` cerca in fase di build.
+- `build-essential`: compilatore C++ e toolchain cgo, che `miqt` richiede.
+- `pkg-config`: cerca le librerie di Qt 6 in fase di build.
+- `qt6-base-dev`: intestazioni e librerie di Qt 6. Qt resta dinamico e di
+  sistema: il binario non lo incorpora.
 - Go 1.26 o successiva.
 - Docker con il plugin `docker compose` per eseguire l'app. Non serve per
   compilare i test.
@@ -29,6 +28,9 @@ make build
 
 Il binario di produzione finisce in `bin/dockercontroller`.
 
+Il primo build compila lo shim C++ di `miqt` e richiede circa quattro minuti
+con la cache Go vuota. Con la cache calda richiede pochi secondi.
+
 ## Test e verifica
 
 ```sh
@@ -38,12 +40,15 @@ make check       # vet + test + build
 make test-ui     # test della UI senza display, con il backend offscreen
 ```
 
+`go test ./...` compila cgo come il build, quindi chiede `qt6-base-dev`,
+`pkg-config` e un compilatore C++. Una macchina senza Qt non esegue nemmeno i
+test.
+
 `make test-ui` esegue con `QT_QPA_PLATFORM=offscreen` il package
 `internal/gui` con il tag di build `ui`: lo smoke test costruisce e distrugge
 la finestra, e il test dei token controlla la scala tipografica, i contrasti e
-il bersaglio minimo. Il target non chiede un display, ma chiede Qt 6
-(`qt6-base-dev`), `pkg-config` e un compilatore C++, perché la build usa cgo.
-I test senza tag restano senza display e girano anche in `make check`.
+il bersaglio minimo. Il target non chiede un display. I test senza tag restano
+senza display e girano anche in `make check`.
 
 ## Installazione
 
