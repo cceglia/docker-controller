@@ -28,6 +28,8 @@ const (
 	breakpointWidth = 900
 	// emptyListText is the line of the list when no Project is saved.
 	emptyListText = "Nessun Progetto."
+	// toastTimeout is how long a message stays on screen, in seconds.
+	toastTimeout = 6
 )
 
 // Run opens the window and blocks until the application quits. The snapshot of
@@ -52,21 +54,31 @@ func Run(ctx context.Context, manager *compose.Manager) error {
 // shell owns the window and the two sides of its split view.
 type shell struct {
 	window  *adw.ApplicationWindow
+	toasts  *adw.ToastOverlay
 	split   *adw.NavigationSplitView
 	list    *gtk.ListBox
 	content *adw.NavigationPage
 	detail  *detailView
+	// manager runs the Actions and ctx stops them when the application quits.
+	manager *compose.Manager
+	ctx     context.Context
 	// rows maps the index of a row of the list to its Project. GTK hands the
 	// handler a wrapper of the row, not the pointer it was built with, so the
 	// pointer cannot be the key.
 	rows     map[int]compose.Project
 	selected string
+	// reachable and loading are the state of Docker of the last snapshot, so
+	// the detail keeps it while no new snapshot arrives.
+	reachable bool
+	loading   bool
 }
 
 // newShell builds the window: the list on the left, the content on the right,
 // and the breakpoint that collapses the two into pages under 900 sp.
 func newShell(app *adw.Application) *shell {
-	s := &shell{rows: map[int]compose.Project{}}
+	// Until the first snapshot arrives Docker has not been asked yet, so the
+	// detail must not call it unreachable.
+	s := &shell{rows: map[int]compose.Project{}, loading: true}
 
 	s.list = gtk.NewListBox()
 	s.list.SetSelectionMode(gtk.SelectionSingle)
@@ -86,6 +98,7 @@ func newShell(app *adw.Application) *shell {
 	sidebar.AddBottomBar(sidebarActions())
 
 	s.detail = newDetailView()
+	s.detail.onAction = s.do
 	s.content = s.detail.page
 
 	s.split = adw.NewNavigationSplitView()
@@ -100,11 +113,15 @@ func newShell(app *adw.Application) *shell {
 	)
 	breakpoint.AddSetter(s.split, "collapsed", true)
 
+	s.toasts = adw.NewToastOverlay()
+	s.toasts.SetChild(s.split)
+
 	s.window = adw.NewApplicationWindow(&app.Application)
 	s.window.SetTitle(windowTitle)
 	s.window.SetDefaultSize(windowWidth, windowHeight)
 	s.window.AddBreakpoint(breakpoint)
-	s.window.SetContent(s.split)
+	s.window.SetContent(s.toasts)
+	s.detail.parent = &s.window.ApplicationWindow.Window
 	return s
 }
 
@@ -147,6 +164,8 @@ func contentPlaceholder() *adw.StatusPage {
 
 // watch follows the Manager and moves every snapshot onto the GTK loop.
 func (s *shell) watch(ctx context.Context, manager *compose.Manager) {
+	s.ctx = ctx
+	s.manager = manager
 	go func() {
 		for snapshot := range manager.Watch(ctx) {
 			glib.IdleAdd(func() { s.apply(snapshot) })
@@ -154,9 +173,29 @@ func (s *shell) watch(ctx context.Context, manager *compose.Manager) {
 	}()
 }
 
+// do launches an Action on the Manager and tells the user why it did not start.
+// The outcome of the Activity belongs to a later ticket.
+func (s *shell) do(action compose.Action) {
+	if s.manager == nil {
+		return
+	}
+	if _, err := s.manager.Do(s.ctx, action); err != nil {
+		s.toast(UserError(err).Error())
+	}
+}
+
+// toast shows a short message over the content.
+func (s *shell) toast(message string) {
+	toast := adw.NewToast(message)
+	toast.SetTimeout(toastTimeout)
+	s.toasts.AddToast(toast)
+}
+
 // apply rebuilds the list from a snapshot, keeping the open Project selected
 // and refreshing its detail in place.
 func (s *shell) apply(snapshot compose.Snapshot) {
+	s.reachable = snapshot.DockerReachable
+	s.loading = snapshot.Loading
 	s.rows = map[int]compose.Project{}
 	s.list.RemoveAll()
 
@@ -184,7 +223,7 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 
 	if selected != nil {
 		s.list.SelectRow(selected)
-		s.detail.set(opened)
+		s.detail.set(opened, s.reachable, s.loading)
 		return
 	}
 	// The open Project is gone: the content side has nothing to show.
@@ -203,7 +242,7 @@ func (s *shell) activateRow(row *gtk.ListBoxRow) {
 		return
 	}
 	s.selected = project.Name
-	s.detail.set(project)
+	s.detail.set(project, s.reachable, s.loading)
 	s.split.SetShowContent(true)
 }
 
