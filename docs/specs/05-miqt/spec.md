@@ -29,11 +29,13 @@ dove serve un ruolo semantico, come i colori dei Servizi nel log.
 
 Il backend resta intatto: compose, database e impostazioni non cambiano
 contratto. La vista si riscrive come package Qt. La tray passa a
-`QSystemTrayIcon`, le notifiche a `QSystemTrayIcon.ShowMessage` e la chiusura
-nasconde la finestra invece di distruggerla.
+`QSystemTrayIcon` e la chiusura nasconde la finestra invece di distruggerla.
+Le notifiche restano su D-Bus, con l'azione `default` e l'ascolto di
+`ActionInvoked`.
 
-Alla fine del lavoro escono dal repository `gotk4`, `libadwaita`,
-`fyne.io/systray` e il trasporto D-Bus delle notifiche. Entrano miqt e Qt 6.
+Alla fine del lavoro escono dal repository `gotk4`, `libadwaita` e
+`fyne.io/systray`. Entrano miqt e Qt 6. Il mittente `internal/notify` resta,
+perché è la via che riporta il click sulla notifica.
 Entra anche la mutation testing con gremlins sui test unitari, con un target
 `make mutate` e un `.gremlins.yaml` versionato.
 
@@ -133,8 +135,8 @@ Entra anche la mutation testing con gremlins sui test unitari, con un target
 - **Moduli**: il package della GUI contiene shell, viste e view model. Il `main` resta il cablaggio: database, impostazioni, `compose.Manager`, GUI e tray. Il package della tray resta puro e senza Qt. Solo l'adapter della tray conosce `QSystemTrayIcon`.
 - **Nessun livello eventi**: la UI legge lo snapshot del Manager e riceve le callback di Attività, Log e Utilizzo direttamente. Nessun payload JSON e nessun binding generato.
 - **Thread**: ogni chiamata Qt avviene sul thread principale. Le callback che arrivano da goroutine si accodano con `mainthread.Start`. Il thread principale resta libero: nessuna operazione oltre 100 ms vi gira dentro. `mainthread.Wait` non si usa dentro uno slot.
-- **Tray**: `QSystemTrayIcon` con `QMenu` aggiornato a ogni snapshot. Il menu si ricostruisce solo quando l'albero cambia. L'icona ha una variante per Docker non raggiungibile, e il tooltip dice "Docker Controller" più lo stato di Docker a parole. Il click sinistro mostra la finestra e il tasto destro apre il menu. L'avvio controlla `QSystemTrayIcon_IsSystemTrayAvailable`; senza tray l'app funziona lo stesso, e "Esci" e le Impostazioni restano nella finestra.
-- **Notifiche**: `QSystemTrayIcon.ShowMessage` con titolo "Docker Controller". La decisione su cosa notificare resta nel package puro della tray, con le sue tre chiamate: `Launching`, `Aborted` e `Observe`. Il mittente nasce dopo `QApplication`, vive sul thread Qt e si raggiunge con `mainthread.Start`. Il trasporto D-Bus sparisce insieme al suo package. Senza tray non arriva nessuna notifica desktop: al suo posto resta l'avviso in sovrimpressione nella finestra.
+- **Tray**: `QSystemTrayIcon` con `QMenu` aggiornato a ogni snapshot. Il menu si ricostruisce solo quando l'albero cambia. L'icona ha una variante per Docker non raggiungibile, e il tooltip dice "Docker Controller" più lo stato di Docker a parole. Il click sinistro mostra la finestra e il tasto destro apre il menu. L'avvio controlla `QSystemTrayIcon_IsSystemTrayAvailable`; senza tray l'app funziona lo stesso, e "Esci" e le Impostazioni restano nella finestra. Su Wayland l'icona è uno StatusNotifierItem: KDE disegna il menu tramite `com.canonical.dbusmenu`, quindi il popup Qt non serve.
+- **Notifiche**: D-Bus tramite `internal/notify` e `github.com/godbus/dbus/v5`, con titolo "Docker Controller" e il testo di oggi. `org.freedesktop.Notifications.Notify` porta l'azione `default`: `[]string{"default", ""}`. Il mittente ascolta `org.freedesktop.Notifications.ActionInvoked` per l'id della notifica inviata, e sul click mostra e alza la finestra. Le notifiche arrivano anche senza tray, perché passano dal bus di sessione. L'invio gira su una goroutine e non blocca il thread Qt. La decisione su cosa notificare resta nel package puro della tray, con le sue tre chiamate: `Launching`, `Aborted` e `Observe`. `internal/notify` non esce dal repository e `godbus` resta in `go.mod`.
 - **Finestra nascosta e stream**: nascondere la finestra ferma il pannello Log e l'Utilizzo risorse, perché `docker compose logs` e `docker stats` sono processi esterni. L'output di un'Attività lanciata dalla tray continua, perché non dipende dalla finestra. Mostrare la finestra riavvia i due stream.
 - **Tema**: stile nativo del desktop, Breeze su KDE. Niente foglio di stile globale che sostituisca il tema. Un QSS applicativo limitato definisce i ruoli che il tema non copre: i colori dei Servizi nel log, le etichette di stato e le tacche. I ruoli hanno un nome semantico e vivono in una sola costante Go. I valori vengono dalla palette del sistema dove la palette li espone, con un valore di ripiego dichiarato accanto. Il test dei token legge la stessa costante che il codice applica.
 - **Tipi e spaziature**: scala tipografica con rapporto 1.125 e corpo a 16 px. Ritmo di spaziatura 4, 8, 12, 16, 24. Margini di pagina 16-24 px. Nessun testo utente in un controllo a larghezza fissa. Bersaglio minimo di 24x24 px per ogni controllo.
@@ -145,7 +147,7 @@ Entra anche la mutation testing con gremlins sui test unitari, con un target
 - **Aperture esterne**: cartella, terminale e porta usano ancora `xdg-open` e il comando del terminale, con la stessa validazione di oggi.
 - **Errori utente**: la mappatura attuale resta nel package della GUI e continua a produrre i testi italiani degli avvisi e dei dialoghi.
 - **Lingua**: stringhe italiane in Go, in una sola sorgente. Nessun `QTranslator` e nessun catalogo esterno, perché l'app ha una lingua sola.
-- **Build**: gli script perdono ogni riferimento a GTK. Restano `go vet`, `go test`, build con cgo e install. Il primo build compila lo shim C++ di miqt e richiede circa dieci minuti. Anche `go test ./...` compila cgo, quindi chiede Qt e un compilatore C++.
+- **Build**: gli script perdono ogni riferimento a GTK. Restano `go vet`, `go test`, build con cgo e install. Il primo build compila lo shim C++ di miqt e richiede 256,53 s con la cache Go vuota, circa quattro minuti. Con la cache calda dura 7,3 s. Anche `go test ./...` compila cgo, quindi chiede Qt e un compilatore C++.
 - **Prerequisiti**: `build-essential`, `pkg-config`, `qt6-base-dev`. Spariscono `libgtk-4-dev`, `libadwaita-1-dev` e `gobject-introspection`.
 - **Skill di UI**: ogni modifica alla vista carica la skill locale `miqt-ui-design` prima di toccare i widget. Le revisioni di layout e navigazione usano `qt-ui-design`. La regola vive in `AGENTS.md` e vale anche per i subagent.
 - **Verifica della UI**: `make test-ui` esegue con `QT_QPA_PLATFORM=offscreen` lo smoke test della finestra e il test dei token di design. Il passaggio sugli screenshot resta manuale, con `QWidget.Grab()`, e le immagini non entrano nel repository.
@@ -163,28 +165,28 @@ Entra anche la mutation testing con gremlins sui test unitari, con un target
 - Il test dei token legge il foglio di stile e la scala tipografica, controlla il corpo minimo di 16 px e i rapporti di contrasto 4.5:1 e 3:1. Fallisce quando un ruolo nuovo salta il controllo.
 - Lo smoke test costruisce la finestra con `QT_QPA_PLATFORM=offscreen` e la distrugge, senza mostrarla. Scopre errori di costruttore e di cablaggio senza display.
 - La seam più alta resta la pipeline di verifica: `go vet`, `go test`, build con cgo, `make test-ui` e `make mutate`. Per il port è l'unica rete che copre tutto.
-- Checklist manuale su KDE prima di chiudere il branch: lista e raggruppamento, tacche, ogni Azione, conferma di Down, aggiunta e rimozione di un Progetto, apertura di cartella, terminale e porta, log con ricerca e pausa, utilizzo della CPU, tray con click sinistro e menu, notifiche, tre comportamenti di chiusura, finestra nascosta e riaperta, scala al 125% e al 150%, installazione con `make install`.
+- Checklist manuale su KDE prima di chiudere il branch: lista e raggruppamento, tacche, ogni Azione, conferma di Down, aggiunta e rimozione di un Progetto, apertura di cartella, terminale e porta, log con ricerca e pausa, utilizzo della CPU, tray con click sinistro e menu, notifiche e click sulla notifica, tre comportamenti di chiusura, finestra nascosta e riaperta, scala al 125% e al 150%, installazione con `make install`.
 
 ## Out of Scope
 
 - Windows e macOS.
 - Una UI in QML.
-- Temi personalizzati, dark mode disegnata a mano, notifiche con pulsanti o azioni.
+- Temi personalizzati, dark mode disegnata a mano, notifiche con pulsanti oltre all'azione `default`.
 - Catalogo di traduzioni e `QTranslator`.
-- Un fallback D-Bus quando la tray non è disponibile.
+- Un ripiego per la tray quando il desktop non offre uno StatusNotifierItem. Le notifiche restano fuori da questo caso, perché passano dal bus di sessione.
 - Modifiche al contratto con la CLI `docker compose` e ai package di compose, database e impostazioni.
 - Nuove funzioni di dominio non presenti oggi. Fanno eccezione la vista a pagine sotto i 900 px, la cronologia delle Attività conservata e gli strumenti di verifica dei test.
 - Una pipeline di integrazione continua: il repository non ne ha una.
-- La riscrittura della logica del menu della tray e delle notifiche.
+- La riscrittura della logica del menu della tray e della decisione su cosa notificare. Cambia solo il mittente D-Bus delle notifiche.
 
 ## Further Notes
 
 - **Licenza**: miqt è MIT e Qt 6 è LGPL-3.0 con linking dinamico. Il vincolo AGPL di `gotk4-adwaita` sparisce. L'ADR 0005 lo registra.
-- **Rischio tray**: su Wayland l'icona è uno StatusNotifierItem e alcuni desktop non la mostrano. Il prototipo del ticket 01 lo verifica su X11 e su Wayland. Se Wayland non regge, la spec dichiara Wayland non supportato e il port resta su X11. Aggiorna la spec chi chiude il prototipo.
-- **Rischio versione**: miqt è generato contro una versione di Qt. Con Qt 6.10.2 il binding può non compilare. In quel caso si fissa il commit di miqt più recente e si aggiorna la spec.
+- **Rischio tray**: chiuso dal prototipo. Su Wayland con KDE `QSystemTrayIcon_IsSystemTrayAvailable()` risponde `true`, `org.kde.StatusNotifierWatcher` è presente e l'oggetto `/StatusNotifierItem` è attivo. Il menu lo disegna il desktop tramite `com.canonical.dbusmenu`: il popup Qt non serve.
+- **Rischio versione**: chiuso dal prototipo. miqt `v0.15.0` compila e gira contro Qt 6.10.2, con Go 1.27.3 e g++ 15.2.0. Il binding resta fissato a `v0.15.0`.
 - **Rischio classe di finestra**: Qt ricava la classe della finestra dal nome applicazione. Se il nome non coincide con `StartupWMClass`, KDE mostra l'icona sbagliata. Il ticket 02 lo imposta, il ticket 14 lo controlla con un test.
-- **Rischio build**: il primo build con cgo richiede circa dieci minuti e una toolchain C++. Anche `go test ./...` compila cgo, quindi chiede Qt. Una macchina senza `qt6-base-dev` non esegue nemmeno i test.
-- **Memoria attesa**: Qt 6 Widgets parte da circa 30-40 MB di PSS, contro i 60-70 MB attesi da GTK4 e i 185 MB della versione Wails.
+- **Rischio build**: il primo build con cgo richiede 256,53 s con la cache Go vuota, circa quattro minuti, e una toolchain C++. Con la cache calda dura 7,3 s. Anche `go test ./...` compila cgo, quindi chiede Qt. Una macchina senza `qt6-base-dev` non esegue nemmeno i test.
+- **Memoria misurata**: 27,0 MB di PSS a riposo su Wayland con la finestra aperta, 136,7 MB di RSS e 11 thread. Restano i 60-70 MB attesi da GTK4 e i 185 MB della versione Wails per il confronto.
 - **Perché non QML**: la vista è fatta di liste, form e pannelli, quindi i Widgets coprono il caso senza un livello dichiarativo e senza il tooling QML.
-- **Perché `ShowMessage`**: una sola API per tray e notifiche, nessun trasporto da mantenere. Il prezzo è che senza tray non arriva nessuna notifica, e che il click non distingue la notifica.
+- **Perché D-Bus per le notifiche**: `QSystemTrayIcon.ShowMessage` invia `Notify` con l'elenco `actions` vuoto, quindi KDE non può segnalare il click. D-Bus costa un trasporto da mantenere, ma il trasporto esiste già in `internal/notify`. In cambio il click sulla notifica funziona, e la notifica arriva anche senza tray.
 - **ADR**: l'ADR 0005 sostituisce l'ADR 0003 per il ciclo di vita della finestra e l'ADR 0004 per il framework e la libreria della tray.

@@ -11,6 +11,7 @@
 - [ ] Il menu si ricostruisce solo quando l'albero delle voci cambia
 - [ ] Il click sinistro mostra la finestra e le porta il focus
 - [ ] Il tasto destro apre il menu
+- [ ] Su Wayland il menu lo disegna il desktop tramite `com.canonical.dbusmenu`: il popup Qt non serve
 - [ ] L'icona cambia quando Docker non risponde
 - [ ] Il tooltip dice "Docker Controller" e ripete lo stato di Docker a parole
 - [ ] Le Azioni della tray funzionano, comprese le conferme di un'Azione distruttiva

@@ -1,4 +1,4 @@
-# Qt 6 con miqt al posto di GTK, systray e del trasporto D-Bus
+# Qt 6 con miqt al posto di GTK e systray
 
 Sostituiamo `gotk4`, `libadwaita` e `fyne.io/systray` con miqt: Qt 6 Widgets in
 Go, con licenza MIT. Sul desktop KDE la finestra deve sembrare parte del
@@ -17,13 +17,16 @@ combinata AGPL un binario distribuito. miqt è MIT e Qt 6 è LGPL-3.0: con il
 linking dinamico il vincolo AGPL sparisce. Resta l'obbligo di rendere
 sostituibile la libreria Qt, che l'installazione di sistema già soddisfa.
 
-La tray passa a `QSystemTrayIcon` e le notifiche a
-`QSystemTrayIcon.ShowMessage`. Una sola API per entrambe, nessun trasporto
-D-Bus da mantenere. Il prezzo è che senza tray non arriva nessuna notifica
-desktop, e che il click sulla notifica non distingue un'Attività da un'altra.
-Su Wayland l'icona resta uno StatusNotifierItem e alcuni desktop non la
-mostrano: il primo lavoro del port è un prototipo su KDE, prima di toccare il
-resto.
+La tray passa a `QSystemTrayIcon`. Le notifiche restano su D-Bus, con il
+mittente `internal/notify` e `github.com/godbus/dbus/v5`. `ShowMessage` non può
+riportare il click, perché manda `Notify` con l'elenco delle azioni vuoto: KDE
+non ha modo di segnalarlo. Il mittente D-Bus passa l'azione `default` e ascolta
+`ActionInvoked`, quindi il click mostra la finestra. La notifica arriva anche
+senza tray, perché passa dal bus di sessione. Il prezzo è un trasporto da
+mantenere, che però esiste già in `internal/notify`.
+Su Wayland l'icona resta uno StatusNotifierItem. Il prototipo su KDE mostra che
+funziona, e che il menu lo disegna il desktop tramite `com.canonical.dbusmenu`:
+il popup Qt non serve.
 
 Cambia anche il ciclo di vita della finestra. L'ADR 0003 la distruggeva alla
 chiusura per liberare la memoria del webview di Wails. Con Qt Widgets non c'è
@@ -34,16 +37,18 @@ finestra si nasconde, perché sono processi esterni. L'output di un'Attività
 lanciata dalla tray continua.
 
 Il port segue una sola passata sul branch `miqt`. Il primo ticket è un prototipo
-che verifica miqt e la tray su Qt 6.10.2, su X11 e su Wayland. Il secondo porta
+che verifica miqt e la tray su Qt 6.10.2, su Wayland con KDE. Il secondo porta
 la shell Qt, la lista e un dettaglio minimo, e toglie i file GTK. Da lì in poi
 ogni ticket riporta un'area e l'app resta compilabile. Il backend di compose,
 database e impostazioni non si tocca.
 
-I rischi restano due. Il primo è la tray su Wayland, che il prototipo deve
-chiarire. Il secondo è la versione: miqt è generato contro una versione di Qt, e
-Qt 6.10.2 può non combaciare con il binding. In quel caso si fissa il commit di
-miqt più recente. Il guadagno atteso è una memoria di circa 30-40 MB di PSS,
-contro i 60-70 MB attesi da GTK4 e i 185 MB della versione Wails.
+I rischi sono chiusi dal prototipo. miqt `v0.15.0` compila e gira contro
+Qt 6.10.2, con Go 1.27.3 e g++ 15.2.0. La tray funziona su Wayland con KDE:
+`QSystemTrayIcon_IsSystemTrayAvailable()` risponde `true` e
+`org.kde.StatusNotifierWatcher` è presente. Il primo build dura 256,53 s con la
+cache Go vuota, circa quattro minuti, e 7,3 s con la cache calda. Il guadagno
+misurato è 27,0 MB di PSS a riposo con la finestra aperta, contro i 60-70 MB
+attesi da GTK4 e i 185 MB della versione Wails.
 
 L'ADR 0003 è sostituito per il ciclo di vita della finestra. L'ADR 0004 è
 sostituito per il framework e per la libreria della tray. La specifica del port

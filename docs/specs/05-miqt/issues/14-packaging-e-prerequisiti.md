@@ -6,9 +6,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] `go mod tidy` toglie `gotk4`, `gotk4-adwaita`, `fyne.io/systray` e il trasporto D-Bus delle notifiche
+- [ ] `go mod tidy` toglie `gotk4`, `gotk4-adwaita` e `fyne.io/systray`. `godbus` resta per `internal/notify`
 - [ ] Il README nomina i prerequisiti Qt 6 e non nomina GTK
-- [ ] Il README spiega che il primo build compila lo shim C++ e richiede circa dieci minuti
+- [ ] Il README spiega che il primo build compila lo shim C++ e richiede circa quattro minuti con la cache Go vuota
 - [ ] Il README spiega che `go test ./...` richiede `qt6-base-dev` e un compilatore C++
 - [ ] Il Makefile non nomina GTK fra le dipendenze di build, e `make build` usa il cgo
 - [ ] `gtk-update-icon-cache` o un comando equivalente resta per aggiornare la cache delle icone
