@@ -7,6 +7,7 @@ import (
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/db"
 	"dockercontroller/internal/gui"
+	"dockercontroller/internal/notify"
 	"dockercontroller/internal/settings"
 )
 
@@ -33,13 +34,18 @@ func run() error {
 	defer cancel()
 
 	// The log of the session lives in the GUI package, without GTK: the Manager
-	// pushes its events into it and never waits for the window.
+	// pushes its events into it and never waits for the window. The notifier
+	// reads the same events and shows the notifications they deserve.
 	activities := gui.NewActivityLog()
+	notifier := gui.NewNotifier(notify.NewDBus())
 
 	manager, err := compose.New(compose.Config{
-		Docker:     compose.ExecDocker{},
-		DB:         conn,
-		OnActivity: activities.Push,
+		Docker: compose.ExecDocker{},
+		DB:     conn,
+		OnActivity: func(e compose.ActivityEvent) {
+			activities.Push(e)
+			notifier.Observe(e)
+		},
 	})
 	if err != nil {
 		return err
@@ -47,5 +53,5 @@ func run() error {
 
 	go manager.Run(ctx, func(err error) { log.Printf("compose refresh: %v", err) })
 
-	return gui.Run(ctx, manager, activities, settings.New(conn))
+	return gui.Run(ctx, manager, activities, settings.New(conn), notifier)
 }

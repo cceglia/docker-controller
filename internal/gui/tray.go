@@ -4,6 +4,7 @@ import (
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
 
+	"dockercontroller/internal/compose"
 	"dockercontroller/internal/tray"
 	"dockercontroller/internal/trayadapter"
 )
@@ -51,7 +52,23 @@ func (s *shell) trayChoose(node trayadapter.Node) {
 		s.confirmTray(node)
 		return
 	}
-	s.do(*node.Action)
+	s.doTray(*node.Action)
+}
+
+// doTray launches an Action chosen in the tray. The Notifier announces it before
+// the Manager sees it, so the end of the Activity is notified, and withdraws the
+// announcement when the Manager refuses the Action. The refusal is also shown as
+// a toast, and the reason is the one the old view used.
+func (s *shell) doTray(action compose.Action) {
+	if s.manager == nil {
+		return
+	}
+	err := s.notifier.launch(action, func(action compose.Action) (compose.ActivityID, error) {
+		return s.manager.Do(s.ctx, action)
+	})
+	if err != nil {
+		s.toast(UserError(err).Error())
+	}
 }
 
 // confirmTray asks the question of an entry that carries Confirm and launches
@@ -68,7 +85,7 @@ func (s *shell) confirmTray(node trayadapter.Node) {
 	dialog.ConnectResponse(func(response string) {
 		s.dropConfirmation(dialog)
 		if response == "run" {
-			s.do(*node.Action)
+			s.doTray(*node.Action)
 		}
 	})
 	dialog.Present()

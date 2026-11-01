@@ -43,8 +43,9 @@ const (
 // the Manager is read through Watch, so a Project added or removed appears
 // without a restart. activities is the log of the session: the bottom panel
 // reads it and the Manager pushes its events into it. store holds the settings:
-// the terminal command of "Apri terminale" comes from it.
-func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog, store *settings.Store) error {
+// the terminal command of "Apri terminale" comes from it. notifier shows the
+// desktop notifications the Manager's events and the tray Actions deserve.
+func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog, store *settings.Store, notifier *Notifier) error {
 	app := adw.NewApplication(appID, gio.ApplicationDefaultFlags)
 	var window *shell
 	app.ConnectActivate(func() {
@@ -52,7 +53,7 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 			window.window.Present()
 			return
 		}
-		window = newShell(app, activities, store)
+		window = newShell(app, activities, store, notifier)
 		window.watch(ctx, manager)
 		window.window.Present()
 	})
@@ -79,6 +80,9 @@ type shell struct {
 	ctx     context.Context
 	// store holds the settings: the terminal command of "Apri terminale".
 	store *settings.Store
+	// notifier shows the desktop notifications of the Activities and of the
+	// tray Actions the Manager refuses.
+	notifier *Notifier
 	// snapshot is the last one applied: the tray builds its menu from it.
 	snapshot compose.Snapshot
 	// add is the dialog of a new Project while it is on screen, nil otherwise.
@@ -104,7 +108,7 @@ type shell struct {
 
 // newShell builds the window: the list on the left, the content on the right,
 // and the breakpoint that collapses the two into pages under 900 sp.
-func newShell(app *adw.Application, activities *ActivityLog, store *settings.Store) *shell {
+func newShell(app *adw.Application, activities *ActivityLog, store *settings.Store, notifier *Notifier) *shell {
 	// Until the first snapshot arrives Docker has not been asked yet, so the
 	// detail must not call it unreachable and the tray must not show the notice.
 	s := &shell{
@@ -112,6 +116,7 @@ func newShell(app *adw.Application, activities *ActivityLog, store *settings.Sto
 		rows:     map[int]compose.Project{},
 		loading:  true,
 		store:    store,
+		notifier: notifier,
 		snapshot: compose.Snapshot{Loading: true},
 	}
 
@@ -332,6 +337,9 @@ func (s *shell) activityFailed(a Activity) {
 // and refreshing its detail in place.
 func (s *shell) apply(snapshot compose.Snapshot) {
 	s.snapshot = snapshot
+	// A notification names a Project as the list does, and the snapshot is the
+	// last place that tells the Display name.
+	s.notifier.SetProjects(snapshot.Projects)
 	if s.tray != nil {
 		s.tray.Show(tray.BuildMenu(snapshot), tray.IconFor(snapshot))
 	}
