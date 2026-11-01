@@ -7,6 +7,7 @@ import (
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/db"
 	"dockercontroller/internal/gui"
+	"dockercontroller/internal/settings"
 )
 
 func main() {
@@ -46,5 +47,5 @@ func run() error {
 
 	go manager.Run(ctx, func(err error) { log.Printf("compose refresh: %v", err) })
 
-	return gui.Run(ctx, manager, activities)
+	return gui.Run(ctx, manager, activities, settings.New(conn))
 }

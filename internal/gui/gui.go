@@ -14,6 +14,7 @@ import (
 	"github.com/diamondburned/gotk4/pkg/pango"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/settings"
 )
 
 const (
@@ -39,8 +40,9 @@ const (
 // Run opens the window and blocks until the application quits. The snapshot of
 // the Manager is read through Watch, so a Project added or removed appears
 // without a restart. activities is the log of the session: the bottom panel
-// reads it and the Manager pushes its events into it.
-func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog) error {
+// reads it and the Manager pushes its events into it. store holds the settings:
+// the terminal command of "Apri terminale" comes from it.
+func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog, store *settings.Store) error {
 	app := adw.NewApplication(appID, gio.ApplicationDefaultFlags)
 	var window *shell
 	app.ConnectActivate(func() {
@@ -48,7 +50,7 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog)
 			window.window.Present()
 			return
 		}
-		window = newShell(app, activities)
+		window = newShell(app, activities, store)
 		window.watch(ctx, manager)
 		window.window.Present()
 	})
@@ -67,6 +69,10 @@ type shell struct {
 	// manager runs the Actions and ctx stops them when the application quits.
 	manager *compose.Manager
 	ctx     context.Context
+	// store holds the settings: the terminal command of "Apri terminale".
+	store *settings.Store
+	// add is the dialog of a new Project while it is on screen, nil otherwise.
+	add *addDialog
 	// rows maps the index of a row of the list to its Project. GTK hands the
 	// handler a wrapper of the row, not the pointer it was built with, so the
 	// pointer cannot be the key.
@@ -88,10 +94,10 @@ type shell struct {
 
 // newShell builds the window: the list on the left, the content on the right,
 // and the breakpoint that collapses the two into pages under 900 sp.
-func newShell(app *adw.Application, activities *ActivityLog) *shell {
+func newShell(app *adw.Application, activities *ActivityLog, store *settings.Store) *shell {
 	// Until the first snapshot arrives Docker has not been asked yet, so the
 	// detail must not call it unreachable.
-	s := &shell{rows: map[int]compose.Project{}, loading: true}
+	s := &shell{rows: map[int]compose.Project{}, loading: true, store: store}
 
 	s.list = gtk.NewListBox()
 	s.list.SetSelectionMode(gtk.SelectionSingle)
@@ -108,11 +114,15 @@ func newShell(app *adw.Application, activities *ActivityLog) *shell {
 	sidebar := adw.NewToolbarView()
 	sidebar.AddTopBar(sidebarBar())
 	sidebar.SetContent(scrolled)
-	sidebar.AddBottomBar(sidebarActions())
+	sidebar.AddBottomBar(s.sidebarActions())
 
 	s.detail = newDetailView(activities)
 	s.detail.onAction = s.do
 	s.detail.onSave = s.saveSettings
+	s.detail.onFolder = s.openFolder
+	s.detail.onTerminal = s.openTerminal
+	s.detail.onRemove = s.removeFromList
+	s.detail.onPort = s.openPort
 	s.detail.panel.onFailure = s.activityFailed
 	s.content = s.detail.page
 
@@ -156,20 +166,20 @@ func sidebarBar() *adw.HeaderBar {
 	return bar
 }
 
-// sidebarActions is the bar under the list. Both buttons stay visible with an
-// empty list and stay insensitive until their ticket wires them.
-func sidebarActions() *gtk.ActionBar {
+// sidebarActions is the bar under the list. The button of a new Project asks for
+// its File compose; Impostazioni stays insensitive until its ticket wires it.
+func (s *shell) sidebarActions() *gtk.ActionBar {
 	bar := gtk.NewActionBar()
 
 	add := gtk.NewButtonWithLabel("Aggiungi progetto")
-	add.SetSensitive(false)
 	add.SetTooltipText("Aggiungi un Progetto alla lista.")
+	add.ConnectClicked(s.showAddDialog)
 	bar.PackStart(add)
 
-	settings := gtk.NewButtonWithLabel("Impostazioni")
-	settings.SetSensitive(false)
-	settings.SetTooltipText("Apri le Impostazioni.")
-	bar.PackEnd(settings)
+	prefs := gtk.NewButtonWithLabel("Impostazioni")
+	prefs.SetSensitive(false)
+	prefs.SetTooltipText("Apri le Impostazioni.")
+	bar.PackEnd(prefs)
 
 	return bar
 }

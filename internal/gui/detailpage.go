@@ -56,12 +56,18 @@ type detailView struct {
 	edit   *ProjectEdit
 	groups []string
 	// onAction launches an Action; onSave hands the settings of the form to the
-	// Manager. parent hosts the confirmation dialog. GTK must keep the last
-	// dialog alive while it is on screen.
-	onAction func(compose.Action)
-	onSave   func(name string, settings compose.Settings)
-	parent   *gtk.Window
-	dialog   *adw.MessageDialog
+	// Manager. onFolder, onTerminal, onPort and onRemove open the folder, a
+	// terminal and a published port of the Project, and take it off the list.
+	// parent hosts the confirmation dialog. GTK must keep the last dialog alive
+	// while it is on screen.
+	onAction   func(compose.Action)
+	onSave     func(name string, settings compose.Settings)
+	onFolder   func(name string)
+	onTerminal func(name string)
+	onPort     func(port int)
+	onRemove   func(name string)
+	parent     *gtk.Window
+	dialog     *adw.MessageDialog
 }
 
 // newDetailView builds the content side: the invitation until a Project is
@@ -162,7 +168,7 @@ func (d *detailView) render() {
 	}
 	d.content.Append(projectHeader(project, actionBar(ProjectActions(project, d.shownDocker), reason, true, d.choose), func() { d.showLogs(project) }))
 	if project.ComposeMissing {
-		d.content.Append(missingBanner())
+		d.content.Append(missingBanner(project, d.shownDocker, d.confirmRemove))
 	}
 	if d.edit != nil {
 		d.content.Append(projectForm(project, d.groups, d.edit, d.saveEdit, d.cancelEdit))
@@ -172,13 +178,14 @@ func (d *detailView) render() {
 			d.content.Append(profiles)
 		}
 	}
+	d.content.Append(projectCommands(project, d.shownDocker, d.openFolder, d.openTerminal, d.confirmRemove))
 	d.content.Append(servicesHeading(len(project.Services)))
 	if len(project.Services) == 0 {
 		d.content.Append(emptyServices(project))
 	}
 	d.blocks = make(map[string]*serviceUsageBlock, len(project.Services))
 	for _, service := range project.Services {
-		group, block := serviceGroup(project, service, d.shownDocker, d.choose)
+		group, block := serviceGroup(project, service, d.shownDocker, d.choose, d.openPort)
 		d.content.Append(group)
 		d.blocks[project.Name+"/"+service.Name] = block
 	}
@@ -280,10 +287,46 @@ func (d *detailView) choose(view ActionView) {
 }
 
 // confirm asks the question of a destructive Action. Cancelling or closing the
-// dialog launches nothing. When the question names a text to type, the confirm
-// response stays off until the entry holds exactly that text.
+// dialog launches nothing.
 func (d *detailView) confirm(view ActionView) {
-	question := view.Confirmation
+	d.ask(*view.Confirmation, func() { d.launch(view.Action) })
+}
+
+// confirmRemove asks the question that takes a Project off the list. A yes
+// hands the name to the shell, which never stops a Container.
+func (d *detailView) confirmRemove(project compose.Project) {
+	d.ask(RemoveConfirmation(project), func() {
+		if d.onRemove != nil {
+			d.onRemove(project.Name)
+		}
+	})
+}
+
+// openFolder opens the folder of the Project shown.
+func (d *detailView) openFolder() {
+	if d.onFolder != nil {
+		d.onFolder(d.shown.Name)
+	}
+}
+
+// openTerminal opens a terminal in the folder of the Project shown.
+func (d *detailView) openTerminal() {
+	if d.onTerminal != nil {
+		d.onTerminal(d.shown.Name)
+	}
+}
+
+// openPort opens a published port of the Project shown in the browser.
+func (d *detailView) openPort(port int) {
+	if d.onPort != nil {
+		d.onPort(port)
+	}
+}
+
+// ask opens the question of a destructive entry. Cancelling or closing the
+// dialog runs nothing. When the question names a text to type, the confirm
+// response stays off until the entry holds exactly that text.
+func (d *detailView) ask(question Confirmation, onConfirm func()) {
 	dialog := adw.NewMessageDialog(d.parent, question.Title, question.Message)
 	d.dialog = dialog
 	dialog.AddResponse("cancel", "Annulla")
@@ -316,7 +359,7 @@ func (d *detailView) confirm(view ActionView) {
 			d.dialog = nil
 		}
 		if response == "run" {
-			d.launch(view.Action)
+			onConfirm()
 		}
 	})
 	dialog.Present()
@@ -398,10 +441,50 @@ func noticeBanner(text string) *adw.Banner {
 	return banner
 }
 
-// missingBanner flags the Project whose Compose files are gone. It carries no
-// button: Rimuovi dalla lista belongs to a later ticket.
-func missingBanner() *adw.Banner {
-	return noticeBanner(MissingComposeText)
+// missingBanner flags the Project whose Compose files are gone. When the
+// Project may leave the list, the banner carries the entry that asks for it.
+func missingBanner(project compose.Project, dockerReachable bool, onRemove func(compose.Project)) *adw.Banner {
+	banner := noticeBanner(MissingComposeText)
+	if CanRemoveFromList(project, dockerReachable) {
+		banner.SetButtonLabel(removeText)
+		banner.ConnectButtonClicked(func() { onRemove(project) })
+	}
+	return banner
+}
+
+// projectCommands is the row of commands of the Project: its folder, a terminal
+// in it and the entry that takes it off the list. The entry is quiet at rest and
+// insensitive while the Project still has a Container.
+func projectCommands(project compose.Project, dockerReachable bool, onFolder, onTerminal func(), onRemove func(compose.Project)) *gtk.Box {
+	bar := gtk.NewBox(gtk.OrientationHorizontal, 6)
+	bar.SetHAlign(gtk.AlignStart)
+
+	folder := commandButton("Cartella", "Apri la cartella del Progetto nel gestore file.", onFolder)
+	folder.SetSensitive(project.Folder != "")
+	bar.Append(folder)
+
+	terminal := commandButton("Terminale", "Apri un terminale nella cartella del Progetto.", onTerminal)
+	terminal.SetSensitive(project.Folder != "")
+	bar.Append(terminal)
+
+	remove := commandButton(removeText, "Togli il Progetto dalla lista: Docker e i file non vengono toccati.",
+		func() { onRemove(project) })
+	remove.SetSensitive(CanRemoveFromList(project, dockerReachable))
+	if reason := RemoveDisabledReason(project, dockerReachable); reason != "" {
+		remove.SetTooltipText(reason)
+	}
+	bar.Append(remove)
+
+	return bar
+}
+
+// commandButton is one quiet command of the detail.
+func commandButton(label, tooltip string, onClick func()) *gtk.Button {
+	button := gtk.NewButtonWithLabel(label)
+	button.AddCSSClass("flat")
+	button.SetTooltipText(tooltip)
+	button.ConnectClicked(onClick)
+	return button
 }
 
 // actionBar is the row of Action buttons of a Project or of a Service. When
@@ -459,7 +542,7 @@ func emptyServices(project compose.Project) *gtk.Label {
 // its Utilizzo risorse and one row per Container, in the order the Project
 // reports them. It returns the block of the measures, so the detail updates it
 // without rebuilding the group.
-func serviceGroup(project compose.Project, service compose.Service, dockerReachable bool, choose func(ActionView)) (*adw.PreferencesGroup, *serviceUsageBlock) {
+func serviceGroup(project compose.Project, service compose.Service, dockerReachable bool, choose func(ActionView), openPort func(int)) (*adw.PreferencesGroup, *serviceUsageBlock) {
 	group := adw.NewPreferencesGroup()
 	group.SetTitle(service.Name)
 	reason := ActionDisabledReason(dockerReachable, project.Activity != nil)
@@ -479,14 +562,14 @@ func serviceGroup(project compose.Project, service compose.Service, dockerReacha
 	group.Add(row)
 
 	for _, container := range service.Containers {
-		group.Add(containerRow(container))
+		group.Add(containerRow(container, openPort))
 	}
 	return group, block
 }
 
 // containerRow is one Container: the marker of its tone, its name, its image,
 // its state, its health and its published ports.
-func containerRow(container compose.Container) *adw.ActionRow {
+func containerRow(container compose.Container, openPort func(int)) *adw.ActionRow {
 	row := adw.NewActionRow()
 	row.SetTitle(container.Name)
 	row.SetSubtitle(container.Image)
@@ -515,24 +598,33 @@ func containerRow(container compose.Container) *adw.ActionRow {
 	}
 
 	if len(container.Ports) > 0 {
-		row.AddSuffix(portBox(container.Ports))
+		row.AddSuffix(portBox(container.Ports, openPort))
 	}
 
 	return row
 }
 
-// portBox lists the published ports of one Container. Opening a port in the
-// browser belongs to a later ticket, so the ports are text only.
-func portBox(ports []compose.Port) *gtk.Box {
+// portBox lists the published ports of one Container as small quiet buttons: a
+// press opens http://localhost:<port> in the browser, and the tooltip says the
+// whole address as the old view did.
+func portBox(ports []compose.Port, openPort func(int)) *gtk.Box {
 	box := gtk.NewBox(gtk.OrientationHorizontal, 6)
 	box.SetVAlign(gtk.AlignCenter)
 	for _, port := range ports {
-		label := gtk.NewLabel(PortText(port))
-		label.AddCSSClass("monospace")
-		label.AddCSSClass("caption")
-		label.SetTooltipText(fmt.Sprintf("Porta host %d, porta del Container %d, protocollo %s",
+		button := gtk.NewButtonWithLabel(PortText(port))
+		button.AddCSSClass("flat")
+		button.AddCSSClass("monospace")
+		button.AddCSSClass("caption")
+		button.SetVAlign(gtk.AlignCenter)
+		button.SetTooltipText(fmt.Sprintf("Apri http://localhost:%d nel browser: porta %d del Container, protocollo %s",
 			port.Published, port.Target, port.Protocol))
-		box.Append(label)
+		published := port.Published
+		button.ConnectClicked(func() {
+			if openPort != nil {
+				openPort(published)
+			}
+		})
+		box.Append(button)
 	}
 	return box
 }
