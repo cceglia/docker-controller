@@ -50,6 +50,37 @@ la finestra, e il test dei token controlla la scala tipografica, i contrasti e
 il bersaglio minimo. Il target non chiede un display. I test senza tag restano
 senza display e girano anche in `make check`.
 
+## Mutation testing
+
+```sh
+make tools       # installa gremlins v0.6.0 in $(go env GOPATH)/bin
+make mutate      # mutation testing su tray, gui e compose
+```
+
+`make tools` installa gli strumenti di sviluppo fuori dal repository. Basta
+lanciarlo una volta per macchina.
+
+`make mutate` esegue gremlins con la configurazione in `.gremlins.yaml`. Il
+comando parte tre volte, un package per volta, perché gremlins accetta un solo
+percorso per lancio. I package sono `internal/tray`, `internal/gui` e
+`internal/compose`.
+
+Un giro completo dura circa sei minuti su questa macchina. Il package `gui`
+pesa più degli altri, perché i suoi test compilano Qt con cgo. Lancia
+`make mutate` dopo una modifica ai test, non a ogni salvataggio.
+
+Il target resta fuori da `make check`. `make check` dura secondi, `make mutate`
+dura minuti, e il repository non ha integrazione continua.
+
+Questo giro non ha soglie. Un risultato debole non ferma il comando: gremlins
+esce con codice 0 ed elenca i mutanti sopravvissuti. Il ticket 16 aggiunge le
+soglie.
+
+Gremlins stampa per ogni package l'efficacia dei test e la copertura dei
+mutanti. L'efficacia vale `KILLED / (KILLED + LIVED)`. La copertura vale
+`(KILLED + LIVED) / totale`. I mutanti `TIMED OUT` restano fuori da entrambe le
+percentuali.
+
 ## Installazione
 
 ```sh

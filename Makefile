@@ -7,6 +7,11 @@ APP_ID := io.github.cceglia.DockerController
 APP_BIN := docker-controller
 ICON_SIZES := 256x256 512x512
 
+# Mutation testing: gremlins accepts one package per run, so `make mutate`
+# runs it three times. The version is pinned together with .gremlins.yaml.
+GREMLINS_VERSION := v0.6.0
+MUTATE_PACKAGES := ./internal/tray ./internal/gui ./internal/compose
+
 PREFIX ?= $(HOME)/.local
 DESTDIR ?=
 
@@ -27,7 +32,7 @@ LEGACY_ICON := $(foreach s,$(ICON_SIZES),$(DESTDIR)$(ICON_ROOT)/$(s)/apps/docker
 # The prefix `-` and the `command -v` test make a missing tool no error.
 ICON_CACHE := -command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -t -f $(DESTDIR)$(PREFIX)/share/icons/hicolor
 
-.PHONY: test test-ui vet check build install uninstall
+.PHONY: test test-ui vet check build install uninstall tools mutate
 
 ## test: Go tests
 test:
@@ -37,6 +42,17 @@ test:
 test-ui:
 	QT_QPA_PLATFORM=offscreen go vet -tags ui ./internal/gui
 	QT_QPA_PLATFORM=offscreen go test -tags ui ./internal/gui
+
+## tools: developer tools in $(GOBIN), outside `make check`
+tools:
+	go install github.com/go-gremlins/gremlins/cmd/gremlins@$(GREMLINS_VERSION)
+
+## mutate: mutation testing with gremlins on tray, gui and compose (minutes, outside `make check`)
+mutate:
+	@for pkg in $(MUTATE_PACKAGES); do \
+		echo "== $$pkg"; \
+		gremlins unleash $$pkg || exit $$?; \
+	done
 
 vet:
 	go vet ./...
