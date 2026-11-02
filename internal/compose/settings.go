@@ -5,17 +5,12 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"dockercontroller/internal/compose/model"
 )
 
-// Settings is a partial update of a Project's settings: a nil field is left as
-// it is, an empty (or blank) value clears the setting and restores the default
-// behaviour (the compose name is shown, no Group). Profiles, when not nil, is
-// the complete set of active Profiles: an empty list deactivates them all.
-type Settings struct {
-	DisplayName *string  `json:"displayName"`
-	Group       *string  `json:"group"`
-	Profiles    []string `json:"profiles"`
-}
+// Settings lives in model; the root re-exports it for gui, tray and main.
+type Settings = model.Settings
 
 // UpdateSettings changes the settings of a saved Project and publishes the new
 // snapshot. It never touches Docker, so it also works while Docker is

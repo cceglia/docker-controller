@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"dockercontroller/internal/compose/model"
 )
 
 // store persists the saved Projects in the app database.
@@ -13,7 +15,7 @@ type store struct{ db *sql.DB }
 
 // upsertDiscovered saves (or refreshes folder and files of) a discovered
 // Project, leaving the user's display name, group and profiles untouched.
-func (s store) upsertDiscovered(ctx context.Context, d discovered) error {
+func (s store) upsertDiscovered(ctx context.Context, d model.Discovered) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("compose: save %s: %w", d.Name, err)
@@ -23,7 +25,7 @@ func (s store) upsertDiscovered(ctx context.Context, d discovered) error {
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO projects (name, folder) VALUES (?, ?)
 		 ON CONFLICT(name) DO UPDATE SET folder = excluded.folder`,
-		d.Name, d.folder()); err != nil {
+		d.Name, model.Folder(d.ComposeFiles)); err != nil {
 		return fmt.Errorf("compose: save %s: %w", d.Name, err)
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM project_files WHERE project_name = ?`, d.Name); err != nil {
@@ -41,7 +43,7 @@ func (s store) upsertDiscovered(ctx context.Context, d discovered) error {
 
 // add saves a Project added by hand; a name already saved is refused with
 // ErrDuplicateProject and nothing is changed.
-func (s store) add(ctx context.Context, d discovered) error {
+func (s store) add(ctx context.Context, d model.Discovered) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("compose: add %s: %w", d.Name, err)
@@ -55,7 +57,7 @@ func (s store) add(ctx context.Context, d discovered) error {
 	if taken {
 		return fmt.Errorf("%w: %q", ErrDuplicateProject, d.Name)
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO projects (name, folder) VALUES (?, ?)`, d.Name, d.folder()); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO projects (name, folder) VALUES (?, ?)`, d.Name, model.Folder(d.ComposeFiles)); err != nil {
 		return fmt.Errorf("compose: add %s: %w", d.Name, err)
 	}
 	for i, f := range d.ComposeFiles {

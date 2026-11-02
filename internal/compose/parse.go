@@ -4,26 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
+
+	"dockercontroller/internal/compose/model"
 )
 
-// discovered is a Project as reported by `docker compose ls -a`.
-type discovered struct {
-	Name         string
-	ComposeFiles []string
-}
-
-func (d discovered) folder() string {
-	if len(d.ComposeFiles) == 0 {
-		return ""
-	}
-	return filepath.Dir(d.ComposeFiles[0])
-}
-
 // parseLs parses the output of `docker compose ls -a --format json`.
-func parseLs(out []byte) ([]discovered, error) {
+func parseLs(out []byte) ([]model.Discovered, error) {
 	var raw []struct {
 		Name        string `json:"Name"`
 		ConfigFiles string `json:"ConfigFiles"`
@@ -34,9 +22,9 @@ func parseLs(out []byte) ([]discovered, error) {
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return nil, fmt.Errorf("compose: parse `compose ls`: %w", err)
 	}
-	res := make([]discovered, 0, len(raw))
+	res := make([]model.Discovered, 0, len(raw))
 	for _, r := range raw {
-		d := discovered{Name: r.Name}
+		d := model.Discovered{Name: r.Name}
 		for _, f := range strings.Split(r.ConfigFiles, ",") {
 			if f = strings.TrimSpace(f); f != "" {
 				d.ComposeFiles = append(d.ComposeFiles, f)
@@ -137,17 +125,4 @@ func runningCount(cs []psContainer) int {
 		}
 	}
 	return n
-}
-
-func statusOf(running, total int) Status {
-	switch {
-	case total == 0:
-		return StatusRemoved
-	case running == total:
-		return StatusActive
-	case running == 0:
-		return StatusStopped
-	default:
-		return StatusPartial
-	}
 }

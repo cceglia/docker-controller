@@ -2,30 +2,26 @@ package compose
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
+
+	"dockercontroller/internal/compose/model"
 )
 
-// ActionKind is what an Action does.
-type ActionKind string
+// ActionKind and the Action constants live in model; the root re-exports them
+// for gui, tray and main.
+type ActionKind = model.ActionKind
 
 const (
-	ActionUp ActionKind = "up"
-	// ActionStart starts existing Containers; it is meant for a Service.
-	ActionStart   ActionKind = "start"
-	ActionStop    ActionKind = "stop"
-	ActionRestart ActionKind = "restart"
-	ActionPull    ActionKind = "pull"
-	ActionBuild   ActionKind = "build"
-	// ActionDown removes the Containers of the whole Project (Project only).
-	ActionDown ActionKind = "down"
-	// ActionDownVolumes is Down that also deletes the Project's volumes, and so
-	// its data (Project only). It is the only kind that ever passes -v.
-	ActionDownVolumes ActionKind = "down-volumes"
-	// ActionDownService stops and removes the Containers of one Service, keeping
-	// volumes (Service only): `compose rm -s -f`, never -v.
-	ActionDownService ActionKind = "down-service"
+	ActionUp          = model.ActionUp
+	ActionStart       = model.ActionStart
+	ActionStop        = model.ActionStop
+	ActionRestart     = model.ActionRestart
+	ActionPull        = model.ActionPull
+	ActionBuild       = model.ActionBuild
+	ActionDown        = model.ActionDown
+	ActionDownVolumes = model.ActionDownVolumes
+	ActionDownService = model.ActionDownService
 )
 
 // verbs maps every ActionKind to the compose arguments that follow the
@@ -63,16 +59,12 @@ type Action struct {
 	Kind    ActionKind `json:"kind"`
 }
 
-// ActivityID identifies one Activity (one execution of an Action).
-type ActivityID string
-
-// ActivityRef is the running Activity of a Project, as shown in the snapshot.
-type ActivityRef struct {
-	ID ActivityID `json:"id"`
-	// Service is the Service the Activity targets, "" for the whole Project.
-	Service string     `json:"service"`
-	Kind    ActionKind `json:"kind"`
-}
+// ActivityID and ActivityRef live in model; the root re-exports them for gui,
+// tray and main.
+type (
+	ActivityID  = model.ActivityID
+	ActivityRef = model.ActivityRef
+)
 
 // ActivityEventType tells what an ActivityEvent reports.
 type ActivityEventType string
@@ -134,20 +126,15 @@ func Summarize(text string) string {
 	return line
 }
 
+// The sentinel errors live in model; the root re-exports them for gui, tray
+// and main.
 var (
-	// ErrActivityRunning is returned when the Project already has an Activity.
-	ErrActivityRunning = errors.New("compose: the Project already has an Activity in progress")
-	// ErrUnknownProject is returned for a Project that is not saved.
-	ErrUnknownProject = errors.New("compose: unknown Project")
-	// ErrUnknownAction is returned for an ActionKind that does not exist.
-	ErrUnknownAction = errors.New("compose: unknown Action")
-	// ErrInvalidService is returned for a Service name compose could take for
-	// an option.
-	ErrInvalidService = errors.New("compose: invalid Service name")
-	// ErrServiceOnly is returned for Down of a Service on the whole Project.
-	ErrServiceOnly = errors.New("compose: this Action applies to a Service, not to the whole Project")
-	// ErrProjectOnly is returned for Down or Down with volumes on a Service.
-	ErrProjectOnly = errors.New("compose: this Action applies to the whole Project, not to a Service")
+	ErrActivityRunning = model.ErrActivityRunning
+	ErrUnknownProject  = model.ErrUnknownProject
+	ErrUnknownAction   = model.ErrUnknownAction
+	ErrInvalidService  = model.ErrInvalidService
+	ErrServiceOnly     = model.ErrServiceOnly
+	ErrProjectOnly     = model.ErrProjectOnly
 )
 
 // projectArgs selects the Project (name, compose files, folder) for any

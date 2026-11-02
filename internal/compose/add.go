@@ -3,25 +3,23 @@ package compose
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"dockercontroller/internal/compose/model"
 )
 
+// The sentinel errors live in model; the root re-exports them for gui, tray
+// and main.
 var (
-	// ErrDuplicateProject is returned by AddProject when a Project with that
-	// name is already saved.
-	ErrDuplicateProject = errors.New("compose: a Project with this name already exists")
-	// ErrInvalidProject is returned for a Project that compose could not use: a
-	// name it would reject, no compose file, or a file that cannot be read.
-	ErrInvalidProject = errors.New("compose: invalid Project")
-	// The specific reasons of an ErrInvalidProject; each error wraps both.
-	ErrInvalidName         = errors.New("name is not a valid compose name")
-	ErrNoComposeFile       = errors.New("no compose file")
-	ErrComposeFileUnusable = errors.New("compose file is not an absolute path to a readable file")
+	ErrDuplicateProject    = model.ErrDuplicateProject
+	ErrInvalidProject      = model.ErrInvalidProject
+	ErrInvalidName         = model.ErrInvalidName
+	ErrNoComposeFile       = model.ErrNoComposeFile
+	ErrComposeFileUnusable = model.ErrComposeFileUnusable
 )
 
 // validName is what compose accepts as a project name.
@@ -104,7 +102,7 @@ func (m *Manager) AddProject(ctx context.Context, name string, files []string) e
 	m.refreshMu.Lock()
 	defer m.refreshMu.Unlock()
 
-	if err := m.store.add(ctx, discovered{Name: name, ComposeFiles: files}); err != nil {
+	if err := m.store.add(ctx, model.Discovered{Name: name, ComposeFiles: files}); err != nil {
 		return err
 	}
 	next, err := m.build(ctx)

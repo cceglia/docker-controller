@@ -6,36 +6,19 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"dockercontroller/internal/compose/model"
 )
 
 // logTail is how many past lines a log stream starts with before following.
 const logTail = "500"
 
-// LogRequest asks for the log stream of a Project, or of one of its Services.
-type LogRequest struct {
-	// Project is the compose name of the Project.
-	Project string `json:"project"`
-	// Service, when not empty, restricts the stream to that Service; compose
-	// is asked for it, the others are not read at all.
-	Service string `json:"service"`
-}
-
-// LogLine is one line of a log stream, already attributed to its Service.
-type LogLine struct {
-	// Service is the Service whose Container wrote the line. It is empty for
-	// a line that did not come from a Container (compose's own messages) and
-	// holds the raw compose prefix when it matches no known Service.
-	Service string `json:"service"`
-	// Timestamp is the time Docker recorded for the line (RFC 3339, as
-	// compose prints it); empty when the line carries none. It is always
-	// requested: whether to show it is up to the caller.
-	Timestamp string `json:"timestamp"`
-	// Text is the line without prefix, timestamp or terminal colour codes.
-	Text string `json:"text"`
-	// Stderr marks a message of compose itself (for example a Service that
-	// does not exist); Container output always arrives as not Stderr.
-	Stderr bool `json:"stderr"`
-}
+// LogRequest and LogLine live in model; the root re-exports them for gui,
+// tray and main.
+type (
+	LogRequest = model.LogRequest
+	LogLine    = model.LogLine
+)
 
 // logsArgs builds the Docker arguments that follow the logs of a Project.
 // Every Profile is passed (like Down does): a Container started under a

@@ -2,18 +2,17 @@ package compose
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
+
+	"dockercontroller/internal/compose/model"
 )
 
+// The sentinel errors live in model; the root re-exports them for gui, tray
+// and main.
 var (
-	// ErrProjectNotRemoved is returned by RemoveFromList for a Project that is
-	// not Rimosso or still has Containers.
-	ErrProjectNotRemoved = errors.New("compose: only a Rimosso Project can be removed from the list")
-	// ErrDockerUnreachable is returned when the answer depends on what Docker
-	// reports and Docker does not answer.
-	ErrDockerUnreachable = errors.New("compose: Docker is not reachable")
+	ErrProjectNotRemoved = model.ErrProjectNotRemoved
+	ErrDockerUnreachable = model.ErrDockerUnreachable
 )
 
 // RemoveFromList deletes a saved Project (and its settings) from the app. It

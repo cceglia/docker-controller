@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"dockercontroller/internal/compose/model"
 )
 
 const (
@@ -155,7 +157,7 @@ func (m *Manager) refreshProject(ctx context.Context, name string) error {
 	projects := append([]Project(nil), base.Projects...)
 	running := runningCount(cs)
 	projects[idx].Running, projects[idx].Total = running, len(cs)
-	projects[idx].Status = statusOf(running, len(cs))
+	projects[idx].Status = model.StatusOf(running, len(cs))
 	projects[idx].Services = groupByService(cs)
 	projects[idx].ComposeMissing = composeMissing(projects[idx].ComposeFiles)
 	m.publish(Snapshot{DockerReachable: true, Projects: projects})

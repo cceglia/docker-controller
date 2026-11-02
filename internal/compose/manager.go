@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"sync"
 	"time"
+
+	"dockercontroller/internal/compose/model"
 )
 
 // Config wires a Manager.
@@ -179,7 +181,7 @@ func (m *Manager) build(ctx context.Context) (Snapshot, error) {
 	for i := range projects {
 		o := seen[projects[i].Name]
 		projects[i].Running, projects[i].Total = o.running, o.total
-		projects[i].Status = statusOf(o.running, o.total)
+		projects[i].Status = model.StatusOf(o.running, o.total)
 		projects[i].Services = o.services
 		if projects[i].Services == nil {
 			projects[i].Services = []Service{}
