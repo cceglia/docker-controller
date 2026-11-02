@@ -1,6 +1,9 @@
 package gui
 
-import "dockercontroller/internal/compose"
+import (
+	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/view"
+)
 
 // DockerUnreachableText is the notice of a view whose Actions are disabled
 // because the Docker daemon does not answer.
@@ -101,7 +104,7 @@ func ProjectActions(project compose.Project, dockerReachable bool) []ActionView 
 			Action:  compose.Action{Project: project.Name, Kind: compose.ActionDown},
 			Enabled: enabled,
 			Confirmation: &Confirmation{
-				Title:        "Down di " + ProjectName(project),
+				Title:        "Down di " + view.ProjectName(project),
 				Message:      "Ferma e rimuove i Container del Progetto. I volumi restano. Il Progetto resta in lista come Rimosso.",
 				ConfirmLabel: "Down",
 			},
@@ -111,7 +114,7 @@ func ProjectActions(project compose.Project, dockerReachable bool) []ActionView 
 			Action:  compose.Action{Project: project.Name, Kind: compose.ActionDownVolumes},
 			Enabled: enabled,
 			Confirmation: &Confirmation{
-				Title:         "Down con volumi di " + ProjectName(project),
+				Title:         "Down con volumi di " + view.ProjectName(project),
 				Message:       "Rimuove i Container e ELIMINA i volumi del Progetto: i dati nei volumi andranno persi per sempre.",
 				ConfirmLabel:  "Down con volumi",
 				TypeToConfirm: project.Name,

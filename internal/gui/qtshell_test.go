@@ -18,6 +18,7 @@ import (
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/gui/guitest"
+	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/settings"
 	"dockercontroller/internal/tray"
 )
@@ -539,7 +540,7 @@ func checkEditForm(t *testing.T, s *shell) {
 	cleared.DisplayName = ""
 	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{cleared, other}})
 	settle()
-	if got := ProjectName(s.panel.shown.project); got != cleared.Name {
+	if got := view.ProjectName(s.panel.shown.project); got != cleared.Name {
 		t.Errorf("the detail names the Project %q, want the compose name %q", got, cleared.Name)
 	}
 	if !slices.Contains(listNames(s.list.widget), cleared.Name) {
@@ -733,7 +734,7 @@ func checkCommands(t *testing.T, s *shell) {
 	if folder != project.Name || terminal != project.Name {
 		t.Errorf("the commands opened %q and %q, want %q", folder, terminal, project.Name)
 	}
-	if want, _ := FirstPublishedPort(project); port != want {
+	if want, _ := view.FirstPublishedPort(project); port != want {
 		t.Errorf("the port command opened %d, want %d", port, want)
 	}
 	s.panel.onFolder, s.panel.onTerminal, s.panel.onPort = folderCallback, terminalCallback, portCallback
@@ -751,8 +752,8 @@ func checkCommands(t *testing.T, s *shell) {
 		if button.IsEnabled() {
 			t.Errorf("the command %q is sensitive on a Project without a folder", name)
 		}
-		if got := button.AccessibleDescription(); got != NoFolderCommandText {
-			t.Errorf("the command %q says %q, want %q", name, got, NoFolderCommandText)
+		if got := button.AccessibleDescription(); got != view.NoFolderCommandText {
+			t.Errorf("the command %q says %q, want %q", name, got, view.NoFolderCommandText)
 		}
 	}
 	if !commandButton(t, block, "portButton").IsEnabled() {
@@ -768,8 +769,8 @@ func checkCommands(t *testing.T, s *shell) {
 	s.open(noPort)
 	settle()
 	block = blockNamed(s.panel, "Comandi del Progetto")
-	if got := commandButton(t, block, "portButton").AccessibleDescription(); got != NoPortCommandText {
-		t.Errorf("the port command says %q, want %q", got, NoPortCommandText)
+	if got := commandButton(t, block, "portButton").AccessibleDescription(); got != view.NoPortCommandText {
+		t.Errorf("the port command says %q, want %q", got, view.NoPortCommandText)
 	}
 
 	// A missing File compose closes every command.
@@ -784,8 +785,8 @@ func checkCommands(t *testing.T, s *shell) {
 		if button.IsEnabled() {
 			t.Errorf("the command %q is sensitive while the File compose is missing", name)
 		}
-		if got := button.AccessibleDescription(); got != MissingComposeText {
-			t.Errorf("the command %q says %q, want %q", name, got, MissingComposeText)
+		if got := button.AccessibleDescription(); got != view.MissingComposeText {
+			t.Errorf("the command %q says %q, want %q", name, got, view.MissingComposeText)
 		}
 	}
 
@@ -1944,14 +1945,14 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	// The modal question is grabbed on its own: the window behind it would hide
 	// the size of the dialog, which is what the check is about.
 	confirm := Confirmation{
-		Title:        "Down di " + ProjectName(projects[0]),
+		Title:        "Down di " + view.ProjectName(projects[0]),
 		Message:      "Ferma e rimuove i Container del Progetto. I volumi restano. Il Progetto resta in lista come Rimosso.",
 		ConfirmLabel: "Down",
 	}
 	captureDialog(t, s.window.QWidget, dir, "09-confirm", confirm)
 
 	typed := confirm
-	typed.Title = "Down con volumi di " + ProjectName(projects[0])
+	typed.Title = "Down con volumi di " + view.ProjectName(projects[0])
 	typed.Message = "Rimuove i Container e ELIMINA i volumi del Progetto: i dati nei volumi andranno persi per sempre."
 	typed.ConfirmLabel = "Down con volumi"
 	typed.TypeToConfirm = projects[0].Name

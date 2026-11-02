@@ -1,4 +1,4 @@
-package gui
+package view
 
 import (
 	"fmt"
@@ -81,17 +81,17 @@ func FirstPublishedPort(project compose.Project) (int, bool) {
 	return 0, false
 }
 
-// openCommand hands a path or an address to the desktop's default handler. The
+// OpenCommand hands a path or an address to the desktop's default handler. The
 // target is one argument, so the shell never reads a space or a quote inside it.
-func openCommand(target string) *exec.Cmd {
+func OpenCommand(target string) *exec.Cmd {
 	return exec.Command("xdg-open", target)
 }
 
-// terminalCommand builds the command of "Apri terminale": the argument vector
+// TerminalCommand builds the command of "Apri terminale": the argument vector
 // of the saved terminal command, with the folder of the Project in place of
 // {dir}. No shell is involved, so the command runs only if it splits. The
 // command is built and not started, so its shape is what the tests check.
-func terminalCommand(command, folder string) (*exec.Cmd, error) {
+func TerminalCommand(command, folder string) (*exec.Cmd, error) {
 	argv, err := settings.TerminalArgv(command, folder)
 	if err != nil {
 		return nil, err

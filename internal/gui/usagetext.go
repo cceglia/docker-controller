@@ -1,6 +1,9 @@
 package gui
 
-import "dockercontroller/internal/compose"
+import (
+	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/view"
+)
 
 // usageText is the figure of one measure and the line under it. An empty note
 // leaves the measure on one line.
@@ -36,23 +39,23 @@ type usageFigures struct {
 func usageTextsOf(f usageFigures) usageTexts {
 	texts := usageTexts{
 		cpu: usageText{
-			value: FormatPercent(f.cpuPercent),
-			note:  FormatCores(f.measures.CPUPercent),
+			value: view.FormatPercent(f.cpuPercent),
+			note:  view.FormatCores(f.measures.CPUPercent),
 		},
 		memory: usageText{
-			value: FormatBytes(float64(f.measures.MemoryBytes), ByteBaseBinary),
+			value: view.FormatBytes(float64(f.measures.MemoryBytes), view.ByteBaseBinary),
 		},
 		net: usageText{
-			value: "↓ " + FormatRate(f.rate.NetInBytesPerSec),
-			note:  "↑ " + FormatRate(f.rate.NetOutBytesPerSec),
+			value: "↓ " + view.FormatRate(f.rate.NetInBytesPerSec),
+			note:  "↑ " + view.FormatRate(f.rate.NetOutBytesPerSec),
 		},
 		disk: usageText{
-			value: "R " + FormatRate(f.rate.BlockReadBytesPerSec),
-			note:  "W " + FormatRate(f.rate.BlockWriteBytesPerSec),
+			value: "R " + view.FormatRate(f.rate.BlockReadBytesPerSec),
+			note:  "W " + view.FormatRate(f.rate.BlockWriteBytesPerSec),
 		},
 	}
 	if f.memoryTotal > 0 {
-		texts.memory.note = "di " + FormatBytes(float64(f.memoryTotal), ByteBaseBinary)
+		texts.memory.note = "di " + view.FormatBytes(float64(f.memoryTotal), view.ByteBaseBinary)
 	}
 	return texts
 }

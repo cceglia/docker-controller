@@ -1,6 +1,9 @@
 package gui
 
-import "dockercontroller/internal/compose"
+import (
+	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/view"
+)
 
 // removeText is the label of the entry that takes a Project off the list.
 const removeText = "Rimuovi dalla lista"
@@ -46,7 +49,7 @@ func RemoveDisabledReason(project compose.Project, dockerReachable bool) string 
 // Docker.
 func RemoveConfirmation(project compose.Project) Confirmation {
 	return Confirmation{
-		Title:        "Rimuovi " + ProjectName(project) + " dalla lista",
+		Title:        "Rimuovi " + view.ProjectName(project) + " dalla lista",
 		Message:      "Il Progetto sparisce dalla lista dell'app. Docker e i file non vengono toccati.",
 		ConfirmLabel: removeText,
 		Destructive:  true,

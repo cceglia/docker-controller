@@ -7,6 +7,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/view"
 )
 
 const (
@@ -26,7 +27,7 @@ const (
 // meterValue turns a percentage into the steps of a bar: a value that is not a
 // number and a value outside 0-100 stay inside the bar.
 func meterValue(percent float64) int {
-	return int(math.Round(levelValue(percent) * meterSteps))
+	return int(math.Round(view.LevelValue(percent) * meterSteps))
 }
 
 // usageMeter builds the bar of a percentage. It is a figure, not a control, so

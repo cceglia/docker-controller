@@ -1,4 +1,4 @@
-package gui
+package view
 
 import (
 	"fmt"
@@ -30,12 +30,6 @@ func StatusOf(status compose.Status) StatusView {
 		return StatusView{Label: "Rimosso", Glyph: "○", CSSClass: "dim-label"}
 	}
 	return StatusView{Label: string(status), Glyph: "○", CSSClass: "dim-label"}
-}
-
-// ProjectName is the Display name of the Project, or its compose name when the
-// Display name is unset.
-func ProjectName(p compose.Project) string {
-	return DisplayNameOf(p.DisplayName, p.Name)
 }
 
 // ProjectCount is the count of the running Containers over the total, as the

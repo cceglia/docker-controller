@@ -119,15 +119,6 @@ func cleanEditProfiles(in []string) []string {
 	return out
 }
 
-// DisplayNameOf is the name the detail and the list show: the trimmed Display
-// name, or the compose name when the Display name is blank.
-func DisplayNameOf(displayName, composeName string) string {
-	if name := strings.TrimSpace(displayName); name != "" {
-		return name
-	}
-	return composeName
-}
-
 // GroupChoices lists the options of the Group field: no Group first, then every
 // Group the Projects in the snapshot use, sorted without duplicates. The
 // current Group of the form joins them when nothing else uses it, so the field

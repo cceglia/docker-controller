@@ -1,4 +1,4 @@
-package gui
+package view
 
 import (
 	"strconv"
@@ -61,9 +61,9 @@ func FormatCores(cpuPercent float64) string {
 	return formatNumber(cpuPercent/100, 2) + " core"
 }
 
-// levelValue clamps a percentage to the 0-1 interval of a GtkLevelBar and
-// treats a value that is not a number as an empty bar.
-func levelValue(percent float64) float64 {
+// LevelValue clamps a percentage to the 0-1 interval of a bar and treats a
+// value that is not a number as an empty bar.
+func LevelValue(percent float64) float64 {
 	if percent != percent { // NaN
 		return 0
 	}

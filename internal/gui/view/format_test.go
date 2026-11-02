@@ -1,4 +1,4 @@
-package gui
+package view
 
 import (
 	"math"
@@ -150,8 +150,8 @@ func TestLevelValue_ClampsTheMeter(t *testing.T) {
 		{"not a number", math.NaN(), 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := levelValue(tc.percent); got != tc.want {
-				t.Errorf("levelValue(%v) = %v, want %v", tc.percent, got, tc.want)
+			if got := LevelValue(tc.percent); got != tc.want {
+				t.Errorf("LevelValue(%v) = %v, want %v", tc.percent, got, tc.want)
 			}
 		})
 	}

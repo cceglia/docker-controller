@@ -9,6 +9,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/view"
 )
 
 // The texts of the panel. They live with the widgets, so the tickets that wire
@@ -395,7 +396,7 @@ func (p *detailPanel) header() *qt6.QWidget {
 	block, box := detailBlock()
 	block.SetAccessibleName("Intestazione del Progetto")
 
-	box.AddWidget(detailLabel(ProjectName(project), "detailTitle").QWidget)
+	box.AddWidget(detailLabel(view.ProjectName(project), "detailTitle").QWidget)
 	if project.DisplayName != "" && project.DisplayName != project.Name {
 		box.AddWidget(detailLabel(project.Name, "detailComposeName").QWidget)
 	}
@@ -403,7 +404,7 @@ func (p *detailPanel) header() *qt6.QWidget {
 	line := qt6.NewQHBoxLayout2()
 	line.SetSpacing(design.SpaceXS)
 
-	status := StatusOf(project.Status)
+	status := view.StatusOf(project.Status)
 	role := design.StateRole(status.CSSClass)
 
 	marker := detailLabel(status.Glyph, role)
@@ -416,7 +417,7 @@ func (p *detailPanel) header() *qt6.QWidget {
 	if notice == "" {
 		line.AddWidget3(detailLabel(ContainerCountLine(project), "detailCount").QWidget, 0, qt6.AlignVCenter)
 
-		tacks, more := Tacks(project.Services)
+		tacks, more := view.Tacks(project.Services)
 		line.AddWidget3(newTackStrip(tacks, p.theme).QWidget, 0, qt6.AlignVCenter)
 		if more > 0 {
 			moreLabel := detailLabel(fmt.Sprintf("+%d", more), "tacksMore")
@@ -495,7 +496,7 @@ func (p *detailPanel) missing() *qt6.QWidget {
 	block, box := detailBlock()
 	block.SetAccessibleName("File compose mancante")
 
-	box.AddWidget(detailLabel(MissingComposeText, "missingComposeNotice").QWidget)
+	box.AddWidget(detailLabel(view.MissingComposeText, "missingComposeNotice").QWidget)
 
 	row := qt6.NewQHBoxLayout2()
 	row.SetSpacing(design.SpaceS)
@@ -558,7 +559,7 @@ func (p *detailPanel) commands() *qt6.QWidget {
 	block, box := detailBlock()
 	block.SetAccessibleName("Comandi del Progetto")
 
-	folderView, terminalView, portView := CommandViews(project)
+	folderView, terminalView, portView := view.CommandViews(project)
 
 	row := qt6.NewQHBoxLayout2()
 	row.SetSpacing(design.SpaceS)
@@ -591,7 +592,7 @@ func (p *detailPanel) commands() *qt6.QWidget {
 		if !portView.Enabled || p.onPort == nil {
 			return
 		}
-		if number, ok := FirstPublishedPort(project); ok {
+		if number, ok := view.FirstPublishedPort(project); ok {
 			p.onPort(number)
 		}
 	})
@@ -693,7 +694,7 @@ func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidg
 	line.AddWidget3(detailLabel(ServiceStateLine(service), "serviceState").QWidget, 0, qt6.AlignVCenter)
 	line.AddStretch()
 
-	tacks, more := Tacks([]compose.Service{service})
+	tacks, more := view.Tacks([]compose.Service{service})
 	line.AddWidget3(newTackStrip(tacks, p.theme).QWidget, 0, qt6.AlignVCenter)
 	if more > 0 {
 		moreLabel := detailLabel(fmt.Sprintf("+%d", more), "tacksMore")

@@ -1,4 +1,4 @@
-package gui
+package view
 
 import (
 	"errors"
@@ -71,7 +71,7 @@ func TestOpenCommand_HandsOneArgumentToXdgOpen(t *testing.T) {
 		"/home/me/My Project",
 	} {
 		t.Run(target, func(t *testing.T) {
-			cmd := openCommand(target)
+			cmd := OpenCommand(target)
 			if len(cmd.Args) != 2 {
 				t.Fatalf("Args = %q, want xdg-open and one target", cmd.Args)
 			}
@@ -125,18 +125,18 @@ func TestTerminalCommand_UsesTheConfiguredVector(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd, err := terminalCommand(tc.command, tc.folder)
+			cmd, err := TerminalCommand(tc.command, tc.folder)
 			if tc.bad {
 				if !errors.Is(err, settings.ErrInvalidTerminalCommand) {
-					t.Fatalf("terminalCommand error = %v, want ErrInvalidTerminalCommand", err)
+					t.Fatalf("TerminalCommand error = %v, want ErrInvalidTerminalCommand", err)
 				}
 				if cmd != nil {
-					t.Errorf("terminalCommand = %v, want no command", cmd)
+					t.Errorf("TerminalCommand = %v, want no command", cmd)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("terminalCommand error = %v", err)
+				t.Fatalf("TerminalCommand error = %v", err)
 			}
 			guitest.AssertStrings(t, "Args", cmd.Args, tc.args)
 			if cmd.Dir != tc.folder {

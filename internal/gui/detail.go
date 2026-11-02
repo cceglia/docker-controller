@@ -8,9 +8,6 @@ import (
 	"dockercontroller/internal/compose"
 )
 
-// MissingComposeText is the notice of a Project whose Compose files are gone.
-const MissingComposeText = "File compose mancante: i file del Progetto non esistono più."
-
 // ToneView is how a Container reads in the detail: the glyph of its marker and
 // the Adwaita class that tints it. It is the dot the old view drew per row.
 type ToneView struct {

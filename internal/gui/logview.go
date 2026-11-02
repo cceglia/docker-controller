@@ -8,6 +8,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/view"
 )
 
 // LogLineLimit is the most lines the Log page keeps; the oldest go first.
@@ -120,7 +121,7 @@ func LogTargetText(project compose.Project, service string) string {
 	if project.Name == "" {
 		return ""
 	}
-	name := ProjectName(project)
+	name := view.ProjectName(project)
 	if service == "" {
 		return name
 	}

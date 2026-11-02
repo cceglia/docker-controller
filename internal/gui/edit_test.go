@@ -239,26 +239,6 @@ func TestProjectEdit_Settings_KeepsAProfileTheComposeFilesNoLongerDefine(t *test
 	}
 }
 
-func TestDisplayNameOf_FallsBackToTheComposeName(t *testing.T) {
-	for _, tc := range []struct {
-		name        string
-		displayName string
-		composeName string
-		want        string
-	}{
-		{"a Display name wins", "Negozio", "shop", "Negozio"},
-		{"a blank Display name falls back", "", "shop", "shop"},
-		{"spaces fall back", "   ", "shop", "shop"},
-		{"surrounding spaces go", "  Negozio ", "shop", "Negozio"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := DisplayNameOf(tc.displayName, tc.composeName); got != tc.want {
-				t.Errorf("DisplayNameOf = %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestGroupChoices_OffersNoGroupThenTheGroupsInUse(t *testing.T) {
 	for _, tc := range []struct {
 		name     string

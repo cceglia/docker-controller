@@ -5,78 +5,24 @@ import (
 	"strings"
 
 	"dockercontroller/internal/compose"
-	"dockercontroller/internal/settings"
+	"dockercontroller/internal/gui/view"
 )
 
-// italianMessages is the single place where the errors of the backend become
-// the Italian text the user reads. The Go errors stay idiomatic English; the
-// views pass what they return through UserError. Order matters: a more specific
-// error comes before the general one it also wraps.
-var italianMessages = []struct {
-	err error
-	msg string
-}{
-	{compose.ErrDuplicateProject, "Esiste già un Progetto con questo nome."},
-	{compose.ErrInvalidName, "Nome non valido: usa lettere minuscole, cifre, - e _."},
-	{compose.ErrNoComposeFile, "Serve almeno un File compose."},
-	{compose.ErrComposeFileUnusable, "Il File compose non esiste, non è leggibile o non è un percorso assoluto."},
-	{compose.ErrInvalidProject, "Progetto non valido: i File compose indicati non sono utilizzabili."},
-	{compose.ErrActivityRunning, "C'è già un'Attività in corso su questo Progetto."},
-	{compose.ErrUnknownProject, "Progetto sconosciuto."},
-	{compose.ErrUnknownAction, "Azione sconosciuta."},
-	{compose.ErrInvalidService, "Nome del Servizio non valido."},
-	{compose.ErrProjectOnly, "Questa Azione riguarda l'intero Progetto, non un singolo Servizio."},
-	{compose.ErrProjectNotRemoved, "Si può togliere dalla lista solo un Progetto Rimosso, senza Container."},
-	{compose.ErrDockerUnreachable, "Docker non è raggiungibile."},
-	{settings.ErrInvalidCloseBehavior, "Comportamento alla chiusura non valido."},
-	{settings.ErrInvalidTerminalCommand, "Comando del terminale non valido: controlla virgolette e backslash, e che non sia vuoto."},
-	{ErrInvalidPort, "Porta non valida."},
-	{ErrNoFolder, NoFolderCommandText},
-	{ErrFolderMissing, "La cartella del Progetto non esiste."},
-	{ErrLogOpen, "Flusso dei log già aperto."},
-	{ErrCannotOpen, "Impossibile aprire: xdg-open non è riuscito a partire."},
-	{ErrTerminalStart, "Impossibile avviare il terminale: controlla il comando nelle Impostazioni."},
-}
+// logOpenText is the Italian message of ErrLogOpen. The Log errors move to the
+// logs package with their streams, so the message stays here until then.
+const logOpenText = "Flusso dei log già aperto."
 
-// Errors of the views that open things on the desktop.
-var (
-	// ErrInvalidPort reports a port outside 1-65535.
-	ErrInvalidPort = errors.New("invalid port")
-	// ErrNoFolder reports a Project without a folder.
-	ErrNoFolder = errors.New("project has no folder")
-	// ErrFolderMissing reports a Project folder that no longer exists.
-	ErrFolderMissing = errors.New("project folder does not exist")
-	// ErrCannotOpen reports that xdg-open did not start.
-	ErrCannotOpen = errors.New("cannot open with xdg-open")
-	// ErrTerminalStart reports that the terminal command did not start.
-	ErrTerminalStart = errors.New("cannot start the terminal")
-)
-
-// unknownErrorPrefix introduces the detail of an error without a message above.
-const unknownErrorPrefix = "Errore: "
-
-// localizedError is an error whose text is Italian and whose chain still holds
-// the original error, so errors.Is keeps working.
-type localizedError struct {
-	msg   string
-	cause error
-}
-
-func (e *localizedError) Error() string { return e.msg }
-func (e *localizedError) Unwrap() error { return e.cause }
-
-// UserError returns err with an Italian message: the one registered for the
-// error it wraps, or an Italian prefix followed by its own text.
+// UserError returns err with an Italian message: the one view registers for the
+// error it wraps, or the one of the Log stream. ErrLogOpen still lives in this
+// package, so this wrapper adds its message to the ones of view.
 func UserError(err error) error {
 	if err == nil {
 		return nil
 	}
-	for _, m := range italianMessages {
-		if errors.Is(err, m.err) {
-			return &localizedError{msg: m.msg, cause: err}
-		}
+	if errors.Is(err, ErrLogOpen) {
+		return view.WithMessage(err, logOpenText)
 	}
-	return &localizedError{msg: unknownErrorPrefix + err.Error(), cause: err}
+	return view.UserError(err)
 }
 
 // logEndedMessage is the Italian reason a log stream ended on its own: the
@@ -84,10 +30,8 @@ func UserError(err error) error {
 // stderr line of compose when there is one. The raw command line of a failed
 // process is never shown.
 func logEndedMessage(err error, stderr []string) string {
-	for _, m := range italianMessages {
-		if errors.Is(err, m.err) {
-			return m.msg
-		}
+	if msg, ok := view.KnownMessage(err); ok {
+		return msg
 	}
 	const base = "Flusso dei log interrotto"
 	if detail := compose.Summarize(strings.Join(stderr, "\n")); detail != "" {

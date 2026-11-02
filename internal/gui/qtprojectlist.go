@@ -7,6 +7,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/view"
 )
 
 // rowKind says what a row of the list holds.
@@ -98,7 +99,7 @@ func (p *projectList) set(projects []compose.Project, selected string, loading b
 	p.strips = nil
 
 	shown := 0
-	for _, section := range Sections(projects) {
+	for _, section := range view.Sections(projects) {
 		if len(section.Projects) == 0 {
 			continue
 		}
@@ -208,10 +209,10 @@ func (p *projectList) appendRow(kind rowKind, project compose.Project, widget *q
 		item.SetFlags(qt6.NoItemFlags)
 	}
 	if kind == rowProject {
-		status := StatusOf(project.Status)
+		status := view.StatusOf(project.Status)
 		// The row is one line, so the compose name lives here when the Display
 		// name hides it.
-		name := ProjectName(project)
+		name := view.ProjectName(project)
 		if project.Name != name {
 			name = fmt.Sprintf("%s (%s)", name, project.Name)
 		}
@@ -232,7 +233,7 @@ func (p *projectList) appendRow(kind rowKind, project compose.Project, widget *q
 // the tacks comes back with the row: it is painted, not styled, so the
 // selection has to reach it in person.
 func newProjectRow(project compose.Project, theme design.DesignTheme) (*qt6.QWidget, *tackStrip) {
-	status := StatusOf(project.Status)
+	status := view.StatusOf(project.Status)
 
 	row := qt6.NewQWidget2()
 	setObjectName(row, rowObjectName)
@@ -251,15 +252,15 @@ func newProjectRow(project compose.Project, theme design.DesignTheme) (*qt6.QWid
 	marker.SetAccessibleName(status.Label)
 	layout.AddWidget3(marker.QWidget, 0, qt6.AlignVCenter)
 
-	name := qt6.NewQLabel3(ProjectName(project))
+	name := qt6.NewQLabel3(view.ProjectName(project))
 	setObjectName(name.QWidget, "projectName")
 	layout.AddWidget3(name.QWidget, 1, qt6.AlignVCenter)
 
-	count := qt6.NewQLabel3(ProjectCount(project))
+	count := qt6.NewQLabel3(view.ProjectCount(project))
 	setObjectName(count.QWidget, "projectCount")
 	layout.AddWidget3(count.QWidget, 0, qt6.AlignVCenter)
 
-	tacks, more := Tacks(project.Services)
+	tacks, more := view.Tacks(project.Services)
 	strip := qt6.NewQHBoxLayout2()
 	strip.SetSpacing(2)
 	bar := newTackStrip(tacks, theme)
@@ -277,7 +278,7 @@ func newProjectRow(project compose.Project, theme design.DesignTheme) (*qt6.QWid
 // statusObjectName is the name the style sheet uses for the marker of a state.
 // The classes of StatusView carry the meaning; only the two states the palette
 // cannot express take a colour, and the others keep the colour of the theme.
-func statusObjectName(status StatusView) string {
+func statusObjectName(status view.StatusView) string {
 	switch status.CSSClass {
 	case "success":
 		return "statusActive"

@@ -6,6 +6,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/view"
 )
 
 // showAddDialog opens the picker of the File compose of a new Project, then the
@@ -79,7 +80,7 @@ func (s *shell) selectProject(name string) {
 
 // openFolder opens the folder of a saved Project in the file manager.
 func (s *shell) openFolder(name string) {
-	folder, err := ProjectFolder(name, s.snapshot.Projects)
+	folder, err := view.ProjectFolder(name, s.snapshot.Projects)
 	if err != nil {
 		s.showNotice(UserError(err).Error())
 		return
@@ -91,7 +92,7 @@ func (s *shell) openFolder(name string) {
 // of the settings. The settings come from the database, so the command is built
 // off the Qt thread and a refusal comes back as the Italian message.
 func (s *shell) openTerminal(name string) {
-	folder, err := ProjectFolder(name, s.snapshot.Projects)
+	folder, err := view.ProjectFolder(name, s.snapshot.Projects)
 	if err != nil {
 		s.showNotice(UserError(err).Error())
 		return
@@ -106,7 +107,7 @@ func (s *shell) openTerminal(name string) {
 			mainthread.Start(func() { s.showNotice(UserError(err).Error()) })
 			return
 		}
-		cmd, err := terminalCommand(cfg.TerminalCommand, folder)
+		cmd, err := view.TerminalCommand(cfg.TerminalCommand, folder)
 		if err != nil {
 			mainthread.Start(func() { s.showNotice(UserError(err).Error()) })
 			return
@@ -114,7 +115,7 @@ func (s *shell) openTerminal(name string) {
 		if err := cmd.Start(); err != nil {
 			program := cmd.Args[0]
 			mainthread.Start(func() {
-				s.showNotice(UserError(fmt.Errorf("%w: %s: %w", ErrTerminalStart, program, err)).Error())
+				s.showNotice(UserError(fmt.Errorf("%w: %s: %w", view.ErrTerminalStart, program, err)).Error())
 			})
 			return
 		}
@@ -125,7 +126,7 @@ func (s *shell) openTerminal(name string) {
 // openPort opens a published port of the Project in the default browser. The
 // address is built from the number, so a widget never supplies it.
 func (s *shell) openPort(port int) {
-	address, err := PortURL(port)
+	address, err := view.PortURL(port)
 	if err != nil {
 		s.showNotice(UserError(err).Error())
 		return
@@ -137,10 +138,10 @@ func (s *shell) openPort(port int) {
 // failure comes back on the Qt thread as the Italian message of the notice.
 func (s *shell) openExternal(target string) {
 	go func() {
-		cmd := openCommand(target)
+		cmd := view.OpenCommand(target)
 		if err := cmd.Start(); err != nil {
 			mainthread.Start(func() {
-				s.showNotice(UserError(fmt.Errorf("%w: %w", ErrCannotOpen, err)).Error())
+				s.showNotice(UserError(fmt.Errorf("%w: %w", view.ErrCannotOpen, err)).Error())
 			})
 			return
 		}

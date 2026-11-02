@@ -1,4 +1,4 @@
-package gui
+package view
 
 import (
 	"testing"
@@ -30,23 +30,6 @@ func TestStatusOf_ReadsTheFourStatusesInItalian(t *testing.T) {
 			}
 			if got.CSSClass != tc.cssClass {
 				t.Errorf("CSSClass = %q, want %q", got.CSSClass, tc.cssClass)
-			}
-		})
-	}
-}
-
-func TestProjectName_PrefersTheDisplayName(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		project compose.Project
-		want    string
-	}{
-		{"display name", compose.Project{Name: "shop", DisplayName: "Negozio"}, "Negozio"},
-		{"compose name when the display name is empty", compose.Project{Name: "shop"}, "shop"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := ProjectName(tc.project); got != tc.want {
-				t.Errorf("ProjectName = %q, want %q", got, tc.want)
 			}
 		})
 	}
