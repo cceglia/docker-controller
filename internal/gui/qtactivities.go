@@ -8,6 +8,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/activity"
 	"dockercontroller/internal/gui/design"
 )
 
@@ -21,8 +22,8 @@ const (
 )
 
 // activityPage is the tab of the Activities: the history on the left and the
-// output of the chosen Activity on the right. It reads the ActivityLog, so it
-// shows the history of the session, and it never stops an Activity.
+// output of the chosen Activity on the right. It reads the log of the session,
+// so it shows the history of the session, and it never stops an Activity.
 //
 // A change of the log arrives on the goroutine of the Manager: the page reads
 // it once per burst on the Qt thread, so a thousand lines cost one refresh.
@@ -33,7 +34,7 @@ type activityPage struct {
 	// scroller follows the end of a running output once the layout ran.
 	scroller *qt6.QTimer
 
-	log *ActivityLog
+	log *activity.Log
 
 	// rows is the Activity of each row, by index, and rowOf its index: the two
 	// keep the history of the log and the history on screen in the same order.
@@ -63,13 +64,13 @@ type activityPage struct {
 	onNew func(compose.ActivityID)
 	// onFailure, when set, is called once for each failed Activity: the panel
 	// turns it into the notice with the link to the output.
-	onFailure func(Activity)
+	onFailure func(activity.Activity)
 }
 
 // newActivityPage builds the page of the Activities. A nil log builds a page
 // that never shows anything, so a shell without the log of the session still
 // builds.
-func newActivityPage(log *ActivityLog) *activityPage {
+func newActivityPage(log *activity.Log) *activityPage {
 	p := &activityPage{
 		log:      log,
 		rowOf:    map[compose.ActivityID]int{},
@@ -90,7 +91,7 @@ func newActivityPage(log *ActivityLog) *activityPage {
 	p.output.SetReadOnly(true)
 	setObjectName(p.output.QWidget, "activityOutput")
 	p.output.SetAccessibleName(activityOutputName)
-	p.output.SetPlaceholderText(emptyActivityText)
+	p.output.SetPlaceholderText(activity.EmptyText)
 	p.output.SetLineWrapMode(qt6.QPlainTextEdit__WidgetWidth)
 	// The output of compose is text to read line by line, so it keeps the fixed
 	// font of the old view.
@@ -140,7 +141,7 @@ func (p *activityPage) refresh() {
 
 	// The decision comes before the rows go in, so the Activities already shown
 	// are the rows on screen.
-	opened, open := panelActivity(p.shownID, activities)
+	opened, open := activity.PanelActivity(p.shownID, activities)
 
 	// The rows of a refresh do not move the view: the scroll of the history is
 	// the one the user left, not the one of a history that grew.
@@ -166,7 +167,7 @@ func (p *activityPage) refresh() {
 	}
 
 	for _, a := range activities {
-		if a.State == ActivityFailed && !p.notified[a.ID] {
+		if a.State == activity.ActivityFailed && !p.notified[a.ID] {
 			p.notified[a.ID] = true
 			if p.onFailure != nil {
 				p.onFailure(a)
@@ -191,9 +192,9 @@ func (p *activityPage) refresh() {
 }
 
 // insertRow adds the row of one Activity at the top of the history.
-func (p *activityPage) insertRow(a Activity) {
-	item := qt6.NewQListWidgetItem2(ActivityHeader(a))
-	item.SetToolTip(activityTooltip(a))
+func (p *activityPage) insertRow(a activity.Activity) {
+	item := qt6.NewQListWidgetItem2(activity.ActivityHeader(a))
+	item.SetToolTip(activity.Tooltip(a))
 
 	p.list.InsertItem(0, item)
 	p.shownID[a.ID] = true
@@ -203,7 +204,7 @@ func (p *activityPage) insertRow(a Activity) {
 
 // updateRow writes the state of a known Activity on its row. The row itself
 // stays, so the history keeps the focus and the scroll.
-func (p *activityPage) updateRow(a Activity) {
+func (p *activityPage) updateRow(a activity.Activity) {
 	row, known := p.rowOf[a.ID]
 	if !known {
 		return
@@ -212,8 +213,8 @@ func (p *activityPage) updateRow(a Activity) {
 	if item == nil {
 		return
 	}
-	item.SetText(ActivityHeader(a))
-	item.SetToolTip(activityTooltip(a))
+	item.SetText(activity.ActivityHeader(a))
+	item.SetToolTip(activity.Tooltip(a))
 }
 
 // rowSelected shows the output of the Activity of the chosen row.
@@ -253,10 +254,10 @@ func (p *activityPage) renderOutput() {
 	}
 
 	if a.ID != p.shown || a.Dropped != p.shownDrop {
-		p.output.SetPlainText(ActivityOutput(a))
+		p.output.SetPlainText(activity.ActivityOutput(a))
 		p.shown, p.shownDrop = a.ID, a.Dropped
 		p.shownLines = len(a.Lines)
-		p.shownDone = a.State != ActivityRunning
+		p.shownDone = a.State != activity.ActivityRunning
 		p.scroller.Start(0)
 		return
 	}
@@ -265,14 +266,14 @@ func (p *activityPage) renderOutput() {
 	if len(a.Lines) > p.shownLines {
 		// AppendPlainText keeps one paragraph per line, so the trailing newline
 		// of the block would leave an empty line at the end.
-		if lines := strings.TrimRight(linesText(a.Lines[p.shownLines:]), "\n"); lines != "" {
+		if lines := strings.TrimRight(activity.LinesText(a.Lines[p.shownLines:]), "\n"); lines != "" {
 			p.output.AppendPlainText(lines)
 		}
 		p.shownLines = len(a.Lines)
 		changed = true
 	}
-	if !p.shownDone && a.State != ActivityRunning {
-		p.output.AppendPlainText(strings.TrimRight(ActivityOutcome(a), "\n"))
+	if !p.shownDone && a.State != activity.ActivityRunning {
+		p.output.AppendPlainText(strings.TrimRight(activity.ActivityOutcome(a), "\n"))
 		p.shownDone = true
 		changed = true
 	}

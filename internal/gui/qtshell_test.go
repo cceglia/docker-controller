@@ -16,6 +16,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/activity"
 	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/gui/forms"
 	"dockercontroller/internal/gui/guitest"
@@ -1052,7 +1053,7 @@ func checkAddForm(t *testing.T, s *shell) {
 func checkBottomPanel(t *testing.T) {
 	t.Helper()
 
-	log := NewActivityLog()
+	log := activity.NewLog()
 	s := newShell(&application{activities: log}, design.LightTheme)
 	defer s.window.Delete()
 	s.show()
@@ -1076,7 +1077,7 @@ func checkBottomPanel(t *testing.T) {
 	if got := s.bottom.tabs.Count(); got != 2 {
 		t.Fatalf("the panel carries %d tabs, want 2", got)
 	}
-	for i, want := range []string{activityPageTitle, logPageTitle} {
+	for i, want := range []string{activity.ActivityPageTitle, activity.LogPageTitle} {
 		if got := s.bottom.tabs.TabText(i); got != want {
 			t.Errorf("tab %d is %q, want %q", i, got, want)
 		}
@@ -1089,20 +1090,20 @@ func checkBottomPanel(t *testing.T) {
 	if !s.bottom.logs.view.IsReadOnly() {
 		t.Error("the text of the logs is editable")
 	}
-	if got := s.bottom.logs.searchLabel.Text(); got != logSearchLabelText {
-		t.Errorf("the search label reads %q, want %q", got, logSearchLabelText)
+	if got := s.bottom.logs.searchLabel.Text(); got != activity.LogSearchLabelText {
+		t.Errorf("the search label reads %q, want %q", got, activity.LogSearchLabelText)
 	}
-	if got := s.bottom.logs.status.Text(); got != emptyLogText {
-		t.Errorf("the empty log reads %q, want %q", got, emptyLogText)
+	if got := s.bottom.logs.status.Text(); got != activity.EmptyLogText {
+		t.Errorf("the empty log reads %q, want %q", got, activity.EmptyLogText)
 	}
 	if s.bottom.showing() || s.bottom.widget.IsVisible() {
 		t.Fatal("the panel takes room before the first Activity")
 	}
-	if got := s.bottom.page.output.PlaceholderText(); got != emptyActivityText {
-		t.Errorf("the empty output reads %q, want %q", got, emptyActivityText)
+	if got := s.bottom.page.output.PlaceholderText(); got != activity.EmptyText {
+		t.Errorf("the empty output reads %q, want %q", got, activity.EmptyText)
 	}
 
-	up := Activity{ID: "act-1", Project: "shop", Kind: compose.ActionUp, State: ActivityRunning}
+	up := activity.Activity{ID: "act-1", Project: "shop", Kind: compose.ActionUp, State: activity.ActivityRunning}
 	log.Push(guitest.Started(up.ID, up.Project, "", up.Kind))
 	for i := 0; i < 3; i++ {
 		log.Push(guitest.Output(up.ID, up.Project, "", up.Kind, fmt.Sprintf("step %d", i), false))
@@ -1118,11 +1119,11 @@ func checkBottomPanel(t *testing.T) {
 	if got := s.bottom.page.list.Count(); got != 1 {
 		t.Fatalf("the history carries %d rows, want 1", got)
 	}
-	if got := s.bottom.page.list.Item(0).Text(); got != ActivityHeader(up) {
-		t.Errorf("the row reads %q, want %q", got, ActivityHeader(up))
+	if got := s.bottom.page.list.Item(0).Text(); got != activity.ActivityHeader(up) {
+		t.Errorf("the row reads %q, want %q", got, activity.ActivityHeader(up))
 	}
-	if got := s.bottom.page.list.Item(0).ToolTip(); got != runningActivityText {
-		t.Errorf("the row says %q, want %q", got, runningActivityText)
+	if got := s.bottom.page.list.Item(0).ToolTip(); got != activity.RunningText {
+		t.Errorf("the row says %q, want %q", got, activity.RunningText)
 	}
 	if got := s.bottom.page.selected; got != up.ID {
 		t.Errorf("the panel shows %q, want the running Activity", got)
@@ -1165,12 +1166,12 @@ func checkBottomPanel(t *testing.T) {
 	log.Push(guitest.Finished("act-bad", "blog", "db", compose.ActionStart, "error: no such image\n", "error: no such image"))
 	settle()
 
-	bad := Activity{
+	bad := activity.Activity{
 		ID:      "act-bad",
 		Project: "blog",
 		Service: "db",
 		Kind:    compose.ActionStart,
-		State:   ActivityFailed,
+		State:   activity.ActivityFailed,
 		Error:   "error: no such image\n",
 		Summary: "error: no such image",
 	}
@@ -1178,7 +1179,7 @@ func checkBottomPanel(t *testing.T) {
 	if s.notice == nil || !s.notice.frame.IsVisible() {
 		t.Fatal("a failed Activity shows no notice")
 	}
-	if got, want := s.notice.label.Text(), ActivityToastText(bad); got != want {
+	if got, want := s.notice.label.Text(), activity.ActivityToastText(bad); got != want {
 		t.Errorf("the notice reads %q, want %q", got, want)
 	}
 	if !s.notice.action.IsVisible() {
@@ -1227,7 +1228,7 @@ func checkBottomPanel(t *testing.T) {
 func checkLogs(t *testing.T) {
 	t.Helper()
 
-	log := NewActivityLog()
+	log := activity.NewLog()
 	s := newShell(&application{activities: log}, design.LightTheme)
 	defer s.window.Delete()
 	s.show()
@@ -1324,8 +1325,8 @@ func checkLogs(t *testing.T) {
 	// A search with no match keeps the text empty and says so.
 	s.bottom.logs.search.SetText("missing")
 	settle()
-	if got := s.bottom.logs.status.Text(); got != logNoMatchText {
-		t.Errorf("the empty search reads %q, want %q", got, logNoMatchText)
+	if got := s.bottom.logs.status.Text(); got != activity.LogNoMatchText {
+		t.Errorf("the empty search reads %q, want %q", got, activity.LogNoMatchText)
 	}
 	s.bottom.logs.search.SetText("")
 	settle()
@@ -1345,8 +1346,8 @@ func checkLogs(t *testing.T) {
 	if !s.bottom.logs.paused {
 		t.Fatal("the pause does not stop the scrolling")
 	}
-	if got := s.bottom.logs.pause.Text(); got != logResumeText {
-		t.Errorf("the pause button reads %q, want %q", got, logResumeText)
+	if got := s.bottom.logs.pause.Text(); got != activity.LogResumeText {
+		t.Errorf("the pause button reads %q, want %q", got, activity.LogResumeText)
 	}
 	for i := 0; i < 400; i++ {
 		lines <- compose.LogLine{Service: "web", Text: fmt.Sprintf("filler %d", i)}
@@ -2016,7 +2017,7 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 func captureActivities(t *testing.T, dir string, theme design.DesignTheme, name string) {
 	t.Helper()
 
-	log := NewActivityLog()
+	log := activity.NewLog()
 	s := newShell(&application{activities: log}, theme)
 	defer s.window.Delete()
 	s.show()
@@ -2057,7 +2058,7 @@ func captureActivities(t *testing.T, dir string, theme design.DesignTheme, name 
 func captureLogs(t *testing.T, dir string, theme design.DesignTheme, name string) {
 	t.Helper()
 
-	log := NewActivityLog()
+	log := activity.NewLog()
 	s := newShell(&application{activities: log}, theme)
 	defer s.window.Delete()
 	s.show()
@@ -2329,7 +2330,7 @@ func checkCloseDialog(t *testing.T, s *shell) {
 func checkHiddenWindow(t *testing.T) {
 	t.Helper()
 
-	log := NewActivityLog()
+	log := activity.NewLog()
 	// The application answers the close with the saved behavior. An adapter
 	// without an icon is enough: the close asks only whether a tray exists.
 	app := &application{
@@ -2430,7 +2431,7 @@ func checkHiddenWindow(t *testing.T) {
 func checkQuit(t *testing.T) {
 	t.Helper()
 
-	log := NewActivityLog()
+	log := activity.NewLog()
 	app := &application{activities: log, prefs: settings.Defaults()}
 	s := newShell(app, design.LightTheme)
 	app.shell = s

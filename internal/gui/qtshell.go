@@ -5,6 +5,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/activity"
 	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/gui/usage"
 	"dockercontroller/internal/gui/view"
@@ -313,8 +314,8 @@ func (s *shell) buildPages() {
 	s.column.SetChildrenCollapsible(false)
 	s.column.AddWidget(s.detail)
 	s.bottom = newBottomPanel(s.app.activities, s.app.logSource(), s.app.ctx, s.theme, s.column)
-	s.bottom.onFailure = func(a Activity) {
-		s.showNoticeAction(ActivityToastText(a), showOutputText, func() { s.bottom.Show(a.ID) })
+	s.bottom.onFailure = func(a activity.Activity) {
+		s.showNoticeAction(activity.ActivityToastText(a), showOutputText, func() { s.bottom.Show(a.ID) })
 	}
 	// The two ways to the logs: the head of the detail opens the whole Project,
 	// a Service opens its own output.

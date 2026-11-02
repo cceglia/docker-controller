@@ -8,6 +8,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/activity"
 	"dockercontroller/internal/gui/design"
 	guiproject "dockercontroller/internal/gui/project"
 	"dockercontroller/internal/gui/usage"
@@ -441,7 +442,7 @@ func (p *detailPanel) header() *qt6.QWidget {
 	// them: one press opens the panel on the tab of the logs.
 	row := qt6.NewQHBoxLayout2()
 	row.SetSpacing(design.SpaceS)
-	logs := detailButton(showLogsText, "logButton", "Mostra i log del Progetto.", true)
+	logs := detailButton(activity.ShowLogsText, "logButton", "Mostra i log del Progetto.", true)
 	logs.OnClicked(func() {
 		if p.onLogs != nil {
 			p.onLogs(project, "")
@@ -450,7 +451,7 @@ func (p *detailPanel) header() *qt6.QWidget {
 	row.AddWidget(logs.QWidget)
 	row.AddStretch()
 	box.AddLayout2(row.QLayout, 0)
-	p.controls = append(p.controls, panelControl{widget: logs.QWidget, label: showLogsText})
+	p.controls = append(p.controls, panelControl{widget: logs.QWidget, label: activity.ShowLogsText})
 
 	return block
 }
@@ -706,15 +707,15 @@ func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidg
 
 	// The logs of this Service alone, next to its name: the panel follows one
 	// Container's output instead of the whole Project.
-	logs := detailButton(serviceLogText, "serviceLogButton", "Mostra i log del Servizio.", true)
-	logs.SetAccessibleName(serviceLogText + " di " + service.Name)
+	logs := detailButton(activity.ServiceLogText, "serviceLogButton", "Mostra i log del Servizio.", true)
+	logs.SetAccessibleName(activity.ServiceLogText + " di " + service.Name)
 	logs.OnClicked(func() {
 		if p.onLogs != nil {
 			p.onLogs(p.shown.Project, service.Name)
 		}
 	})
 	line.AddWidget3(logs.QWidget, 0, qt6.AlignVCenter)
-	p.controls = append(p.controls, panelControl{widget: logs.QWidget, label: service.Name + "/" + serviceLogText})
+	p.controls = append(p.controls, panelControl{widget: logs.QWidget, label: service.Name + "/" + activity.ServiceLogText})
 	box.AddLayout2(line.QLayout, 0)
 
 	for _, container := range service.Containers {

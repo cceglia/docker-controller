@@ -6,6 +6,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/activity"
 	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/gui/logs"
 )
@@ -55,19 +56,19 @@ type bottomPanel struct {
 
 	// onFailure, when set, is called once for each failed Activity: the shell
 	// turns it into the notice with the link to the output.
-	onFailure func(Activity)
+	onFailure func(activity.Activity)
 }
 
 // newBottomPanel builds the panel closed. splitter is the vertical splitter the
 // panel shares with the detail. A nil log builds a panel that never opens by
 // itself; a nil source builds a Log page that streams nothing.
-func newBottomPanel(log *ActivityLog, source logs.LogSource, ctx context.Context, theme design.DesignTheme, splitter *qt6.QSplitter) *bottomPanel {
+func newBottomPanel(log *activity.Log, source logs.LogSource, ctx context.Context, theme design.DesignTheme, splitter *qt6.QSplitter) *bottomPanel {
 	p := &bottomPanel{splitter: splitter}
 
 	p.page = newActivityPage(log)
 	// A new Activity opens the panel on it, as the old drawer did.
 	p.page.onNew = p.Show
-	p.page.onFailure = func(a Activity) {
+	p.page.onFailure = func(a activity.Activity) {
 		if p.onFailure != nil {
 			p.onFailure(a)
 		}
@@ -78,7 +79,7 @@ func newBottomPanel(log *ActivityLog, source logs.LogSource, ctx context.Context
 	p.logs.ctx = ctx
 
 	p.tabs = qt6.NewQTabWidget2()
-	p.tabs.SetAccessibleName(panelAccessibleName)
+	p.tabs.SetAccessibleName(activity.PanelAccessibleName)
 	// The two tabs always fit, so the bar never scrolls and the two arrows of
 	// Qt stay out of the way.
 	if bar := p.tabs.TabBar(); bar != nil {
@@ -87,8 +88,8 @@ func newBottomPanel(log *ActivityLog, source logs.LogSource, ctx context.Context
 	// The two tabs carry the content alone: the panel is compact, and a frame
 	// around a frame would take a line away from the output.
 	p.tabs.SetDocumentMode(true)
-	p.tabs.AddTab(p.page.widget, activityPageTitle)
-	p.tabs.AddTab(p.logs.widget, logPageTitle)
+	p.tabs.AddTab(p.page.widget, activity.ActivityPageTitle)
+	p.tabs.AddTab(p.logs.widget, activity.LogPageTitle)
 	// The Log tab shows the logs of the Project on screen when the user chooses
 	// it, so a tab that was never opened still streams what it names.
 	p.tabs.OnCurrentChanged(func(index int) {
@@ -97,8 +98,8 @@ func newBottomPanel(log *ActivityLog, source logs.LogSource, ctx context.Context
 		}
 	})
 
-	p.close = qt6.NewQPushButton3(panelCloseText)
-	p.close.SetAccessibleName(panelCloseText)
+	p.close = qt6.NewQPushButton3(activity.PanelCloseText)
+	p.close.SetAccessibleName(activity.PanelCloseText)
 	p.close.SetToolTip("Nascondi il pannello e ferma il flusso dei log. L'Attività in corso continua.")
 	p.close.OnClicked(func() { p.Close() })
 	keepTarget(p.close.QWidget)

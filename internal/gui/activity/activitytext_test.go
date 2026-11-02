@@ -1,4 +1,4 @@
-package gui
+package activity
 
 import (
 	"testing"
@@ -18,7 +18,7 @@ func TestActivityTooltip(t *testing.T) {
 		{
 			"a running Activity says so",
 			Activity{State: ActivityRunning, Project: "shop", Kind: compose.ActionUp},
-			runningActivityText,
+			RunningText,
 		},
 		{
 			"a success names the Action and its target",
@@ -43,12 +43,12 @@ func TestActivityTooltip(t *testing.T) {
 		{
 			"a state the view does not know reads as running",
 			Activity{State: ActivityState("queued"), Project: "shop", Kind: compose.ActionUp},
-			runningActivityText,
+			RunningText,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := activityTooltip(tc.activity); got != tc.want {
-				t.Errorf("activityTooltip() = %q, want %q", got, tc.want)
+			if got := Tooltip(tc.activity); got != tc.want {
+				t.Errorf("Tooltip() = %q, want %q", got, tc.want)
 			}
 		})
 	}

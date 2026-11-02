@@ -7,6 +7,7 @@ import (
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/db"
 	"dockercontroller/internal/gui"
+	"dockercontroller/internal/gui/activity"
 	"dockercontroller/internal/notify"
 	"dockercontroller/internal/settings"
 )
@@ -33,10 +34,10 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// The log of the session lives in the GUI package, without Qt: the Manager
-	// pushes its events into it and never waits for the window. The notifier
-	// reads the same events and shows the notifications they deserve.
-	activities := gui.NewActivityLog()
+	// The log of the session lives in the activity package, without Qt: the
+	// Manager pushes its events into it and never waits for the window. The
+	// notifier reads the same events and shows the notifications they deserve.
+	activities := activity.NewLog()
 	notifier := gui.NewNotifier(notify.NewDBus())
 
 	manager, err := compose.New(compose.Config{

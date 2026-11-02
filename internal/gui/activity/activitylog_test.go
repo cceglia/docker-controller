@@ -1,4 +1,4 @@
-package gui
+package activity
 
 import (
 	"fmt"
@@ -194,8 +194,8 @@ func TestActivityGlyph(t *testing.T) {
 	}
 }
 
-func TestActivityLog_KeepsTheHistoryNewestFirst(t *testing.T) {
-	log := NewActivityLog()
+func TestLog_KeepsTheHistoryNewestFirst(t *testing.T) {
+	log := NewLog()
 	log.Push(guitest.Started("act-1", "shop", "", compose.ActionUp))
 	log.Push(guitest.Started("act-2", "blog", "db", compose.ActionStart))
 	log.Push(guitest.Output("act-2", "blog", "db", compose.ActionStart, "starting", false))
@@ -216,7 +216,7 @@ func TestActivityLog_KeepsTheHistoryNewestFirst(t *testing.T) {
 	}
 }
 
-func TestActivityLog_State(t *testing.T) {
+func TestLog_State(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		events []compose.ActivityEvent
@@ -245,7 +245,7 @@ func TestActivityLog_State(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			log := NewActivityLog()
+			log := NewLog()
 			for _, e := range tc.events {
 				log.Push(e)
 			}
@@ -260,8 +260,8 @@ func TestActivityLog_State(t *testing.T) {
 	}
 }
 
-func TestActivityLog_KeepsTheSummaryOfAFailure(t *testing.T) {
-	log := NewActivityLog()
+func TestLog_KeepsTheSummaryOfAFailure(t *testing.T) {
+	log := NewLog()
 	log.Push(guitest.Started("act-1", "shop", "", compose.ActionUp))
 	log.Push(guitest.Finished("act-1", "shop", "", compose.ActionUp, "error: no such image", "no such image"))
 
@@ -277,8 +277,8 @@ func TestActivityLog_KeepsTheSummaryOfAFailure(t *testing.T) {
 	}
 }
 
-func TestActivityLog_IgnoresAnUnknownActivity(t *testing.T) {
-	log := NewActivityLog()
+func TestLog_IgnoresAnUnknownActivity(t *testing.T) {
+	log := NewLog()
 	log.Push(guitest.Output("act-1", "shop", "", compose.ActionUp, "late", false))
 	log.Push(guitest.Finished("act-1", "shop", "", compose.ActionUp, "boom", "boom"))
 
@@ -290,8 +290,8 @@ func TestActivityLog_IgnoresAnUnknownActivity(t *testing.T) {
 	}
 }
 
-func TestActivityLog_KeepsTheLastLines(t *testing.T) {
-	log := NewActivityLog()
+func TestLog_KeepsTheLastLines(t *testing.T) {
+	log := NewLog()
 	log.Push(guitest.Started("act-1", "shop", "", compose.ActionUp))
 	for i := 0; i <= ActivityLineLimit; i++ {
 		log.Push(guitest.Output("act-1", "shop", "", compose.ActionUp, fmt.Sprintf("line %d", i), false))
@@ -315,8 +315,8 @@ func TestActivityLog_KeepsTheLastLines(t *testing.T) {
 	}
 }
 
-func TestActivityLog_NotifiesAfterAChange(t *testing.T) {
-	log := NewActivityLog()
+func TestLog_NotifiesAfterAChange(t *testing.T) {
+	log := NewLog()
 	calls := 0
 	log.OnChange(func() { calls++ })
 
@@ -338,7 +338,7 @@ func TestActivityLog_NotifiesAfterAChange(t *testing.T) {
 	}
 }
 
-func TestActivityLog_Clear(t *testing.T) {
+func TestLog_Clear(t *testing.T) {
 	// The history of the window before: two Activities, one of them failed.
 	before := []compose.ActivityEvent{
 		guitest.Started("act-1", "shop", "", compose.ActionUp),
@@ -378,7 +378,7 @@ func TestActivityLog_Clear(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			log := NewActivityLog()
+			log := NewLog()
 			for _, e := range tc.before {
 				log.Push(e)
 			}
@@ -409,8 +409,8 @@ func TestActivityLog_Clear(t *testing.T) {
 	}
 }
 
-func TestActivityLog_ClearNotifiesTheSubscriber(t *testing.T) {
-	log := NewActivityLog()
+func TestLog_ClearNotifiesTheSubscriber(t *testing.T) {
+	log := NewLog()
 	calls := 0
 	log.OnChange(func() { calls++ })
 
@@ -425,8 +425,8 @@ func TestActivityLog_ClearNotifiesTheSubscriber(t *testing.T) {
 	}
 }
 
-func TestActivityLog_ReadIsACopy(t *testing.T) {
-	log := NewActivityLog()
+func TestLog_ReadIsACopy(t *testing.T) {
+	log := NewLog()
 	log.Push(guitest.Started("act-1", "shop", "", compose.ActionUp))
 	log.Push(guitest.Output("act-1", "shop", "", compose.ActionUp, "one", false))
 

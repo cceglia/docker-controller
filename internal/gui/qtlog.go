@@ -10,6 +10,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/activity"
 	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/gui/logs"
 )
@@ -141,10 +142,10 @@ func newLogPage(theme design.DesignTheme) *logPage {
 	// The visible label names the field, and the field carries the same words
 	// for a screen reader: a hint inside the field would be text too, and the
 	// placeholder role of the desktop palette is too faint on the dark surface.
-	p.searchLabel = qt6.NewQLabel3(logSearchLabelText)
+	p.searchLabel = qt6.NewQLabel3(activity.LogSearchLabelText)
 	p.searchLabel.SetBuddy(p.search.QWidget)
 
-	p.clocks = qt6.NewQCheckBox3(logTimestampsText)
+	p.clocks = qt6.NewQCheckBox3(activity.LogTimestampsText)
 	setObjectName(p.clocks.QWidget, "logClocks")
 	p.clocks.SetAccessibleName("Mostra l'ora di ogni riga")
 	p.clocks.SetChecked(true)
@@ -155,7 +156,7 @@ func newLogPage(theme design.DesignTheme) *logPage {
 		p.follow()
 	})
 
-	p.pause = qt6.NewQPushButton3(logPauseText)
+	p.pause = qt6.NewQPushButton3(activity.LogPauseText)
 	p.pause.SetCheckable(true)
 	p.pause.SetAccessibleName("Pausa dello scorrimento")
 	p.pause.SetToolTip("Ferma lo scorrimento automatico. Le righe nuove continuano ad arrivare.")
@@ -272,7 +273,7 @@ func (p *logPage) resetView() {
 	p.clocks.SetChecked(true)
 	p.paused = false
 	p.pause.SetChecked(false)
-	p.pause.SetText(logPauseText)
+	p.pause.SetText(activity.LogPauseText)
 }
 
 // start terminates the stream on screen, if any, and opens the new one.
@@ -450,10 +451,10 @@ func (p *logPage) searchChanged(text string) {
 func (p *logPage) togglePause(checked bool) {
 	p.paused = checked
 	if checked {
-		p.pause.SetText(logResumeText)
+		p.pause.SetText(activity.LogResumeText)
 		return
 	}
-	p.pause.SetText(logPauseText)
+	p.pause.SetText(activity.LogPauseText)
 	p.follow()
 }
 
@@ -471,13 +472,13 @@ func (p *logPage) updateState() {
 	case p.end != nil && p.end.Error != "":
 		status, fault = p.end.Error, true
 	case p.end != nil && !p.end.Stopped:
-		status = logEndedText
+		status = activity.LogEndedText
 	case visible == 0 && p.term != "":
-		status = logNoMatchText
+		status = activity.LogNoMatchText
 	case p.project == "":
-		status = emptyLogText
+		status = activity.EmptyLogText
 	case visible == 0:
-		status = logWaitingText
+		status = activity.LogWaitingText
 	}
 
 	p.status.SetText(status)

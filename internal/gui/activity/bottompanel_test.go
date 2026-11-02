@@ -1,4 +1,4 @@
-package gui
+package activity
 
 import (
 	"testing"
@@ -58,9 +58,9 @@ func TestPanelActivity(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			id, open := panelActivity(tc.shown, tc.activities)
+			id, open := PanelActivity(tc.shown, tc.activities)
 			if id != tc.wantID || open != tc.wantOpen {
-				t.Errorf("panelActivity() = (%q, %t), want (%q, %t)", id, open, tc.wantID, tc.wantOpen)
+				t.Errorf("PanelActivity() = (%q, %t), want (%q, %t)", id, open, tc.wantID, tc.wantOpen)
 			}
 		})
 	}

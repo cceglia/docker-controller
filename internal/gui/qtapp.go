@@ -8,6 +8,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/activity"
 	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/gui/logs"
 	"dockercontroller/internal/gui/usage"
@@ -20,7 +21,7 @@ import (
 // the list, the bottom panel and the settings window read them in later
 // tickets. notifier names a Project as the list does and shows the desktop
 // notifications the Manager's events deserve.
-func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog, store *settings.Store, notifier *Notifier) error {
+func Run(ctx context.Context, manager *compose.Manager, activities *activity.Log, store *settings.Store, notifier *Notifier) error {
 	a := &application{
 		ctx:        ctx,
 		manager:    manager,
@@ -104,7 +105,7 @@ type application struct {
 	qt         *qt6.QApplication
 	ctx        context.Context
 	manager    *compose.Manager
-	activities *ActivityLog
+	activities *activity.Log
 	store      *settings.Store
 	notifier   *Notifier
 	// prefs is the saved settings: what a close does and the terminal command.

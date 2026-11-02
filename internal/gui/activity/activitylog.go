@@ -1,4 +1,4 @@
-package gui
+package activity
 
 import (
 	"strings"
@@ -119,8 +119,8 @@ func ActivityOutcome(a Activity) string {
 	return ""
 }
 
-// linesText is the text of some output lines, one line each.
-func linesText(lines []ActivityLine) string {
+// LinesText is the text of some output lines, one line each.
+func LinesText(lines []ActivityLine) string {
 	var b strings.Builder
 	for _, line := range lines {
 		b.WriteString(line.Text)
@@ -134,7 +134,7 @@ func linesText(lines []ActivityLine) string {
 // stderr of compose, which the Manager already streamed as lines: the message
 // must not appear twice.
 func ActivityOutput(a Activity) string {
-	text := linesText(a.Lines)
+	text := LinesText(a.Lines)
 	outcome := ActivityOutcome(a)
 	if outcome == "" {
 		return text
@@ -145,25 +145,25 @@ func ActivityOutput(a Activity) string {
 	return text + outcome + "\n"
 }
 
-// ActivityLog keeps the Activities of the session, newest first, with their
+// Log keeps the Activities of the session, newest first, with their
 // output and outcome. It is the single source of the panel: the Manager pushes
-// its events into it, the view reads it and subscribes. It has no GTK, so a
+// its events into it, the view reads it and subscribes. It has no Qt binding, so a
 // test drives it with synthetic events.
 //
 // The log never stops an Activity and never waits for the view: Push holds the
 // lock only to change the history, and calls the subscriber after unlocking.
 // The application clears it when it builds a new window, so the history of a
 // destroyed window never comes back.
-type ActivityLog struct {
+type Log struct {
 	mu         sync.Mutex
 	activities []Activity // newest first
 	index      map[compose.ActivityID]int
 	onChange   func()
 }
 
-// NewActivityLog creates an empty log.
-func NewActivityLog() *ActivityLog {
-	return &ActivityLog{index: map[compose.ActivityID]int{}}
+// NewLog creates an empty log.
+func NewLog() *Log {
+	return &Log{index: map[compose.ActivityID]int{}}
 }
 
 // Push appends the event to the history and returns at once. A Started event
@@ -171,7 +171,7 @@ func NewActivityLog() *ActivityLog {
 // last ActivityLineLimit lines; a Finished event sets its state and its error.
 // An event for an Activity the log does not know changes nothing. The
 // subscriber, when set, runs after a change, on the goroutine that pushed.
-func (l *ActivityLog) Push(e compose.ActivityEvent) {
+func (l *Log) Push(e compose.ActivityEvent) {
 	changed := false
 
 	l.mu.Lock()
@@ -227,7 +227,7 @@ func (l *ActivityLog) Push(e compose.ActivityEvent) {
 // the close says. The subscriber, when set, runs after the clear, so a view
 // still on screen shows nothing. An Activity that ran before the clear stays
 // out: its later events name an ID the log no longer knows.
-func (l *ActivityLog) Clear() {
+func (l *Log) Clear() {
 	l.mu.Lock()
 	l.activities = nil
 	l.index = map[compose.ActivityID]int{}
@@ -241,7 +241,7 @@ func (l *ActivityLog) Clear() {
 
 // Activities returns the Activities of the session in display order, newest
 // first. The view owns the result: it is a copy.
-func (l *ActivityLog) Activities() []Activity {
+func (l *Log) Activities() []Activity {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -253,7 +253,7 @@ func (l *ActivityLog) Activities() []Activity {
 }
 
 // Activity returns one Activity of the session. The view owns the result.
-func (l *ActivityLog) Activity(id compose.ActivityID) (Activity, bool) {
+func (l *Log) Activity(id compose.ActivityID) (Activity, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -267,14 +267,14 @@ func (l *ActivityLog) Activity(id compose.ActivityID) (Activity, bool) {
 // OnChange registers the subscriber the log calls after every change. The
 // subscriber must return at once: the Manager waits for Push, not for the
 // view. A nil function removes the subscription.
-func (l *ActivityLog) OnChange(fn func()) {
+func (l *Log) OnChange(fn func()) {
 	l.mu.Lock()
 	l.onChange = fn
 	l.mu.Unlock()
 }
 
 // reindex rebuilds the position of each Activity. The caller holds the lock.
-func (l *ActivityLog) reindex() {
+func (l *Log) reindex() {
 	l.index = make(map[compose.ActivityID]int, len(l.activities))
 	for i, a := range l.activities {
 		l.index[a.ID] = i
