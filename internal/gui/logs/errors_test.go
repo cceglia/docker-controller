@@ -1,4 +1,4 @@
-package gui
+package logs
 
 import (
 	"errors"
@@ -10,7 +10,7 @@ import (
 )
 
 // TestUserError_LogOpenKeepsTheItalianMessage checks the message of the Log
-// stream, which stays in this package until the Log errors move to logs.
+// stream, which lives in this package with its streams.
 func TestUserError_LogOpenKeepsTheItalianMessage(t *testing.T) {
 	got := UserError(fmt.Errorf("%w: id", ErrLogOpen))
 	if got == nil || !strings.Contains(got.Error(), "già aperto") {

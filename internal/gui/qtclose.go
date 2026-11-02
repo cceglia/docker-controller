@@ -5,6 +5,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/settings"
 )
 
@@ -181,7 +182,7 @@ func (a *application) answerClose(choice settings.CloseBehavior, remember bool) 
 		mainthread.Start(func() {
 			if err != nil {
 				if a.shell != nil {
-					a.shell.showNotice(UserError(err).Error())
+					a.shell.showNotice(view.UserError(err).Error())
 				}
 				return
 			}

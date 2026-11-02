@@ -3,6 +3,7 @@ package gui
 import (
 	"strings"
 
+	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/settings"
 )
 
@@ -95,7 +96,7 @@ func validateTerminalCommand(command string) string {
 		return ""
 	}
 	if _, err := settings.TerminalArgv(command, ""); err != nil {
-		return UserError(err).Error()
+		return view.UserError(err).Error()
 	}
 	return ""
 }
@@ -116,7 +117,7 @@ func storedSettings(v settings.Settings) settings.Settings {
 // terminal command is the Italian message of UserError.
 func preferencesSaveOutcome(err error) (message string, saved bool) {
 	if err != nil {
-		return UserError(err).Error(), false
+		return view.UserError(err).Error(), false
 	}
 	return settingsSavedText, true
 }

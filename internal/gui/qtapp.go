@@ -9,6 +9,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/logs"
 	"dockercontroller/internal/settings"
 )
 
@@ -129,7 +130,7 @@ type application struct {
 
 // logSource is the stream the Log tab opens. A Manager that is not wired yet
 // leaves the page with no source, so the window still builds.
-func (a *application) logSource() LogSource {
+func (a *application) logSource() logs.LogSource {
 	if a.manager == nil {
 		return nil
 	}

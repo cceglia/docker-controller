@@ -7,6 +7,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/view"
 )
 
 // The texts of the form of a new Project and of its picker.
@@ -205,7 +206,7 @@ func (d *addDialog) pickFiles() {
 		d.refresh()
 		d.showName()
 		if err != nil {
-			d.showError(UserError(err).Error())
+			d.showError(view.UserError(err).Error())
 		}
 	})
 }
@@ -286,7 +287,7 @@ func (d *addDialog) proposeMain() {
 	}
 	name, err := compose.ProposeName(main)
 	if err != nil {
-		d.showError(UserError(err).Error())
+		d.showError(view.UserError(err).Error())
 		return
 	}
 	d.form.Propose(name)
@@ -334,7 +335,7 @@ func (d *addDialog) submit() {
 func (d *addDialog) done(name string, err error) {
 	d.busy = false
 	if err != nil {
-		d.showError(UserError(err).Error())
+		d.showError(view.UserError(err).Error())
 		d.updateAdd()
 		return
 	}

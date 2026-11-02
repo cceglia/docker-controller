@@ -6,6 +6,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/tray"
 )
 
@@ -247,7 +248,7 @@ func (s *shell) do(action compose.Action) {
 		_, err := manager.Do(s.app.ctx, action)
 		mainthread.Start(func() {
 			if err != nil {
-				s.showNotice(UserError(err).Error())
+				s.showNotice(view.UserError(err).Error())
 			}
 			s.panel.actionDone()
 		})

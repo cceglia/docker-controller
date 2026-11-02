@@ -1,4 +1,4 @@
-package gui
+package logs
 
 import (
 	"errors"
@@ -8,12 +8,11 @@ import (
 	"dockercontroller/internal/gui/view"
 )
 
-// logOpenText is the Italian message of ErrLogOpen. The Log errors move to the
-// logs package with their streams, so the message stays here until then.
+// logOpenText is the Italian message of ErrLogOpen.
 const logOpenText = "Flusso dei log già aperto."
 
 // UserError returns err with an Italian message: the one view registers for the
-// error it wraps, or the one of the Log stream. ErrLogOpen still lives in this
+// error it wraps, or the one of the Log stream. ErrLogOpen lives in this
 // package, so this wrapper adds its message to the ones of view.
 func UserError(err error) error {
 	if err == nil {

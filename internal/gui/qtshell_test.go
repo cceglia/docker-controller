@@ -18,6 +18,7 @@ import (
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/gui/guitest"
+	"dockercontroller/internal/gui/logs"
 	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/settings"
 	"dockercontroller/internal/tray"
@@ -467,7 +468,7 @@ func checkEditForm(t *testing.T, s *shell) {
 	if form == nil {
 		t.Fatal("a refused save closes the form")
 	}
-	message := UserError(compose.ErrUnknownProject).Error()
+	message := view.UserError(compose.ErrUnknownProject).Error()
 	if got := errorUnder(form); got != message {
 		t.Errorf("the refusal reads %q under the field, want %q", got, message)
 	}
@@ -1232,7 +1233,7 @@ func checkLogs(t *testing.T) {
 	projects := screenshotProjects()
 	project := projects[0] // vakt: web, db and cache
 
-	lines := make(chan compose.LogLine, 2*LogLineLimit)
+	lines := make(chan compose.LogLine, 2*logs.LogLineLimit)
 	stopped := make(chan struct{}, 8)
 	s.bottom.logs.ctx = context.Background()
 	s.bottom.logs.source = func(ctx context.Context, _ compose.LogRequest, onLine func(compose.LogLine)) error {
@@ -1273,11 +1274,11 @@ func checkLogs(t *testing.T) {
 	s.bottom.Open()
 	s.bottom.tabs.SetCurrentIndex(logTab)
 	waitFor(t, "the stream of the Project", func() bool { return s.bottom.logs.Running() })
-	if got, want := s.bottom.logs.target.Text(), LogTargetText(project, ""); got != want {
+	if got, want := s.bottom.logs.target.Text(), logs.LogTargetText(project, ""); got != want {
 		t.Errorf("the Log tab names %q, want %q", got, want)
 	}
 
-	clock := LogTime("2024-03-01T12:34:56Z")
+	clock := logs.LogTime("2024-03-01T12:34:56Z")
 	for _, line := range []compose.LogLine{
 		{Service: "web", Timestamp: "2024-03-01T12:34:56Z", Text: "GET /index.html 200"},
 		{Service: "db", Text: "database system is ready"},
@@ -1301,7 +1302,7 @@ func checkLogs(t *testing.T) {
 	}
 
 	// The format of a Service comes from the role of the palette.
-	hue := ServiceHue("web")
+	hue := logs.ServiceHue("web")
 	if got, want := s.bottom.logs.formats.service[hue].Foreground().Color().Name(), design.ServiceColor(hue, design.LightTheme); got != want {
 		t.Errorf("the colour of the name %q is %s, want %s", "web", got, want)
 	}
@@ -1313,7 +1314,7 @@ func checkLogs(t *testing.T) {
 	if strings.Contains(text, "GET /index.html 200") || !strings.Contains(text, "database system is ready") {
 		t.Errorf("the search shows %q, want the matching line alone", text)
 	}
-	if got, want := s.bottom.logs.count.Text(), LogCountText(1, 3); got != want {
+	if got, want := s.bottom.logs.count.Text(), logs.LogCountText(1, 3); got != want {
 		t.Errorf("the count reads %q, want %q", got, want)
 	}
 
@@ -1360,26 +1361,26 @@ func checkLogs(t *testing.T) {
 	settle()
 	waitFor(t, "the last line after the resume", func() bool { return bar.Value() == bar.Maximum() })
 
-	// The panel keeps at most LogLineLimit lines and drops the oldest.
-	for i := 0; i < LogLineLimit; i++ {
+	// The panel keeps at most logs.LogLineLimit lines and drops the oldest.
+	for i := 0; i < logs.LogLineLimit; i++ {
 		lines <- compose.LogLine{Service: "db", Text: fmt.Sprintf("overflow %d", i)}
 	}
-	waitFor(t, "the cap of the lines", func() bool { return len(s.bottom.logs.lines) == LogLineLimit })
-	if got := len(s.bottom.logs.lines); got != LogLineLimit {
-		t.Errorf("the panel keeps %d lines, want %d", got, LogLineLimit)
+	waitFor(t, "the cap of the lines", func() bool { return len(s.bottom.logs.lines) == logs.LogLineLimit })
+	if got := len(s.bottom.logs.lines); got != logs.LogLineLimit {
+		t.Errorf("the panel keeps %d lines, want %d", got, logs.LogLineLimit)
 	}
 	if text := s.bottom.logs.view.ToPlainText(); strings.Contains(text, "GET /index.html 200") ||
 		!strings.Contains(text, "overflow 0\n") || !strings.Contains(text, "overflow 4999") {
 		t.Error("the text does not hold the last lines of the burst alone")
 	}
-	if got, limit := s.bottom.logs.view.Document().BlockCount(), LogLineLimit+1; got > limit {
+	if got, limit := s.bottom.logs.view.Document().BlockCount(), logs.LogLineLimit+1; got > limit {
 		t.Errorf("the text holds %d blocks, want at most %d", got, limit)
 	}
 
 	// A Service of the detail opens the logs of that Service alone.
 	s.bottom.ShowLogs(project, "db")
 	waitFor(t, "the stream of the Service", func() bool { return s.bottom.logs.Running() })
-	if got, want := s.bottom.logs.target.Text(), LogTargetText(project, "db"); got != want {
+	if got, want := s.bottom.logs.target.Text(), logs.LogTargetText(project, "db"); got != want {
 		t.Errorf("the Log tab names %q, want %q", got, want)
 	}
 	if name, service := s.bottom.logs.Target(); name != project.Name || service != "db" {
@@ -1892,7 +1893,7 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	// The form of the settings, with the Italian reason of a refused save under
 	// its first field: the light theme and the dark one have a shot each.
 	s.panel.startEdit()
-	s.panel.edit.message = UserError(compose.ErrUnknownProject).Error()
+	s.panel.edit.message = view.UserError(compose.ErrUnknownProject).Error()
 	s.panel.render()
 	shot("18-form-light")
 	s.panel.cancelEdit()
@@ -1991,7 +1992,7 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	// The form of the settings in the dark palette: the message of a refused
 	// save must read on the dark surface too.
 	dark.panel.startEdit()
-	dark.panel.edit.message = UserError(compose.ErrUnknownProject).Error()
+	dark.panel.edit.message = view.UserError(compose.ErrUnknownProject).Error()
 	dark.panel.render()
 	saveGrab(t, dark.window, dir, "19-form-dark")
 	dark.panel.cancelEdit()

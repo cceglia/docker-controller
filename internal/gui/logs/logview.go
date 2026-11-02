@@ -1,4 +1,4 @@
-package gui
+package logs
 
 import (
 	"fmt"
@@ -113,6 +113,18 @@ func ServiceTag(service string) string {
 // serviceTag is the name of the buffer tag of one palette entry.
 func serviceTag(hue int) string {
 	return serviceTagPrefix + strconv.Itoa(hue)
+}
+
+// ServiceHueOf reads the palette entry of a tag of ServiceTag.
+func ServiceHueOf(tag string) (int, bool) {
+	if !strings.HasPrefix(tag, serviceTagPrefix) {
+		return 0, false
+	}
+	hue, err := strconv.Atoi(strings.TrimPrefix(tag, serviceTagPrefix))
+	if err != nil || hue < 0 || hue >= design.ServiceHues {
+		return 0, false
+	}
+	return hue, true
 }
 
 // LogTargetText is the target the Log page names: the Display name of the

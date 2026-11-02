@@ -24,7 +24,7 @@ func (s *shell) showAddDialog() {
 		}
 		dialog := s.openAddForm(form)
 		if dialog != nil && err != nil {
-			dialog.showError(UserError(err).Error())
+			dialog.showError(view.UserError(err).Error())
 		}
 	})
 }
@@ -82,7 +82,7 @@ func (s *shell) selectProject(name string) {
 func (s *shell) openFolder(name string) {
 	folder, err := view.ProjectFolder(name, s.snapshot.Projects)
 	if err != nil {
-		s.showNotice(UserError(err).Error())
+		s.showNotice(view.UserError(err).Error())
 		return
 	}
 	s.openExternal(folder)
@@ -94,7 +94,7 @@ func (s *shell) openFolder(name string) {
 func (s *shell) openTerminal(name string) {
 	folder, err := view.ProjectFolder(name, s.snapshot.Projects)
 	if err != nil {
-		s.showNotice(UserError(err).Error())
+		s.showNotice(view.UserError(err).Error())
 		return
 	}
 	store := s.app.store
@@ -104,18 +104,18 @@ func (s *shell) openTerminal(name string) {
 	go func() {
 		cfg, err := store.Get(s.app.ctx)
 		if err != nil {
-			mainthread.Start(func() { s.showNotice(UserError(err).Error()) })
+			mainthread.Start(func() { s.showNotice(view.UserError(err).Error()) })
 			return
 		}
 		cmd, err := view.TerminalCommand(cfg.TerminalCommand, folder)
 		if err != nil {
-			mainthread.Start(func() { s.showNotice(UserError(err).Error()) })
+			mainthread.Start(func() { s.showNotice(view.UserError(err).Error()) })
 			return
 		}
 		if err := cmd.Start(); err != nil {
 			program := cmd.Args[0]
 			mainthread.Start(func() {
-				s.showNotice(UserError(fmt.Errorf("%w: %s: %w", view.ErrTerminalStart, program, err)).Error())
+				s.showNotice(view.UserError(fmt.Errorf("%w: %s: %w", view.ErrTerminalStart, program, err)).Error())
 			})
 			return
 		}
@@ -128,7 +128,7 @@ func (s *shell) openTerminal(name string) {
 func (s *shell) openPort(port int) {
 	address, err := view.PortURL(port)
 	if err != nil {
-		s.showNotice(UserError(err).Error())
+		s.showNotice(view.UserError(err).Error())
 		return
 	}
 	s.openExternal(address)
@@ -141,7 +141,7 @@ func (s *shell) openExternal(target string) {
 		cmd := view.OpenCommand(target)
 		if err := cmd.Start(); err != nil {
 			mainthread.Start(func() {
-				s.showNotice(UserError(fmt.Errorf("%w: %w", view.ErrCannotOpen, err)).Error())
+				s.showNotice(view.UserError(fmt.Errorf("%w: %w", view.ErrCannotOpen, err)).Error())
 			})
 			return
 		}
@@ -159,7 +159,7 @@ func (s *shell) removeFromList(name string) {
 	}
 	go func() {
 		if err := manager.RemoveFromList(s.app.ctx, name); err != nil {
-			mainthread.Start(func() { s.showNotice(UserError(err).Error()) })
+			mainthread.Start(func() { s.showNotice(view.UserError(err).Error()) })
 		}
 	}()
 }

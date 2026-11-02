@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/notify"
 	"dockercontroller/internal/tray"
 )
@@ -61,7 +62,7 @@ func (n *Notifier) launch(action compose.Action, start func(compose.Action) (com
 	n.policy.Launching(action)
 	if _, err := start(action); err != nil {
 		n.policy.Aborted(action)
-		n.sender.Send(windowTitle, UserError(err).Error())
+		n.sender.Send(windowTitle, view.UserError(err).Error())
 		return err
 	}
 	return nil

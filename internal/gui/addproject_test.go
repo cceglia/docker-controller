@@ -7,6 +7,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/guitest"
+	"dockercontroller/internal/gui/view"
 )
 
 // formWith builds a form with the named files already chosen, so a test says
@@ -391,7 +392,7 @@ func TestAddRefusal_ExplainsTheRefusalBeforeTheSave(t *testing.T) {
 			if !errors.Is(err, tc.err) {
 				t.Fatalf("AddRefusal error = %v, want %v", err, tc.err)
 			}
-			if got := UserError(err).Error(); got != tc.text {
+			if got := view.UserError(err).Error(); got != tc.text {
 				t.Errorf("the refusal reads %q, want %q", got, tc.text)
 			}
 		})

@@ -5,6 +5,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/tray"
 )
 
@@ -260,7 +261,7 @@ func (a *application) launchTray(action compose.Action) {
 		}
 		mainthread.Start(func() {
 			if a.shell != nil {
-				a.shell.showNotice(UserError(err).Error())
+				a.shell.showNotice(view.UserError(err).Error())
 			}
 		})
 	}()

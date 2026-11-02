@@ -5,6 +5,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/view"
 )
 
 // The texts of the form of the settings.
@@ -101,7 +102,7 @@ func (p *detailPanel) saveDone(err error) {
 	}
 	p.edit.saving = false
 	if err != nil {
-		p.edit.message = UserError(err).Error()
+		p.edit.message = view.UserError(err).Error()
 		p.render()
 		p.focusEdit()
 		return

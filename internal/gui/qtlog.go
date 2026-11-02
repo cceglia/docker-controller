@@ -3,7 +3,6 @@ package gui
 import (
 	"context"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -12,6 +11,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/logs"
 )
 
 // stderrPrefix marks a line of compose itself in the text. The colour of the
@@ -53,31 +53,19 @@ func newLogFormats(theme design.DesignTheme) *logFormats {
 	return f
 }
 
-// format returns the format of a tag of LogSegments. A tag the page does not
+// format returns the format of a tag of logs.LogSegments. A tag the page does not
 // know, and the empty tag of the text of a Container, keep the plain format.
 func (f *logFormats) format(tag string) *qt6.QTextCharFormat {
 	switch tag {
-	case LogTimestampTag:
+	case logs.LogTimestampTag:
 		return f.timestamp
-	case LogStderrTag:
+	case logs.LogStderrTag:
 		return f.stderr
 	}
-	if hue, ok := serviceHueOf(tag); ok {
+	if hue, ok := logs.ServiceHueOf(tag); ok {
 		return f.service[hue]
 	}
 	return f.plain
-}
-
-// serviceHueOf reads the palette entry of a tag of ServiceTag.
-func serviceHueOf(tag string) (int, bool) {
-	if !strings.HasPrefix(tag, serviceTagPrefix) {
-		return 0, false
-	}
-	hue, err := strconv.Atoi(strings.TrimPrefix(tag, serviceTagPrefix))
-	if err != nil || hue < 0 || hue >= design.ServiceHues {
-		return 0, false
-	}
-	return hue, true
 }
 
 // logPage is the page of the logs of the bottom panel: the logs of a Project,
@@ -103,12 +91,12 @@ type logPage struct {
 	formats *logFormats
 
 	// source opens the stream: it is compose.Manager.Logs in the application.
-	source LogSource
+	source logs.LogSource
 	// ctx stops every stream when the application quits.
 	ctx context.Context
 	// streams keeps the running stream, so a close that overtakes an opening
 	// still terminates it.
-	streams LogStreams
+	streams logs.LogStreams
 
 	// project and service are what the page streams now; id is the stream in
 	// the registry, "" when none runs. Both belong to the Qt thread.
@@ -116,7 +104,7 @@ type logPage struct {
 	service string
 	id      string
 
-	// lines are the lines the page keeps, at most LogLineLimit; shown is how
+	// lines are the lines the page keeps, at most logs.LogLineLimit; shown is how
 	// many of them the view already holds. Both belong to the Qt thread.
 	lines []compose.LogLine
 	shown int
@@ -125,7 +113,7 @@ type logPage struct {
 	term   string
 	paused bool
 	// end is how the stream ended on its own, nil while it runs.
-	end *LogEnd
+	end *logs.LogEnd
 
 	// mu guards generation and pending, which the goroutine of the stream
 	// touches too.
@@ -198,7 +186,7 @@ func newLogPage(theme design.DesignTheme) *logPage {
 	// than the page trims the history, so the text never grows past the cap.
 	// One block more than the lines: the last line opens an empty block after
 	// its newline.
-	p.view.SetMaximumBlockCount(LogLineLimit + 1)
+	p.view.SetMaximumBlockCount(logs.LogLineLimit + 1)
 	p.view.SetLineWrapMode(qt6.QPlainTextEdit__WidgetWidth)
 	font := qt6.NewQFont2("Monospace")
 	font.SetStyleHint(qt6.QFont__Monospace)
@@ -230,7 +218,7 @@ func newLogPage(theme design.DesignTheme) *logPage {
 // starts the stream: the last 500 lines at once, then the new ones. The same
 // stream already open is shown again, not restarted.
 func (p *logPage) Open(project compose.Project, service string) {
-	p.target.SetText(LogTargetText(project, service))
+	p.target.SetText(logs.LogTargetText(project, service))
 	if p.source == nil || project.Name == "" {
 		p.project, p.service = "", ""
 		p.updateState()
@@ -322,7 +310,7 @@ func (p *logPage) start() {
 	source := p.source
 	req := compose.LogRequest{Project: p.project, Service: p.service}
 	go func() {
-		end := StreamLogs(streamCtx, req, source,
+		end := logs.StreamLogs(streamCtx, req, source,
 			func(line compose.LogLine) { p.push(generation, line) })
 		p.streams.Release(id)
 		if end.Stopped {
@@ -358,7 +346,7 @@ func (p *logPage) push(generation int, line compose.LogLine) {
 }
 
 // finish records how the stream ended, on the Qt thread.
-func (p *logPage) finish(generation int, end LogEnd) {
+func (p *logPage) finish(generation int, end logs.LogEnd) {
 	mainthread.Start(func() {
 		p.mu.Lock()
 		current := generation == p.generation
@@ -397,11 +385,11 @@ func (p *logPage) flush() {
 	}
 
 	before := len(p.lines)
-	p.lines = AppendLogLines(p.lines, incoming, LogLineLimit)
+	p.lines = logs.AppendLogLines(p.lines, incoming, logs.LogLineLimit)
 	if before+len(incoming) > len(p.lines) || p.shown > len(p.lines) {
 		p.rebuild()
 	} else {
-		p.appendLines(FilterLogLines(p.lines[p.shown:], p.term))
+		p.appendLines(logs.FilterLogLines(p.lines[p.shown:], p.term))
 		p.shown = len(p.lines)
 	}
 	p.updateState()
@@ -414,7 +402,7 @@ func (p *logPage) rebuild() {
 	p.view.SetPlainText("")
 	cursor := p.view.TextCursor()
 	cursor.MovePosition(qt6.QTextCursor__End)
-	p.appendLinesAt(cursor, FilterLogLines(p.lines, p.term))
+	p.appendLinesAt(cursor, logs.FilterLogLines(p.lines, p.term))
 	p.shown = len(p.lines)
 }
 
@@ -435,13 +423,13 @@ func (p *logPage) appendLinesAt(cursor *qt6.QTextCursor, lines []compose.LogLine
 // writeLine writes one line: the segments with their tags, a space between the
 // parts, and the prefix of a message of compose itself.
 func (p *logPage) writeLine(cursor *qt6.QTextCursor, line compose.LogLine) {
-	for i, segment := range LogSegments(line, p.clocks.IsChecked()) {
+	for i, segment := range logs.LogSegments(line, p.clocks.IsChecked()) {
 		if i > 0 {
 			cursor.InsertText2(" ", p.formats.plain)
 		}
 		// The prefix sits before the text of compose, not before its clock: the
 		// message must read as one piece whatever the rest of the line holds.
-		if segment.Tag == LogStderrTag {
+		if segment.Tag == logs.LogStderrTag {
 			cursor.InsertText2(stderrPrefix, p.formats.stderr)
 		}
 		cursor.InsertText2(segment.Text, p.formats.format(segment.Tag))
@@ -473,8 +461,8 @@ func (p *logPage) togglePause(checked bool) {
 // lines and with the end of the stream. The line carries every hint, so an
 // empty page never depends on the faint placeholder of the theme.
 func (p *logPage) updateState() {
-	visible := len(FilterLogLines(p.lines, p.term))
-	count := LogCountText(visible, len(p.lines))
+	visible := len(logs.FilterLogLines(p.lines, p.term))
+	count := logs.LogCountText(visible, len(p.lines))
 	p.count.SetText(count)
 	p.count.SetToolTip(count)
 

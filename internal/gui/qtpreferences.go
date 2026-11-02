@@ -5,6 +5,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/settings"
 )
 
@@ -253,7 +254,7 @@ func (d *preferencesDialog) done(err error) {
 	d.busy = false
 	d.save.SetEnabled(true)
 	if err != nil {
-		d.showError(UserError(err).Error())
+		d.showError(view.UserError(err).Error())
 		return
 	}
 	d.dialog.Accept()

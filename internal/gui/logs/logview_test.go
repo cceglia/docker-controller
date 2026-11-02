@@ -1,4 +1,4 @@
-package gui
+package logs
 
 import (
 	"fmt"
@@ -400,7 +400,7 @@ func TestServiceTag(t *testing.T) {
 func TestServiceHueOf(t *testing.T) {
 	for _, name := range []string{"web", "db", "api", "worker", ""} {
 		t.Run(name, func(t *testing.T) {
-			hue, ok := serviceHueOf(ServiceTag(name))
+			hue, ok := ServiceHueOf(ServiceTag(name))
 			if !ok {
 				t.Fatalf("the tag %q belongs to no hue", ServiceTag(name))
 			}
@@ -412,8 +412,8 @@ func TestServiceHueOf(t *testing.T) {
 
 	for _, tag := range []string{"", LogTimestampTag, LogStderrTag, serviceTagPrefix, serviceTagPrefix + "x", serviceTagPrefix + "-1", serviceTagPrefix + strconv.Itoa(design.ServiceHues)} {
 		t.Run("foreign/"+tag, func(t *testing.T) {
-			if hue, ok := serviceHueOf(tag); ok {
-				t.Errorf("serviceHueOf(%q) = %d, want no hue", tag, hue)
+			if hue, ok := ServiceHueOf(tag); ok {
+				t.Errorf("ServiceHueOf(%q) = %d, want no hue", tag, hue)
 			}
 		})
 	}
