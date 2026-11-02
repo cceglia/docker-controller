@@ -80,11 +80,11 @@ percentuali.
 Ogni package ha la sua coppia di soglie. Il valore è la misura del ticket 15
 meno cinque punti.
 
-| Package            | File                     | Efficacia misurata | Soglia efficacia | Copertura misurata | Soglia copertura |
-| ------------------ | ------------------------ | -----------------: | ---------------: | -----------------: | ---------------: |
-| `internal/tray`    | `.gremlins/tray.yaml`    |             89,66% |           84,66% |             93,55% |           88,55% |
-| `internal/gui`     | `.gremlins/gui.yaml`     |             90,33% |           85,33% |             41,90% |           36,90% |
-| `internal/compose` | `.gremlins/compose.yaml` |             76,85% |           71,85% |             91,53% |           86,53% |
+| Package            | File                     | Misura ticket 15 (efficacia) | Soglia efficacia | Misura ticket 15 (copertura) | Soglia copertura |
+| ------------------ | ------------------------ | ---------------------------: | ---------------: | ---------------------------: | ---------------: |
+| `internal/tray`    | `.gremlins/tray.yaml`    |                       89,66% |           84,66% |                       93,55% |           88,55% |
+| `internal/gui`     | `.gremlins/gui.yaml`     |                       90,33% |           85,33% |                       41,90% |           36,90% |
+| `internal/compose` | `.gremlins/compose.yaml` |                       76,85% |           71,85% |                       91,53% |           86,53% |
 
 Le tre coppie sono diverse, quindi un solo `.gremlins.yaml` non basta. Gremlins
 legge un solo file per lancio, e `make mutate` passa il file del package con
@@ -94,6 +94,12 @@ codice 0. Per questo le soglie vivono nei file.
 
 I file ripetono il blocco condiviso: `workers`, `timeout-coefficient` e
 `exclude-files`. Se cambi uno di questi valori, cambialo in tutti e tre.
+
+`make mutate` esegue gremlins con `GOFLAGS=-count=1`. Il valore disabilita la
+cache dei test. Gremlins calcola il timeout di ogni mutante dalla durata del giro
+di copertura, e un giro servito dalla cache dura pochi millisecondi. Con quel
+tempo il timeout scende sotto la compilazione dei test `gui`, e centinaia di
+mutanti scadono invece di essere uccisi.
 
 Sotto soglia il target esce con errore e nomina la soglia mancata e il valore
 misurato:
