@@ -6,20 +6,8 @@ import (
 	"testing"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/guitest"
 )
-
-// started, output, finished and failed build the events the Manager sends.
-func started(id compose.ActivityID, project, service string, kind compose.ActionKind) compose.ActivityEvent {
-	return compose.ActivityEvent{ID: id, Type: compose.ActivityStarted, Project: project, Service: service, Kind: kind}
-}
-
-func output(id compose.ActivityID, project, service string, kind compose.ActionKind, text string, stderr bool) compose.ActivityEvent {
-	return compose.ActivityEvent{ID: id, Type: compose.ActivityLine, Project: project, Service: service, Kind: kind, Line: text, Stderr: stderr}
-}
-
-func finished(id compose.ActivityID, project, service string, kind compose.ActionKind, err, summary string) compose.ActivityEvent {
-	return compose.ActivityEvent{ID: id, Type: compose.ActivityFinished, Project: project, Service: service, Kind: kind, Error: err, Summary: summary}
-}
 
 func TestActivityHeader(t *testing.T) {
 	for _, tc := range []struct {
@@ -208,10 +196,10 @@ func TestActivityGlyph(t *testing.T) {
 
 func TestActivityLog_KeepsTheHistoryNewestFirst(t *testing.T) {
 	log := NewActivityLog()
-	log.Push(started("act-1", "shop", "", compose.ActionUp))
-	log.Push(started("act-2", "blog", "db", compose.ActionStart))
-	log.Push(output("act-2", "blog", "db", compose.ActionStart, "starting", false))
-	log.Push(finished("act-2", "blog", "db", compose.ActionStart, "", ""))
+	log.Push(guitest.Started("act-1", "shop", "", compose.ActionUp))
+	log.Push(guitest.Started("act-2", "blog", "db", compose.ActionStart))
+	log.Push(guitest.Output("act-2", "blog", "db", compose.ActionStart, "starting", false))
+	log.Push(guitest.Finished("act-2", "blog", "db", compose.ActionStart, "", ""))
 
 	got := log.Activities()
 	if len(got) != 2 {
@@ -236,22 +224,22 @@ func TestActivityLog_State(t *testing.T) {
 	}{
 		{
 			"a new Activity runs",
-			[]compose.ActivityEvent{started("act-1", "shop", "", compose.ActionUp)},
+			[]compose.ActivityEvent{guitest.Started("act-1", "shop", "", compose.ActionUp)},
 			ActivityRunning,
 		},
 		{
 			"a finished Activity with no error worked",
 			[]compose.ActivityEvent{
-				started("act-1", "shop", "", compose.ActionUp),
-				finished("act-1", "shop", "", compose.ActionUp, "", ""),
+				guitest.Started("act-1", "shop", "", compose.ActionUp),
+				guitest.Finished("act-1", "shop", "", compose.ActionUp, "", ""),
 			},
 			ActivityOK,
 		},
 		{
 			"a finished Activity with an error failed",
 			[]compose.ActivityEvent{
-				started("act-1", "shop", "", compose.ActionUp),
-				finished("act-1", "shop", "", compose.ActionUp, "boom", "boom"),
+				guitest.Started("act-1", "shop", "", compose.ActionUp),
+				guitest.Finished("act-1", "shop", "", compose.ActionUp, "boom", "boom"),
 			},
 			ActivityFailed,
 		},
@@ -274,8 +262,8 @@ func TestActivityLog_State(t *testing.T) {
 
 func TestActivityLog_KeepsTheSummaryOfAFailure(t *testing.T) {
 	log := NewActivityLog()
-	log.Push(started("act-1", "shop", "", compose.ActionUp))
-	log.Push(finished("act-1", "shop", "", compose.ActionUp, "error: no such image", "no such image"))
+	log.Push(guitest.Started("act-1", "shop", "", compose.ActionUp))
+	log.Push(guitest.Finished("act-1", "shop", "", compose.ActionUp, "error: no such image", "no such image"))
 
 	got, ok := log.Activity("act-1")
 	if !ok {
@@ -291,8 +279,8 @@ func TestActivityLog_KeepsTheSummaryOfAFailure(t *testing.T) {
 
 func TestActivityLog_IgnoresAnUnknownActivity(t *testing.T) {
 	log := NewActivityLog()
-	log.Push(output("act-1", "shop", "", compose.ActionUp, "late", false))
-	log.Push(finished("act-1", "shop", "", compose.ActionUp, "boom", "boom"))
+	log.Push(guitest.Output("act-1", "shop", "", compose.ActionUp, "late", false))
+	log.Push(guitest.Finished("act-1", "shop", "", compose.ActionUp, "boom", "boom"))
 
 	if got := log.Activities(); len(got) != 0 {
 		t.Errorf("Activities() = %v, want none", got)
@@ -304,9 +292,9 @@ func TestActivityLog_IgnoresAnUnknownActivity(t *testing.T) {
 
 func TestActivityLog_KeepsTheLastLines(t *testing.T) {
 	log := NewActivityLog()
-	log.Push(started("act-1", "shop", "", compose.ActionUp))
+	log.Push(guitest.Started("act-1", "shop", "", compose.ActionUp))
 	for i := 0; i <= ActivityLineLimit; i++ {
-		log.Push(output("act-1", "shop", "", compose.ActionUp, fmt.Sprintf("line %d", i), false))
+		log.Push(guitest.Output("act-1", "shop", "", compose.ActionUp, fmt.Sprintf("line %d", i), false))
 	}
 
 	got, ok := log.Activity("act-1")
@@ -332,19 +320,19 @@ func TestActivityLog_NotifiesAfterAChange(t *testing.T) {
 	calls := 0
 	log.OnChange(func() { calls++ })
 
-	log.Push(started("act-1", "shop", "", compose.ActionUp))
+	log.Push(guitest.Started("act-1", "shop", "", compose.ActionUp))
 	if calls != 1 {
 		t.Fatalf("calls after started = %d, want 1", calls)
 	}
-	log.Push(output("act-1", "shop", "", compose.ActionUp, "one", false))
+	log.Push(guitest.Output("act-1", "shop", "", compose.ActionUp, "one", false))
 	if calls != 2 {
 		t.Fatalf("calls after a line = %d, want 2", calls)
 	}
-	log.Push(output("act-unknown", "shop", "", compose.ActionUp, "lost", false))
+	log.Push(guitest.Output("act-unknown", "shop", "", compose.ActionUp, "lost", false))
 	if calls != 2 {
 		t.Fatalf("calls after an ignored line = %d, want 2", calls)
 	}
-	log.Push(finished("act-1", "shop", "", compose.ActionUp, "", ""))
+	log.Push(guitest.Finished("act-1", "shop", "", compose.ActionUp, "", ""))
 	if calls != 3 {
 		t.Fatalf("calls after finished = %d, want 3", calls)
 	}
@@ -353,10 +341,10 @@ func TestActivityLog_NotifiesAfterAChange(t *testing.T) {
 func TestActivityLog_Clear(t *testing.T) {
 	// The history of the window before: two Activities, one of them failed.
 	before := []compose.ActivityEvent{
-		started("act-1", "shop", "", compose.ActionUp),
-		output("act-1", "shop", "", compose.ActionUp, "one", false),
-		finished("act-1", "shop", "", compose.ActionUp, "boom", "boom"),
-		started("act-2", "blog", "db", compose.ActionStart),
+		guitest.Started("act-1", "shop", "", compose.ActionUp),
+		guitest.Output("act-1", "shop", "", compose.ActionUp, "one", false),
+		guitest.Finished("act-1", "shop", "", compose.ActionUp, "boom", "boom"),
+		guitest.Started("act-2", "blog", "db", compose.ActionStart),
 	}
 
 	for _, tc := range []struct {
@@ -375,16 +363,16 @@ func TestActivityLog_Clear(t *testing.T) {
 		{
 			name:   "an Activity after the clear appears alone",
 			before: before,
-			after:  []compose.ActivityEvent{started("act-3", "shop", "", compose.ActionStop)},
+			after:  []compose.ActivityEvent{guitest.Started("act-3", "shop", "", compose.ActionStop)},
 			want:   []compose.ActivityID{"act-3"},
 		},
 		{
 			name:   "the events of an Activity before the clear stay out",
 			before: before,
 			after: []compose.ActivityEvent{
-				output("act-2", "blog", "db", compose.ActionStart, "late", false),
-				finished("act-2", "blog", "db", compose.ActionStart, "", ""),
-				started("act-3", "shop", "", compose.ActionStop),
+				guitest.Output("act-2", "blog", "db", compose.ActionStart, "late", false),
+				guitest.Finished("act-2", "blog", "db", compose.ActionStart, "", ""),
+				guitest.Started("act-3", "shop", "", compose.ActionStop),
 			},
 			want: []compose.ActivityID{"act-3"},
 		},
@@ -426,7 +414,7 @@ func TestActivityLog_ClearNotifiesTheSubscriber(t *testing.T) {
 	calls := 0
 	log.OnChange(func() { calls++ })
 
-	log.Push(started("act-1", "shop", "", compose.ActionUp))
+	log.Push(guitest.Started("act-1", "shop", "", compose.ActionUp))
 	log.Clear()
 
 	if calls != 2 {
@@ -439,8 +427,8 @@ func TestActivityLog_ClearNotifiesTheSubscriber(t *testing.T) {
 
 func TestActivityLog_ReadIsACopy(t *testing.T) {
 	log := NewActivityLog()
-	log.Push(started("act-1", "shop", "", compose.ActionUp))
-	log.Push(output("act-1", "shop", "", compose.ActionUp, "one", false))
+	log.Push(guitest.Started("act-1", "shop", "", compose.ActionUp))
+	log.Push(guitest.Output("act-1", "shop", "", compose.ActionUp, "one", false))
 
 	got := log.Activities()
 	got[0].State = ActivityFailed

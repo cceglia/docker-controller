@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/guitest"
 )
 
 // formWith builds a form with the named files already chosen, so a test says
@@ -44,7 +45,7 @@ func TestAddProjectForm_AddFileKeepsTheMainFileFirst(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			form := formWith(tc.paths...)
-			assertStrings(t, "Files", form.Files, tc.want)
+			guitest.AssertStrings(t, "Files", form.Files, tc.want)
 		})
 	}
 }
@@ -56,7 +57,7 @@ func TestAddProjectForm_RemoveFileMovesTheMainFile(t *testing.T) {
 	t.Run("removing the main file picks the next one", func(t *testing.T) {
 		form := formWith(main, override)
 		form.RemoveFile(0)
-		assertStrings(t, "Files", form.Files, []string{override})
+		guitest.AssertStrings(t, "Files", form.Files, []string{override})
 		if got := form.MainFile(); got != override {
 			t.Errorf("MainFile = %q, want %q", got, override)
 		}
@@ -65,14 +66,14 @@ func TestAddProjectForm_RemoveFileMovesTheMainFile(t *testing.T) {
 	t.Run("removing an additional file keeps the main one", func(t *testing.T) {
 		form := formWith(main, override)
 		form.RemoveFile(1)
-		assertStrings(t, "Files", form.Files, []string{main})
+		guitest.AssertStrings(t, "Files", form.Files, []string{main})
 	})
 
 	t.Run("removing outside the list changes nothing", func(t *testing.T) {
 		form := formWith(main)
 		form.RemoveFile(3)
 		form.RemoveFile(-1)
-		assertStrings(t, "Files", form.Files, []string{main})
+		guitest.AssertStrings(t, "Files", form.Files, []string{main})
 	})
 }
 
@@ -176,11 +177,11 @@ func TestAddProjectForm_PickOpensOnlyAfterARealChoice(t *testing.T) {
 			if got := err != nil; got != tc.fail {
 				t.Errorf("Pick error = %v, want a failure: %t", err, tc.fail)
 			}
-			assertStrings(t, "Files", form.Files, tc.wantFiles)
+			guitest.AssertStrings(t, "Files", form.Files, tc.wantFiles)
 			if form.Name != tc.wantName {
 				t.Errorf("Name = %q, want %q", form.Name, tc.wantName)
 			}
-			assertStrings(t, "propose", asked, tc.wantAsked)
+			guitest.AssertStrings(t, "propose", asked, tc.wantAsked)
 		})
 	}
 }
@@ -310,7 +311,7 @@ func TestAddProjectForm_PickKeepsTheOrderOfThePicker(t *testing.T) {
 		if _, err := form.Pick([]string{override, main}, propose); err != nil {
 			t.Fatalf("Pick error = %v", err)
 		}
-		assertStrings(t, "Files", form.Files, []string{override, main})
+		guitest.AssertStrings(t, "Files", form.Files, []string{override, main})
 		if got := form.MainFile(); got != override {
 			t.Errorf("MainFile = %q, want the first file of the picker: %q", got, override)
 		}
@@ -320,14 +321,14 @@ func TestAddProjectForm_PickKeepsTheOrderOfThePicker(t *testing.T) {
 		var form AddProjectForm
 		form.Pick([]string{main, override}, propose)
 		form.Pick([]string{extra}, propose)
-		assertStrings(t, "Files", form.Files, []string{main, override, extra})
+		guitest.AssertStrings(t, "Files", form.Files, []string{main, override, extra})
 	})
 
 	t.Run("removing the main file moves the first place down the order", func(t *testing.T) {
 		var form AddProjectForm
 		form.Pick([]string{main, override, extra}, propose)
 		form.RemoveFile(0)
-		assertStrings(t, "Files", form.Files, []string{override, extra})
+		guitest.AssertStrings(t, "Files", form.Files, []string{override, extra})
 		if got := form.MainFile(); got != override {
 			t.Errorf("MainFile = %q, want %q", got, override)
 		}
@@ -416,19 +417,5 @@ func TestNameTaken_RefusesASavedName(t *testing.T) {
 				t.Errorf("NameTaken(%q) = %t, want %t", tc.input, got, tc.want)
 			}
 		})
-	}
-}
-
-// assertStrings compares two runs of strings, treating nil and empty as the
-// same list of nothing.
-func assertStrings(t *testing.T, what string, got, want []string) {
-	t.Helper()
-	if len(got) != len(want) {
-		t.Fatalf("%s = %q, want %q", what, got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("%s = %q, want %q", what, got, want)
-		}
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/guitest"
 	"dockercontroller/internal/settings"
 )
 
@@ -137,7 +138,7 @@ func TestTerminalCommand_UsesTheConfiguredVector(t *testing.T) {
 			if err != nil {
 				t.Fatalf("terminalCommand error = %v", err)
 			}
-			assertStrings(t, "Args", cmd.Args, tc.args)
+			guitest.AssertStrings(t, "Args", cmd.Args, tc.args)
 			if cmd.Dir != tc.folder {
 				t.Errorf("Dir = %q, want %q", cmd.Dir, tc.folder)
 			}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/guitest"
 )
 
 // usageQueue is the dispatch of a feed in a test: it holds the work a sample
@@ -96,7 +97,7 @@ func TestUsageFeed_DeliversTheSamples(t *testing.T) {
 	f.OnSample = func(sample *compose.UsageSample) { got = append(got, sample) }
 
 	f.Follow(true)
-	waitSignal(t, reported, "the sample")
+	guitest.WaitSignal(t, reported, "the sample")
 
 	if len(got) != 1 || got[0] == nil || got[0].Containers != want.Containers {
 		t.Fatalf("samples = %v, want the one with %d Containers", got, want.Containers)
@@ -108,7 +109,7 @@ func TestUsageFeed_TheSameDockerStateKeepsOneStream(t *testing.T) {
 	f := testFeed(t, idleSource(starts), nil)
 
 	f.Follow(true)
-	waitSignal(t, starts, "the stream")
+	guitest.WaitSignal(t, starts, "the stream")
 
 	// A new snapshot of the same state draws the same figures: it must not
 	// terminate and restart `docker stats`.
@@ -127,10 +128,10 @@ func TestUsageFeed_ADockerThatLeavesAndReturnsStartsANewStream(t *testing.T) {
 	f := testFeed(t, idleSource(starts), nil)
 
 	f.Follow(true)
-	waitSignal(t, starts, "the first stream")
+	guitest.WaitSignal(t, starts, "the first stream")
 	f.Follow(false)
 	f.Follow(true)
-	waitSignal(t, starts, "the stream after Docker came back")
+	guitest.WaitSignal(t, starts, "the stream after Docker came back")
 }
 
 func TestUsageFeed_AStopTakesTheFiguresOffTheScreen(t *testing.T) {
@@ -153,7 +154,7 @@ func TestUsageFeed_AHiddenWindowStopsTheStreamAndTheReturnStartsIt(t *testing.T)
 	f.OnSample = func(sample *compose.UsageSample) { got = append(got, sample) }
 
 	f.Follow(true)
-	waitSignal(t, starts, "the stream")
+	guitest.WaitSignal(t, starts, "the stream")
 
 	// The window leaves the screen: `docker stats` stops and the figures go, so
 	// no number stays on screen as if it were current.
@@ -172,7 +173,7 @@ func TestUsageFeed_AHiddenWindowStopsTheStreamAndTheReturnStartsIt(t *testing.T)
 
 	// The window comes back: the stream starts again.
 	f.SetHidden(false)
-	waitSignal(t, starts, "the stream of the window back")
+	guitest.WaitSignal(t, starts, "the stream of the window back")
 }
 
 func TestUsageFeed_ASampleQueuedBeforeTheStopNeverArrives(t *testing.T) {
@@ -189,7 +190,7 @@ func TestUsageFeed_ASampleQueuedBeforeTheStopNeverArrives(t *testing.T) {
 	f.OnSample = func(sample *compose.UsageSample) { got = append(got, sample) }
 
 	f.Follow(true)
-	waitSignal(t, reported, "the sample")
+	guitest.WaitSignal(t, reported, "the sample")
 
 	// The sample waits for the thread that draws; the stop arrives first.
 	f.Follow(false)

@@ -9,18 +9,8 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/guitest"
 )
-
-// waitSignal fails the test when signal does not arrive in a short time, so a
-// deadlock of the streamer reads as a failure and not as a hang.
-func waitSignal(t *testing.T, signal <-chan struct{}, what string) {
-	t.Helper()
-	select {
-	case <-signal:
-	case <-time.After(time.Second):
-		t.Fatalf("timed out waiting for %s", what)
-	}
-}
 
 // testStreamer builds a streamer that ends with the test.
 func testStreamer(t *testing.T, source UsageSource) *UsageStreamer {
@@ -45,9 +35,9 @@ func TestUsageStreamer_StartIsIdempotent(t *testing.T) {
 
 	u.Start()
 	u.Start()
-	waitSignal(t, started, "the stream")
+	guitest.WaitSignal(t, started, "the stream")
 	u.Stop()
-	waitSignal(t, stopped, "the stopped notice")
+	guitest.WaitSignal(t, stopped, "the stopped notice")
 
 	if got := runs.Load(); got != 1 {
 		t.Errorf("%d streams, want 1", got)
@@ -68,14 +58,14 @@ func TestUsageStreamer_StopDoesNotBlockTheCaller(t *testing.T) {
 	u.OnStop = func() { close(stopped) }
 
 	u.Start()
-	waitSignal(t, started, "the stream")
+	guitest.WaitSignal(t, started, "the stream")
 	returned := make(chan struct{})
 	go func() {
 		u.Stop()
 		u.Stop() // the second stop does nothing and must not panic
 		close(returned)
 	}()
-	waitSignal(t, returned, "Stop to return")
+	guitest.WaitSignal(t, returned, "Stop to return")
 
 	select {
 	case <-stopped:
@@ -84,7 +74,7 @@ func TestUsageStreamer_StopDoesNotBlockTheCaller(t *testing.T) {
 	}
 
 	close(release)
-	waitSignal(t, stopped, "the stopped notice")
+	guitest.WaitSignal(t, stopped, "the stopped notice")
 }
 
 func TestUsageStreamer_ANewStreamWaitsForThePreviousOne(t *testing.T) {
@@ -108,7 +98,7 @@ func TestUsageStreamer_ANewStreamWaitsForThePreviousOne(t *testing.T) {
 	u := testStreamer(t, source)
 
 	u.Start()
-	waitSignal(t, started, "the first stream")
+	guitest.WaitSignal(t, started, "the first stream")
 	u.Stop()
 	u.Start()
 
@@ -119,7 +109,7 @@ func TestUsageStreamer_ANewStreamWaitsForThePreviousOne(t *testing.T) {
 	}
 
 	close(release) // the first stream ends and the second one starts
-	waitSignal(t, started, "the second stream")
+	guitest.WaitSignal(t, started, "the second stream")
 	u.Stop()
 
 	if got := most.Load(); got != 1 {
@@ -171,9 +161,9 @@ func TestUsageStreamer_ASampleAfterTheStopIsDropped(t *testing.T) {
 	u.OnStop = func() { close(stopped) }
 
 	u.Start()
-	waitSignal(t, first, "the first sample")
+	guitest.WaitSignal(t, first, "the first sample")
 	u.Stop()
-	waitSignal(t, stopped, "the stopped notice")
+	guitest.WaitSignal(t, stopped, "the stopped notice")
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -208,7 +198,7 @@ func TestUsageStreamer_TheStoppedNoticeComesAfterTheLastSample(t *testing.T) {
 
 	u.Start()
 	u.Stop()
-	waitSignal(t, stopped, "the stopped notice")
+	guitest.WaitSignal(t, stopped, "the stopped notice")
 
 	mu.Lock()
 	defer mu.Unlock()

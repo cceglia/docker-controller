@@ -16,6 +16,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/guitest"
 	"dockercontroller/internal/settings"
 	"dockercontroller/internal/tray"
 )
@@ -1096,9 +1097,9 @@ func checkBottomPanel(t *testing.T) {
 	}
 
 	up := Activity{ID: "act-1", Project: "shop", Kind: compose.ActionUp, State: ActivityRunning}
-	log.Push(started(up.ID, up.Project, "", up.Kind))
+	log.Push(guitest.Started(up.ID, up.Project, "", up.Kind))
 	for i := 0; i < 3; i++ {
-		log.Push(output(up.ID, up.Project, "", up.Kind, fmt.Sprintf("step %d", i), false))
+		log.Push(guitest.Output(up.ID, up.Project, "", up.Kind, fmt.Sprintf("step %d", i), false))
 	}
 	settle()
 
@@ -1125,7 +1126,7 @@ func checkBottomPanel(t *testing.T) {
 	}
 
 	// The output grows while the command runs: the row stays, the text grows.
-	log.Push(output(up.ID, up.Project, "", up.Kind, "step 3", false))
+	log.Push(guitest.Output(up.ID, up.Project, "", up.Kind, "step 3", false))
 	settle()
 	if got := s.bottom.page.list.Count(); got != 1 {
 		t.Errorf("a new line rebuilt the history: %d rows, want 1", got)
@@ -1136,7 +1137,7 @@ func checkBottomPanel(t *testing.T) {
 
 	// The history keeps its scroll while the output changes.
 	for i := 0; i < 40; i++ {
-		log.Push(started(compose.ActivityID(fmt.Sprintf("bulk-%02d", i)), "shop", "", compose.ActionStop))
+		log.Push(guitest.Started(compose.ActivityID(fmt.Sprintf("bulk-%02d", i)), "shop", "", compose.ActionStop))
 	}
 	settle()
 	bar := s.bottom.page.list.VerticalScrollBar()
@@ -1145,7 +1146,7 @@ func checkBottomPanel(t *testing.T) {
 	}
 	bar.SetValue(bar.Maximum() / 2)
 	value := bar.Value()
-	log.Push(output("bulk-39", "shop", "", compose.ActionStop, "late line", false))
+	log.Push(guitest.Output("bulk-39", "shop", "", compose.ActionStop, "late line", false))
 	settle()
 	if got := bar.Value(); got != value {
 		t.Errorf("scroll = %d after a new line, want %d", got, value)
@@ -1153,9 +1154,9 @@ func checkBottomPanel(t *testing.T) {
 
 	// A failed Activity shows its message in the notice, with the way to its
 	// output.
-	log.Push(started("act-bad", "blog", "db", compose.ActionStart))
-	log.Push(output("act-bad", "blog", "db", compose.ActionStart, "creating", false))
-	log.Push(finished("act-bad", "blog", "db", compose.ActionStart, "error: no such image\n", "error: no such image"))
+	log.Push(guitest.Started("act-bad", "blog", "db", compose.ActionStart))
+	log.Push(guitest.Output("act-bad", "blog", "db", compose.ActionStart, "creating", false))
+	log.Push(guitest.Finished("act-bad", "blog", "db", compose.ActionStart, "error: no such image\n", "error: no such image"))
 	settle()
 
 	bad := Activity{
@@ -1392,7 +1393,7 @@ func checkLogs(t *testing.T) {
 
 	// Closing the panel terminates the process of the logs.
 	s.bottom.Close()
-	waitSignal(t, stopped, "the end of the stream on close")
+	guitest.WaitSignal(t, stopped, "the end of the stream on close")
 	if s.bottom.logs.Running() {
 		t.Error("the stream runs after the panel closed")
 	}
@@ -1402,13 +1403,13 @@ func checkLogs(t *testing.T) {
 	s.bottom.ShowLogs(project, "")
 	waitFor(t, "the stream again", func() bool { return s.bottom.logs.Running() })
 	s.open(projects[2]) // blog
-	waitSignal(t, stopped, "the end of the stream on a change of Project")
+	guitest.WaitSignal(t, stopped, "the end of the stream on a change of Project")
 	waitFor(t, "the stream of the new Project", func() bool { return s.bottom.logs.Running() })
 	if name, service := s.bottom.logs.Target(); name != projects[2].Name || service != "" {
 		t.Errorf("the page streams %q/%q, want %q alone", name, service, projects[2].Name)
 	}
 	s.bottom.Close()
-	waitSignal(t, stopped, "the last stream")
+	guitest.WaitSignal(t, stopped, "the last stream")
 }
 
 // checkUsage checks the Utilizzo risorse: the bar of the machine above the
@@ -2020,17 +2021,17 @@ func captureActivities(t *testing.T, dir string, theme designTheme, name string)
 	s.open(projects[1])
 	settle()
 
-	log.Push(started("cap-run", "shop", "", compose.ActionUp))
+	log.Push(guitest.Started("cap-run", "shop", "", compose.ActionUp))
 	for _, line := range []string{
 		"[+] Running 2/2",
 		" ✔ Container shop-db-1  Started",
 		" ✔ Container shop-web-1  Started",
 	} {
-		log.Push(output("cap-run", "shop", "", compose.ActionUp, line, false))
+		log.Push(guitest.Output("cap-run", "shop", "", compose.ActionUp, line, false))
 	}
-	log.Push(started("cap-ok", "vakt", "web", compose.ActionRestart))
-	log.Push(output("cap-ok", "vakt", "web", compose.ActionRestart, " ✔ Container vakt-web-1  Restarted", false))
-	log.Push(finished("cap-ok", "vakt", "web", compose.ActionRestart, "", ""))
+	log.Push(guitest.Started("cap-ok", "vakt", "web", compose.ActionRestart))
+	log.Push(guitest.Output("cap-ok", "vakt", "web", compose.ActionRestart, " ✔ Container vakt-web-1  Restarted", false))
+	log.Push(guitest.Finished("cap-ok", "vakt", "web", compose.ActionRestart, "", ""))
 	// The running Activity is the one on screen: it is what the user follows
 	// while the command runs. The pushes queue their refresh, so the page must
 	// have its rows before the choice.
@@ -2038,10 +2039,10 @@ func captureActivities(t *testing.T, dir string, theme designTheme, name string)
 	s.bottom.Show("cap-run")
 	saveGrab(t, s.window, dir, name)
 
-	log.Push(started("cap-bad", "blog", "", compose.ActionPull))
-	log.Push(output("cap-bad", "blog", "", compose.ActionPull, "Pulling web...", false))
-	log.Push(output("cap-bad", "blog", "", compose.ActionPull, "error: no such image", true))
-	log.Push(finished("cap-bad", "blog", "", compose.ActionPull, "error: no such image\n", "error: no such image"))
+	log.Push(guitest.Started("cap-bad", "blog", "", compose.ActionPull))
+	log.Push(guitest.Output("cap-bad", "blog", "", compose.ActionPull, "Pulling web...", false))
+	log.Push(guitest.Output("cap-bad", "blog", "", compose.ActionPull, "error: no such image", true))
+	log.Push(guitest.Finished("cap-bad", "blog", "", compose.ActionPull, "error: no such image\n", "error: no such image"))
 	saveGrab(t, s.window, dir, name+"-failure")
 }
 
@@ -2341,8 +2342,8 @@ func checkHiddenWindow(t *testing.T) {
 	s.open(projects[1])
 	settle()
 
-	log.Push(started("hide-1", projects[1].Name, "", compose.ActionUp))
-	log.Push(finished("hide-1", projects[1].Name, "", compose.ActionUp, "", ""))
+	log.Push(guitest.Started("hide-1", projects[1].Name, "", compose.ActionUp))
+	log.Push(guitest.Finished("hide-1", projects[1].Name, "", compose.ActionUp, "", ""))
 	waitFor(t, "the history of the Activities", func() bool { return s.bottom.page.list.Count() == 1 })
 	history := s.bottom.page.list.Count()
 
@@ -2383,8 +2384,8 @@ func checkHiddenWindow(t *testing.T) {
 
 	// An Activity that runs while the window is hidden keeps its output: the
 	// Manager pushes it into the log of the session, which no window holds.
-	log.Push(started("hide-2", projects[1].Name, "", compose.ActionPull))
-	log.Push(output("hide-2", projects[1].Name, "", compose.ActionPull, "✔ Container shop-web-1  Started", false))
+	log.Push(guitest.Started("hide-2", projects[1].Name, "", compose.ActionPull))
+	log.Push(guitest.Output("hide-2", projects[1].Name, "", compose.ActionPull, "✔ Container shop-web-1  Started", false))
 	wantHistory := history + 1
 	waitFor(t, "the output of the Activity on the hidden window", func() bool {
 		return s.bottom.page.list.Count() == wantHistory &&
