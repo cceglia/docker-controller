@@ -195,3 +195,22 @@ versionato.
 - **Perché non QML**: la vista è fatta di liste, form e pannelli, quindi i Widgets coprono il caso senza un livello dichiarativo e senza il tooling QML.
 - **Perché D-Bus per le notifiche**: `QSystemTrayIcon.ShowMessage` invia `Notify` con l'elenco `actions` vuoto, quindi KDE non può segnalare il click. D-Bus costa un trasporto da mantenere, ma il trasporto esiste già in `internal/notify`. In cambio il click sulla notifica funziona, e la notifica arriva anche senza tray.
 - **ADR**: l'ADR 0005 sostituisce l'ADR 0003 per il ciclo di vita della finestra e l'ADR 0004 per il framework e la libreria della tray.
+
+## Stato della verifica manuale
+
+Verificato il 2 novembre 2026:
+
+| Voce | Esito |
+| --- | --- |
+| Lista, raggruppamento, tacche, dettaglio, Servizi | Screenshot offscreen e finestra vera su Wayland e xcb |
+| Azioni, conferme, aggiunta, modifica | Prova dell'utente su KDE e test offscreen |
+| Log, Utilizzo risorse, Attività | Test offscreen e screenshot nei due temi |
+| Tray: icona, tooltip, menu, "Esci", Azioni | Chiamate `Activate` ed `Event` del desktop su Wayland e xcb |
+| Notifica e click | Notifica vera e `ActionInvoked` con l'id vero |
+| Chiusura, nascondi, riapertura | Test offscreen |
+| Scala al 125% e al 150% | `QT_SCALE_FACTOR` e screenshot |
+| Installazione | `make install` in `~/.local`: binario, voce desktop valida, icone, `WM_CLASS` uguale a `StartupWMClass`, `kbuildsycoca6` |
+| Mutation testing | Giro completo con le soglie, uscita 0 |
+
+Restano da provare con le mani: i click fisici sulla tray, il giro completo con
+la sola tastiera, i file nascosti nel selettore e la voce nel menu di KDE.

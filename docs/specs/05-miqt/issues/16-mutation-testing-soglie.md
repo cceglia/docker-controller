@@ -53,7 +53,11 @@ SOGLIA MANCATA: ./internal/tray, efficacia 89.66%, soglia 95.00%
 Poi la soglia è tornata a 84,66. Il report elenca i mutanti sopravvissuti con
 file e posizione, per esempio `LIVED CONDITIONALS_BOUNDARY at logs.go:152:8`.
 
-**Nota sulla durata**. Il giro completo dura da 8 a 15 minuti secondo il carico.
-In due giri lunghi l'ambiente ha mandato `SIGTERM` a `make` durante il package
-`gui`, quindi il verde è documentato package per package, con la stessa
-configurazione. `make check` non esegue gremlins.
+**Giro completo con le soglie**, con la configurazione finale: uscita 0.
+`tray` 4 s, `gui` 6 min 27 s, `compose` 2 min 19 s. Copertura di `gui` 41,67%
+sopra la soglia di 36,90%.
+
+La chiave è `GOFLAGS=-count=1`. Gremlins calcola il timeout dalla durata del giro
+di copertura: un giro servito dalla cache dura pochi millisecondi, e il timeout
+scende sotto la compilazione dei test di `gui`. Senza `-count=1` il giro perde
+centinaia di mutanti per timeout. `make check` non esegue gremlins.
