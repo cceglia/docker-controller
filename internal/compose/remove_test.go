@@ -8,18 +8,18 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
-	"dockercontroller/internal/compose/composefake"
+	"dockercontroller/internal/compose/docker/fake"
 )
 
 // removedProjects returns a Manager (on dbPath) whose Docker has no Container
 // at all: every saved Project is Rimosso.
-func removedProjects(t *testing.T, dbPath string) (*compose.Manager, *composefake.Fake) {
+func removedProjects(t *testing.T, dbPath string) (*compose.Manager, *fake.Fake) {
 	t.Helper()
 	first := newManager(t, realDocker(t), dbPath)
 	if err := first.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	f := composefake.New()
+	f := fake.New()
 	f.Respond([]byte("[]"), lsArgs...)
 	for _, p := range []string{"sunlinkdocker", "stellantisvpn", "personalvpn", "sunlinkvpn", "travelgrouplaravel"} {
 		f.Respond([]byte("[]"), psArgs(p)...) // the fresh check made before deleting
@@ -61,7 +61,7 @@ func TestRemoveFromList_DropsARemovedProjectForGoodWithoutTouchingDocker(t *test
 	}
 
 	// A new process on the same DB no longer knows it either.
-	f2 := composefake.New()
+	f2 := fake.New()
 	f2.Respond([]byte("[]"), lsArgs...)
 	again := newManager(t, f2, path)
 	if err := again.Refresh(context.Background()); err != nil {

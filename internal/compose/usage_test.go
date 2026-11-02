@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
-	"dockercontroller/internal/compose/composefake"
+	"dockercontroller/internal/compose/docker/fake"
 	"dockercontroller/internal/db"
 )
 
@@ -40,7 +40,7 @@ const (
 // usageDocker is realDocker plus the usage commands: stream is what
 // `docker stats` prints, err how it exits; with follow it stays open after
 // its output, like the real command, until it is cancelled.
-func usageDocker(t *testing.T, stream []byte, err error, follow bool) *composefake.Fake {
+func usageDocker(t *testing.T, stream []byte, err error, follow bool) *fake.Fake {
 	t.Helper()
 	f := realDocker(t)
 	f.Respond(fixture(t, "info.json"), infoArgs...)
@@ -52,7 +52,7 @@ func usageDocker(t *testing.T, stream []byte, err error, follow bool) *composefa
 }
 
 // followingDocker streams the three real frames and stays open.
-func followingDocker(t *testing.T) *composefake.Fake {
+func followingDocker(t *testing.T) *fake.Fake {
 	t.Helper()
 	return usageDocker(t, fixture(t, "stats-stream.txt"), nil, true)
 }

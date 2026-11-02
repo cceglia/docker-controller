@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
-	"dockercontroller/internal/compose/composefake"
+	"dockercontroller/internal/compose/docker/fake"
 	"dockercontroller/internal/db"
 )
 
@@ -397,11 +397,11 @@ func TestWatch_NotifiesRightAfterAnActivityEnds(t *testing.T) {
 	rec.finished(t, id)
 }
 
-var _ = composefake.New
+var _ = fake.New
 
 // actionCalls returns the calls that are not the discovery/refresh traffic of
 // the Manager, i.e. the ones that ran an Action.
-func actionCalls(f *composefake.Fake) [][]string {
+func actionCalls(f *fake.Fake) [][]string {
 	var out [][]string
 	for _, call := range f.Calls() {
 		if len(call) > 1 && call[1] == "ls" {

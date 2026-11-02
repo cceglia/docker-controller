@@ -1,16 +1,16 @@
-package compose_test
+package docker_test
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	"dockercontroller/internal/compose"
+	"dockercontroller/internal/compose/docker"
 )
 
 // The adapter is exercised with `sh` standing in for the docker binary.
 func TestExecDocker_RunReturnsStdoutAndStderrOnFailure(t *testing.T) {
-	d := compose.ExecDocker{Binary: "sh"}
+	d := docker.ExecDocker{Binary: "sh"}
 
 	out, err := d.Run(context.Background(), "-c", "echo hello")
 	if err != nil || strings.TrimSpace(string(out)) != "hello" {
@@ -24,7 +24,7 @@ func TestExecDocker_RunReturnsStdoutAndStderrOnFailure(t *testing.T) {
 }
 
 func TestExecDocker_StreamDeliversLinesWithOrigin(t *testing.T) {
-	d := compose.ExecDocker{Binary: "sh"}
+	d := docker.ExecDocker{Binary: "sh"}
 	var got []string
 	err := d.Stream(context.Background(), []string{"-c", "echo a; echo b >&2"}, func(line string, stderr bool) {
 		got = append(got, map[bool]string{false: "out:", true: "err:"}[stderr]+line)

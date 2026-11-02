@@ -1,7 +1,10 @@
-// Package composefake is the test adapter of the compose Docker port: it
-// answers with canned (real, captured) output and records the arguments it
-// receives. It is safe for concurrent use.
-package composefake
+// Package fake is the test adapter of the Docker port: it answers with canned
+// (real, captured) output and records the arguments it receives. It is safe
+// for concurrent use.
+//
+// Dependency direction: fake ← tests. It is support code for tests, not
+// production code, and it does not import the compose root.
+package fake
 
 import (
 	"bufio"
@@ -12,8 +15,8 @@ import (
 	"sync"
 )
 
-// Fake implements compose.Docker. It does not import compose: the port uses
-// only primitive types so any adapter can satisfy it structurally.
+// Fake implements docker.Docker. It does not import the docker package: the
+// port uses only primitive types so any adapter can satisfy it structurally.
 type Fake struct {
 	mu        sync.Mutex
 	responses map[string]response
@@ -93,7 +96,7 @@ func (f *Fake) lookup(args []string) (response, error) {
 	f.calls = append(f.calls, append([]string(nil), args...))
 	r, ok := f.responses[key(args)]
 	if !ok {
-		return response{}, fmt.Errorf("composefake: unexpected docker call %q", strings.Join(args, " "))
+		return response{}, fmt.Errorf("fake: unexpected docker call %q", strings.Join(args, " "))
 	}
 	return r, r.err
 }

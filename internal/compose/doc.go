@@ -5,10 +5,10 @@
 // Window and tray only use Manager: Snapshot, Refresh, Watch, AddProject,
 // RemoveFromList, Do (Actions, run as Activities), Logs (log streams) and
 // Usage (Utilizzo risorse samples, a flow separate from Watch).
-// Docker is reached through the Docker port (see docker.go), so tests replace
-// it with composefake fed with real captured output.
+// Docker is reached through the Docker port in the docker subpackage, so tests
+// replace it with the fake under docker/fake, fed with real captured output.
 //
 // The domain types, the pure helpers and the sentinel errors live in the model
 // subpackage. The root re-exports with aliases the surface that gui, tray and
-// main use. Dependency direction: model ← root.
+// main use. Dependency direction: model ← docker ← root.
 package compose

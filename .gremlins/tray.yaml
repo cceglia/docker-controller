@@ -17,7 +17,7 @@ unleash:
   # I test sono esclusi da gremlins per default.
   exclude-files:
     - "internal/db/"
-    - "internal/compose/composefake/"
+    - "internal/compose/docker/fake/"
     - "(_gen|_generated)\\.go$"
     - "\\.gen\\.go$"
     - "/generated/"

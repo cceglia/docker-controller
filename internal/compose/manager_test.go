@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
-	"dockercontroller/internal/compose/composefake"
+	"dockercontroller/internal/compose/docker/fake"
 	"dockercontroller/internal/db"
 )
 
@@ -46,9 +46,9 @@ var (
 )
 
 // realDocker answers like the machine did when the fixtures were captured.
-func realDocker(t *testing.T) *composefake.Fake {
+func realDocker(t *testing.T) *fake.Fake {
 	t.Helper()
-	f := composefake.New()
+	f := fake.New()
 	f.Respond(fixture(t, "ls.json"), lsArgs...)
 	for _, p := range []string{"sunlinkdocker", "stellantisvpn", "personalvpn"} {
 		f.Respond(fixture(t, "ps-"+p+".json"), psArgs(p)...)
@@ -265,7 +265,7 @@ func TestRefresh_RemovedProjectStaysListedAcrossRestarts(t *testing.T) {
 	}
 
 	// Docker no longer knows any project (e.g. after a Down).
-	empty := composefake.New()
+	empty := fake.New()
 	empty.Respond([]byte("[]"), lsArgs...)
 
 	same := newManager(t, empty, path) // a new process on the same DB
@@ -299,7 +299,7 @@ func TestRefresh_NoDuplicatesWhenDiscoveredAgain(t *testing.T) {
 }
 
 func TestRefresh_DockerUnreachable(t *testing.T) {
-	f := composefake.New()
+	f := fake.New()
 	f.RespondErr(nil, errors.New("Cannot connect to the Docker daemon"), lsArgs...)
 	m := newManager(t, f, tempDB(t))
 
@@ -370,7 +370,7 @@ func TestRefresh_FlagsAProjectWhoseComposeFilesAreGone(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	f := composefake.New()
+	f := fake.New()
 	f.Respond(lsOf("tmpproject", file, other), lsArgs...)
 	f.Respond(nil, psArgs("tmpproject")...)
 	m := newManager(t, f, tempDB(t))
@@ -406,12 +406,12 @@ func TestRefresh_FlagsAProjectWhoseComposeFilesAreGone(t *testing.T) {
 func TestWatch_FirstSnapshotIsLoadingUntilTheFirstRefresh(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
-		docker    func() *composefake.Fake
+		docker    func() *fake.Fake
 		reachable bool
 	}{
-		{"docker reachable", func() *composefake.Fake { return realDocker(t) }, true},
-		{"docker unreachable", func() *composefake.Fake {
-			f := composefake.New()
+		{"docker reachable", func() *fake.Fake { return realDocker(t) }, true},
+		{"docker unreachable", func() *fake.Fake {
+			f := fake.New()
 			f.RespondErr(nil, errors.New("Cannot connect to the Docker daemon"), lsArgs...)
 			return f
 		}, false},
@@ -440,7 +440,7 @@ func TestWatch_FirstSnapshotIsLoadingUntilTheFirstRefresh(t *testing.T) {
 }
 
 func TestRefresh_FirstRefreshFailureStopsLoadingAndIsVisible(t *testing.T) {
-	f := composefake.New()
+	f := fake.New()
 	f.Respond([]byte("this is not json"), lsArgs...)
 	m := newManager(t, f, tempDB(t))
 

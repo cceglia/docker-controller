@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"dockercontroller/internal/compose"
-	"dockercontroller/internal/compose/composefake"
+	"dockercontroller/internal/compose/docker/fake"
 	"dockercontroller/internal/db"
 )
 
@@ -65,7 +65,7 @@ func TestProposeName_FailsForAFileThatCannotBeRead(t *testing.T) {
 
 // addManager is a Manager on dbPath over the captured Docker output, with its
 // Activities recorded.
-func addManager(t *testing.T, dbPath string) (*compose.Manager, *recorder, *composefake.Fake) {
+func addManager(t *testing.T, dbPath string) (*compose.Manager, *recorder, *fake.Fake) {
 	t.Helper()
 	conn, err := db.Open(dbPath)
 	if err != nil {

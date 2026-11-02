@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
-	"dockercontroller/internal/compose/composefake"
+	"dockercontroller/internal/compose/docker/fake"
 	"dockercontroller/internal/db"
 )
 
@@ -24,7 +24,7 @@ import (
 //	  web:  {image: nginx}
 //	  dbg:  {image: busybox, profiles: [debug]}
 //	  tool: {image: busybox, profiles: [tools, debug]}
-func profilesProject(t *testing.T, dbPath string) (*compose.Manager, *composefake.Fake, string, *recorder) {
+func profilesProject(t *testing.T, dbPath string) (*compose.Manager, *fake.Fake, string, *recorder) {
 	t.Helper()
 	dir := t.TempDir()
 	file := filepath.Join(dir, "docker-compose.yml")
@@ -53,7 +53,7 @@ func profilesProject(t *testing.T, dbPath string) (*compose.Manager, *composefak
 	return m, f, file, rec
 }
 
-func configCalls(f *composefake.Fake) int {
+func configCalls(f *fake.Fake) int {
 	n := 0
 	for _, c := range f.Calls() {
 		if c[len(c)-1] == "--profiles" {

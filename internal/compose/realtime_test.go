@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
-	"dockercontroller/internal/compose/composefake"
+	"dockercontroller/internal/compose/docker/fake"
 	"dockercontroller/internal/db"
 )
 
@@ -68,7 +68,7 @@ func until(t *testing.T, ch <-chan compose.Snapshot, what string, ok func(compos
 	}
 }
 
-func count(f *composefake.Fake, args []string) int {
+func count(f *fake.Fake, args []string) int {
 	n := 0
 	for _, c := range f.Calls() {
 		if strings.Join(c, " ") == strings.Join(args, " ") {
@@ -179,7 +179,7 @@ func TestRun_FullRefreshIsTheSafetyNet(t *testing.T) {
 }
 
 func TestRun_RecoversByItselfWhenDockerComesBack(t *testing.T) {
-	f := composefake.New()
+	f := fake.New()
 	f.RespondErr(nil, errors.New("Cannot connect to the Docker daemon"), lsArgs...)
 	f.Follow(eventsArgs...)
 	release := f.Hold(eventsArgs...)
