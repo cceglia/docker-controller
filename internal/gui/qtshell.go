@@ -5,6 +5,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/tray"
 )
 
 // shell is the window of the application: the column of the Projects on the
@@ -71,6 +72,9 @@ func newShell(app *application, theme designTheme) *shell {
 	s := &shell{app: app, theme: theme}
 
 	s.window = qt6.NewQMainWindow2()
+	// The window carries the icon of the app, so the title bar and the task
+	// manager show it even when the desktop entry is not installed.
+	s.window.SetWindowIcon(systemTrayIcon(tray.IconNormal))
 	s.window.SetWindowTitle(windowTitle)
 	s.window.SetAccessibleName(windowTitle)
 	s.window.Resize(windowWidth, windowHeight)
