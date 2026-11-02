@@ -21,7 +21,7 @@ func (m *Manager) UpdateSettings(ctx context.Context, name string, s Settings) e
 	m.refreshMu.Lock()
 	defer m.refreshMu.Unlock()
 
-	found, err := m.store.updateSettings(ctx, name, s)
+	found, err := m.store.UpdateSettings(ctx, name, s)
 	if err != nil {
 		return err
 	}

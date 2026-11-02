@@ -1,4 +1,12 @@
-package compose
+// Package store persists the saved Projects in the app database.
+//
+// The caller opens and migrates the database (see package db) and passes it to
+// New. store only reads and writes the tables projects, project_files and
+// active_profiles: it knows no Docker and no compose command.
+//
+// Dependency direction: model is the leaf. store imports model and never the
+// root package compose.
+package store
 
 import (
 	"context"
@@ -10,12 +18,15 @@ import (
 	"dockercontroller/internal/compose/model"
 )
 
-// store persists the saved Projects in the app database.
-type store struct{ db *sql.DB }
+// Store persists the saved Projects in the app database.
+type Store struct{ db *sql.DB }
 
-// upsertDiscovered saves (or refreshes folder and files of) a discovered
+// New returns a Store on an open, migrated database.
+func New(db *sql.DB) *Store { return &Store{db: db} }
+
+// UpsertDiscovered saves (or refreshes folder and files of) a discovered
 // Project, leaving the user's display name, group and profiles untouched.
-func (s store) upsertDiscovered(ctx context.Context, d model.Discovered) error {
+func (s *Store) UpsertDiscovered(ctx context.Context, d model.Discovered) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("compose: save %s: %w", d.Name, err)
@@ -41,9 +52,9 @@ func (s store) upsertDiscovered(ctx context.Context, d model.Discovered) error {
 	return tx.Commit()
 }
 
-// add saves a Project added by hand; a name already saved is refused with
-// ErrDuplicateProject and nothing is changed.
-func (s store) add(ctx context.Context, d model.Discovered) error {
+// Add saves a Project added by hand; a name already saved is refused with
+// model.ErrDuplicateProject and nothing is changed.
+func (s *Store) Add(ctx context.Context, d model.Discovered) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("compose: add %s: %w", d.Name, err)
@@ -55,7 +66,7 @@ func (s store) add(ctx context.Context, d model.Discovered) error {
 		return fmt.Errorf("compose: add %s: %w", d.Name, err)
 	}
 	if taken {
-		return fmt.Errorf("%w: %q", ErrDuplicateProject, d.Name)
+		return fmt.Errorf("%w: %q", model.ErrDuplicateProject, d.Name)
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO projects (name, folder) VALUES (?, ?)`, d.Name, model.Folder(d.ComposeFiles)); err != nil {
 		return fmt.Errorf("compose: add %s: %w", d.Name, err)
@@ -70,9 +81,9 @@ func (s store) add(ctx context.Context, d model.Discovered) error {
 	return tx.Commit()
 }
 
-// updateSettings applies the non-nil fields of st to a saved Project; an empty
+// UpdateSettings applies the non-nil fields of st to a saved Project; an empty
 // value is stored as NULL. It reports whether the Project exists.
-func (s store) updateSettings(ctx context.Context, name string, st Settings) (bool, error) {
+func (s *Store) UpdateSettings(ctx context.Context, name string, st model.Settings) (bool, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return false, fmt.Errorf("compose: update settings of %s: %w", name, err)
@@ -112,8 +123,8 @@ func (s store) updateSettings(ctx context.Context, name string, st Settings) (bo
 	return true, nil
 }
 
-// list returns every saved Project, sorted by name, without status.
-func (s store) list(ctx context.Context) ([]Project, error) {
+// List returns every saved Project, sorted by name, without status.
+func (s *Store) List(ctx context.Context) ([]model.Project, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT name, folder, COALESCE(display_name, ''), COALESCE(group_name, '') FROM projects`)
 	if err != nil {
@@ -121,10 +132,10 @@ func (s store) list(ctx context.Context) ([]Project, error) {
 	}
 	defer rows.Close()
 
-	byName := map[string]*Project{}
-	var out []Project
+	byName := map[string]*model.Project{}
+	var out []model.Project
 	for rows.Next() {
-		var p Project
+		var p model.Project
 		if err := rows.Scan(&p.Name, &p.Folder, &p.DisplayName, &p.Group); err != nil {
 			return nil, fmt.Errorf("compose: list projects: %w", err)
 		}
@@ -184,9 +195,9 @@ func (s store) list(ctx context.Context) ([]Project, error) {
 	return out, nil
 }
 
-// remove deletes a saved Project; its compose files and active Profiles go
+// Remove deletes a saved Project; its compose files and active Profiles go
 // with it (ON DELETE CASCADE).
-func (s store) remove(ctx context.Context, name string) error {
+func (s *Store) Remove(ctx context.Context, name string) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM projects WHERE name = ?`, name); err != nil {
 		return fmt.Errorf("compose: remove %s: %w", name, err)
 	}

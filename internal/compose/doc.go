@@ -10,5 +10,5 @@
 //
 // The domain types, the pure helpers and the sentinel errors live in the model
 // subpackage. The root re-exports with aliases the surface that gui, tray and
-// main use. Dependency direction: model ← docker ← root.
+// main use. Dependency direction: model ← docker/store ← root.
 package compose

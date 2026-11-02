@@ -102,7 +102,7 @@ func (m *Manager) AddProject(ctx context.Context, name string, files []string) e
 	m.refreshMu.Lock()
 	defer m.refreshMu.Unlock()
 
-	if err := m.store.add(ctx, model.Discovered{Name: name, ComposeFiles: files}); err != nil {
+	if err := m.store.Add(ctx, model.Discovered{Name: name, ComposeFiles: files}); err != nil {
 		return err
 	}
 	next, err := m.build(ctx)

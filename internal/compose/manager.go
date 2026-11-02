@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose/model"
+	"dockercontroller/internal/compose/store"
 )
 
 // Config wires a Manager.
@@ -34,7 +35,7 @@ type Config struct {
 // Manager is the interface of the compose module.
 type Manager struct {
 	docker Docker
-	store  store
+	store  *store.Store
 
 	refreshEvery, retryEvery time.Duration
 
@@ -60,7 +61,7 @@ func New(cfg Config) (*Manager, error) {
 	}
 	return &Manager{
 		docker:     cfg.Docker,
-		store:      store{db: cfg.DB},
+		store:      store.New(cfg.DB),
 		base:       Snapshot{Loading: true, Projects: []Project{}, Groups: []string{}},
 		snap:       Snapshot{Loading: true, Projects: []Project{}, Groups: []string{}},
 		running:    map[string]ActivityRef{},
@@ -169,12 +170,12 @@ func (m *Manager) build(ctx context.Context) (Snapshot, error) {
 			return Snapshot{}, err
 		}
 		seen[d.Name] = observed{running: runningCount(cs), total: len(cs), services: groupByService(cs)}
-		if err := m.store.upsertDiscovered(ctx, d); err != nil {
+		if err := m.store.UpsertDiscovered(ctx, d); err != nil {
 			return Snapshot{}, err
 		}
 	}
 
-	projects, err := m.store.list(ctx)
+	projects, err := m.store.List(ctx)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -212,7 +213,7 @@ func (m *Manager) unreachable(ctx context.Context) (Snapshot, error) {
 	if len(prev.Projects) > 0 {
 		return Snapshot{DockerReachable: false, Projects: prev.Projects}, nil
 	}
-	projects, err := m.store.list(ctx)
+	projects, err := m.store.List(ctx)
 	if err != nil {
 		return Snapshot{}, err
 	}

@@ -50,7 +50,7 @@ func (m *Manager) RemoveFromList(ctx context.Context, name string) error {
 		return fmt.Errorf("%w: %s has %d Containers", ErrProjectNotRemoved, name, len(containers))
 	}
 
-	if err := m.store.remove(ctx, name); err != nil {
+	if err := m.store.Remove(ctx, name); err != nil {
 		return err
 	}
 	next, err := m.build(ctx)
