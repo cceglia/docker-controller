@@ -5,6 +5,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/forms"
 	"dockercontroller/internal/gui/view"
 )
 
@@ -39,7 +40,7 @@ const (
 // values live here and not in the widgets, so a render builds the form again
 // without losing what the user typed.
 type editForm struct {
-	edit ProjectEdit
+	edit forms.ProjectEdit
 	// message is the Italian reason of a refused save, "" while there is none.
 	// It sits under the Display name field, the first field of the form.
 	message string
@@ -60,7 +61,7 @@ func (p *detailPanel) startEdit() {
 	if p.edit != nil || !p.visible {
 		return
 	}
-	p.edit = &editForm{edit: NewProjectEdit(p.shown.Project)}
+	p.edit = &editForm{edit: forms.NewProjectEdit(p.shown.Project)}
 	p.render()
 	p.focusEdit()
 }
@@ -212,8 +213,8 @@ func (p *detailPanel) editBlock() *qt6.QWidget {
 	setObjectName(group.QWidget, "editGroup")
 	group.SetEditable(true)
 	group.SetInsertPolicy(qt6.QComboBox__NoInsert)
-	group.SetPlaceholderText(NoGroupText)
-	group.AddItems(GroupSuggestions(GroupChoices(form.edit.Group, p.projects)))
+	group.SetPlaceholderText(forms.NoGroupText)
+	group.AddItems(forms.GroupSuggestions(forms.GroupChoices(form.edit.Group, p.projects)))
 	group.SetCurrentText(form.edit.Group)
 	group.SetAccessibleName(groupLabelText)
 	group.SetAccessibleDescription(groupHint)
@@ -237,7 +238,7 @@ func (p *detailPanel) editBlock() *qt6.QWidget {
 	box.AddWidget(detailLabel(profilesLabelText, "detailHeading").QWidget)
 	box.AddWidget(detailLabel(profilesHint, "").QWidget)
 
-	names := ProfileChoices(project)
+	names := forms.ProfileChoices(project)
 	form.checks = make(map[string]*qt6.QCheckBox, len(names))
 	if len(names) == 0 {
 		box.AddWidget(detailLabel(noProfilesText, "detailEmpty").QWidget)

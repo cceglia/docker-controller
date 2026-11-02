@@ -6,6 +6,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/forms"
 	"dockercontroller/internal/gui/view"
 )
 
@@ -17,7 +18,7 @@ func (s *shell) showAddDialog() {
 		return
 	}
 	pickComposeFiles(s.window.QWidget, func(paths []string) {
-		var form AddProjectForm
+		var form forms.AddProjectForm
 		added, err := form.Pick(paths, compose.ProposeName)
 		if !added {
 			return
@@ -30,7 +31,7 @@ func (s *shell) showAddDialog() {
 }
 
 // openAddForm shows the form of a new Project with form, once.
-func (s *shell) openAddForm(form AddProjectForm) *addDialog {
+func (s *shell) openAddForm(form forms.AddProjectForm) *addDialog {
 	if s.addForm != nil {
 		return nil
 	}
@@ -50,7 +51,7 @@ func (s *shell) openAddForm(form AddProjectForm) *addDialog {
 // Manager judges the files and the saved list. done runs on the Qt thread with
 // the refusal, nil when the Project is saved.
 func (s *shell) addProject(name string, files []string, done func(error)) {
-	if err := AddRefusal(name, files, s.snapshot.Projects); err != nil {
+	if err := forms.AddRefusal(name, files, s.snapshot.Projects); err != nil {
 		done(err)
 		return
 	}

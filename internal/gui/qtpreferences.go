@@ -5,6 +5,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/forms"
 	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/settings"
 )
@@ -24,7 +25,7 @@ const (
 type preferencesDialog struct {
 	dialog *qt6.QDialog
 	// behavior is the close choice on screen, and choices are its radio
-	// buttons, in the order of closeBehaviorChoices.
+	// buttons, in the order of CloseBehaviorChoices.
 	behavior settings.CloseBehavior
 	choices  []*qt6.QRadioButton
 	// terminal is the field of the command and error the message of a refused
@@ -54,8 +55,8 @@ func newPreferencesDialog(parent *qt6.QWidget, prefs settings.Settings, tray boo
 	d := &preferencesDialog{onSave: onSave}
 
 	d.dialog = qt6.NewQDialog(parent)
-	d.dialog.SetWindowTitle(preferencesTitle)
-	d.dialog.SetAccessibleName(preferencesTitle)
+	d.dialog.SetWindowTitle(forms.PreferencesTitle)
+	d.dialog.SetAccessibleName(forms.PreferencesTitle)
 	d.dialog.SetModal(true)
 	d.dialog.SetMinimumWidth(preferencesMinWidth)
 	d.dialog.SetMaximumWidth(preferencesMaxWidth)
@@ -64,10 +65,10 @@ func newPreferencesDialog(parent *qt6.QWidget, prefs settings.Settings, tray boo
 	layout.SetContentsMargins(design.SpaceL, design.SpaceL, design.SpaceL, design.SpaceL)
 	layout.SetSpacing(design.SpaceL)
 
-	title := detailLabel(preferencesTitle, "dialogTitle")
+	title := detailLabel(forms.PreferencesTitle, "dialogTitle")
 	layout.AddWidget(title.QWidget)
 
-	layout.AddWidget(d.closeGroup(tray, closeBehaviorShown(prefs.CloseBehavior, tray)))
+	layout.AddWidget(d.closeGroup(tray, forms.CloseBehaviorShown(prefs.CloseBehavior, tray)))
 	layout.AddWidget(d.terminalGroup(prefs.TerminalCommand))
 	layout.AddWidget(d.buttons())
 
@@ -102,35 +103,35 @@ func newPreferencesDialog(parent *qt6.QWidget, prefs settings.Settings, tray boo
 // honour stays on screen and off: a missing option would read as a bug, while a
 // hint under it says why.
 func (d *preferencesDialog) closeGroup(tray bool, shown settings.CloseBehavior) *qt6.QWidget {
-	group := qt6.NewQGroupBox3(closeBehaviorGroupTitle)
+	group := qt6.NewQGroupBox3(forms.CloseBehaviorGroupTitle)
 	setObjectName(group.QWidget, "preferencesGroup")
 
 	box := qt6.NewQVBoxLayout(group.QWidget)
 	box.SetContentsMargins(design.SpaceM, design.SpaceM, design.SpaceM, design.SpaceM)
 	box.SetSpacing(design.SpaceS)
 
-	box.AddWidget(detailLabel(closeBehaviorGroupHint, "").QWidget)
+	box.AddWidget(detailLabel(forms.CloseBehaviorGroupHint, "").QWidget)
 	if !tray {
-		box.AddWidget(detailLabel(noTrayHintText, "").QWidget)
+		box.AddWidget(detailLabel(forms.NoTrayHintText, "").QWidget)
 	}
 
 	d.behavior = shown
-	for _, choice := range closeBehaviorChoices {
+	for _, choice := range forms.CloseBehaviorChoices {
 		choice := choice
-		radio := qt6.NewQRadioButton3(choice.label)
+		radio := qt6.NewQRadioButton3(choice.Label)
 		setObjectName(radio.QWidget, "closeChoice")
-		radio.SetAccessibleName(choice.label)
-		if !closeBehaviorAvailable(choice.behavior, tray) {
+		radio.SetAccessibleName(choice.Label)
+		if !forms.CloseBehaviorAvailable(choice.Behavior, tray) {
 			radio.SetEnabled(false)
-			radio.SetToolTip(noTrayHintText)
-			radio.SetAccessibleDescription(noTrayHintText)
+			radio.SetToolTip(forms.NoTrayHintText)
+			radio.SetAccessibleDescription(forms.NoTrayHintText)
 		}
-		radio.SetChecked(choice.behavior == shown)
+		radio.SetChecked(choice.Behavior == shown)
 		radio.OnToggled(func(on bool) {
 			if !on {
 				return
 			}
-			d.behavior = choice.behavior
+			d.behavior = choice.Behavior
 			d.clearError()
 		})
 		keepTarget(radio.QWidget)
@@ -144,22 +145,22 @@ func (d *preferencesDialog) closeGroup(tray bool, shown settings.CloseBehavior) 
 // terminalGroup is the group of the terminal command: the field, the hint of the
 // {dir} placeholder and, under the field, the message of a refused save.
 func (d *preferencesDialog) terminalGroup(command string) *qt6.QWidget {
-	group := qt6.NewQGroupBox3(terminalGroupTitle)
+	group := qt6.NewQGroupBox3(forms.TerminalGroupTitle)
 	setObjectName(group.QWidget, "preferencesGroup")
 
 	box := qt6.NewQVBoxLayout(group.QWidget)
 	box.SetContentsMargins(design.SpaceM, design.SpaceM, design.SpaceM, design.SpaceM)
 	box.SetSpacing(design.SpaceS)
 
-	box.AddWidget(detailLabel(terminalGroupHint, "").QWidget)
+	box.AddWidget(detailLabel(forms.TerminalGroupHint, "").QWidget)
 
-	caption := detailLabel(terminalRowTitle, "fieldLabel")
+	caption := detailLabel(forms.TerminalRowTitle, "fieldLabel")
 	d.terminal = qt6.NewQLineEdit2()
 	setObjectName(d.terminal.QWidget, "terminalCommand")
 	d.terminal.SetText(command)
 	d.terminal.SetClearButtonEnabled(true)
-	d.terminal.SetAccessibleName(terminalRowTitle)
-	d.terminal.SetAccessibleDescription(terminalGroupHint)
+	d.terminal.SetAccessibleName(forms.TerminalRowTitle)
+	d.terminal.SetAccessibleDescription(forms.TerminalGroupHint)
 	caption.SetBuddy(d.terminal.QWidget)
 	keepTarget(d.terminal.QWidget)
 	// A change of the command takes the old refusal away: the message must
@@ -184,7 +185,7 @@ func (d *preferencesDialog) buttons() *qt6.QWidget {
 	d.cancel = answerButton(box, cancelText, "preferencesCancel", "Chiude senza salvare le impostazioni.", qt6.QDialogButtonBox__RejectRole)
 	d.cancel.OnClicked(func() { d.dialog.Reject() })
 
-	d.save = answerButton(box, saveSettingsText, "primaryAction", "Salva le impostazioni nel database.", qt6.QDialogButtonBox__AcceptRole)
+	d.save = answerButton(box, forms.SaveSettingsText, "primaryAction", "Salva le impostazioni nel database.", qt6.QDialogButtonBox__AcceptRole)
 	d.save.SetDefault(true)
 	d.save.SetAutoDefault(true)
 	d.save.OnClicked(d.submit)
@@ -211,7 +212,7 @@ func (d *preferencesDialog) open() {
 	d.dialog.AdjustSize()
 	d.dialog.Open()
 	for i, radio := range d.choices {
-		if i == closeBehaviorIndex(d.behavior) && radio.IsEnabled() {
+		if i == forms.CloseBehaviorIndex(d.behavior) && radio.IsEnabled() {
 			radio.SetFocus()
 			return
 		}
@@ -229,14 +230,14 @@ func (d *preferencesDialog) submit() {
 		return
 	}
 	command := d.terminal.Text()
-	if message := validateTerminalCommand(command); message != "" {
+	if message := forms.ValidateTerminalCommand(command); message != "" {
 		d.showError(message)
 		d.terminal.SetFocus()
 		return
 	}
 	d.busy = true
 	d.save.SetEnabled(false)
-	values := storedSettings(settings.Settings{CloseBehavior: d.behavior, TerminalCommand: command})
+	values := forms.StoredSettings(settings.Settings{CloseBehavior: d.behavior, TerminalCommand: command})
 	if d.onSave == nil {
 		d.done(nil)
 		return
@@ -268,7 +269,7 @@ func (d *preferencesDialog) done(err error) {
 func (d *preferencesDialog) showError(message string) {
 	d.error.SetText(message)
 	d.error.SetVisible(true)
-	d.terminal.SetAccessibleName(fieldAccessibleName(terminalRowTitle, message))
+	d.terminal.SetAccessibleName(fieldAccessibleName(forms.TerminalRowTitle, message))
 }
 
 // clearError hides the message of a refusal.
@@ -278,7 +279,7 @@ func (d *preferencesDialog) clearError() {
 	}
 	d.error.SetText("")
 	d.error.SetVisible(false)
-	d.terminal.SetAccessibleName(terminalRowTitle)
+	d.terminal.SetAccessibleName(forms.TerminalRowTitle)
 }
 
 // openPreferences shows the settings dialog. The application holds one at a
@@ -295,7 +296,7 @@ func (a *application) openPreferences() {
 	dialog := newPreferencesDialog(a.shell.window.QWidget, a.prefs, a.hasTray(), a.savePreferences)
 	dialog.onSaved = func() {
 		if a.shell != nil {
-			a.shell.showNotice(settingsSavedText)
+			a.shell.showNotice(forms.SettingsSavedText)
 		}
 	}
 	dialog.onClosed = func() {

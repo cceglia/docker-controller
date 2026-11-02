@@ -1,4 +1,4 @@
-package gui
+package forms
 
 import (
 	"strings"
@@ -12,37 +12,37 @@ func TestCloseActionFor(t *testing.T) {
 		name     string
 		behavior settings.CloseBehavior
 		tray     bool
-		want     closeAction
+		want     CloseAction
 	}{
-		{"hide with a tray hides the window", settings.CloseHide, true, closeHide},
-		{"quit ends the application", settings.CloseQuit, true, closeQuit},
-		{"ask opens the dialog", settings.CloseAsk, true, closeAsk},
-		{"unknown keeps the default", settings.CloseBehavior("maybe"), true, closeHide},
-		{"empty keeps the default", settings.CloseBehavior(""), true, closeHide},
-		{"hide without a tray quits", settings.CloseHide, false, closeQuit},
-		{"ask without a tray quits", settings.CloseAsk, false, closeQuit},
-		{"quit without a tray quits", settings.CloseQuit, false, closeQuit},
+		{"hide with a tray hides the window", settings.CloseHide, true, CloseHide},
+		{"quit ends the application", settings.CloseQuit, true, CloseQuit},
+		{"ask opens the dialog", settings.CloseAsk, true, CloseAsk},
+		{"unknown keeps the default", settings.CloseBehavior("maybe"), true, CloseHide},
+		{"empty keeps the default", settings.CloseBehavior(""), true, CloseHide},
+		{"hide without a tray quits", settings.CloseHide, false, CloseQuit},
+		{"ask without a tray quits", settings.CloseAsk, false, CloseQuit},
+		{"quit without a tray quits", settings.CloseQuit, false, CloseQuit},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := closeActionFor(tc.behavior, tc.tray); got != tc.want {
-				t.Errorf("closeActionFor(%q, %v) = %v, want %v", tc.behavior, tc.tray, got, tc.want)
+			if got := CloseActionFor(tc.behavior, tc.tray); got != tc.want {
+				t.Errorf("CloseActionFor(%q, %v) = %v, want %v", tc.behavior, tc.tray, got, tc.want)
 			}
 		})
 	}
 }
 
 func TestAskCloseText_DoesNotPromiseTheLossOfTheHistory(t *testing.T) {
-	if askCloseHeading != "Chiudere la finestra?" {
-		t.Errorf("heading = %q", askCloseHeading)
+	if AskCloseHeading != "Chiudere la finestra?" {
+		t.Errorf("heading = %q", AskCloseHeading)
 	}
 	for _, want := range []string{"tray", "cronologia delle Attività"} {
-		if !strings.Contains(askCloseBody, want) {
-			t.Errorf("body = %q, want it to say %q", askCloseBody, want)
+		if !strings.Contains(AskCloseBody, want) {
+			t.Errorf("body = %q, want it to say %q", AskCloseBody, want)
 		}
 	}
 	for _, unwanted := range []string{"persa", "perdi", "va perso"} {
-		if strings.Contains(askCloseBody, unwanted) {
-			t.Errorf("body = %q, want it to leave the history alone, not to say %q", askCloseBody, unwanted)
+		if strings.Contains(AskCloseBody, unwanted) {
+			t.Errorf("body = %q, want it to leave the history alone, not to say %q", AskCloseBody, unwanted)
 		}
 	}
 }
@@ -56,34 +56,34 @@ func TestAskCloseAnswers_AreHideQuitAndCancel(t *testing.T) {
 		{"Esci", settings.CloseQuit},
 		{"Annulla", ""},
 	}
-	got := availableCloseAnswers(true)
+	got := AvailableCloseAnswers(true)
 	if len(got) != len(want) {
 		t.Fatalf("%d answers, want %d", len(got), len(want))
 	}
 	for i, w := range want {
-		if got[i].label != w.label || got[i].behavior != w.behavior {
+		if got[i].Label != w.label || got[i].Behavior != w.behavior {
 			t.Errorf("answer %d = %+v, want label %q and behavior %q", i, got[i], w.label, w.behavior)
 		}
 	}
 }
 
 func TestAvailableCloseAnswers_WithoutATrayLeaveNoHide(t *testing.T) {
-	got := availableCloseAnswers(false)
+	got := AvailableCloseAnswers(false)
 
 	if len(got) != 2 {
 		t.Fatalf("%d answers without a tray, want Esci and Annulla", len(got))
 	}
-	if got[0].behavior != settings.CloseQuit || got[1].behavior != "" {
+	if got[0].Behavior != settings.CloseQuit || got[1].Behavior != "" {
 		t.Errorf("answers = %+v, want Esci and Annulla", got)
 	}
 }
 
 func TestCloseQuestionBody_WithoutATrayDoesNotOfferHiding(t *testing.T) {
-	with := closeQuestionBody(true)
+	with := CloseQuestionBody(true)
 	if !strings.Contains(with, "nascondere") {
 		t.Errorf("body = %q, want it to offer hiding with a tray", with)
 	}
-	without := closeQuestionBody(false)
+	without := CloseQuestionBody(false)
 	for _, unwanted := range []string{"nascondere", "restare nel tray"} {
 		if strings.Contains(without, unwanted) {
 			t.Errorf("body = %q, want it to offer no hiding without a tray, not %q", without, unwanted)
@@ -112,8 +112,8 @@ func TestCloseAnswerFor(t *testing.T) {
 			if ok != tc.ok {
 				t.Fatalf("closeAnswerFor(%q) ok = %v, want %v", tc.response, ok, tc.ok)
 			}
-			if answer.behavior != tc.behavior {
-				t.Errorf("behavior = %q, want %q", answer.behavior, tc.behavior)
+			if answer.Behavior != tc.behavior {
+				t.Errorf("behavior = %q, want %q", answer.Behavior, tc.behavior)
 			}
 		})
 	}
@@ -135,9 +135,9 @@ func TestCloseToSave(t *testing.T) {
 		{"not remembered quit", settings.CloseQuit, false, "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, save := closeToSave(tc.choice, tc.remember)
+			got, save := CloseToSave(tc.choice, tc.remember)
 			if got != tc.want || save != tc.save {
-				t.Errorf("closeToSave(%q, %v) = (%q, %v), want (%q, %v)",
+				t.Errorf("CloseToSave(%q, %v) = (%q, %v), want (%q, %v)",
 					tc.choice, tc.remember, got, save, tc.want, tc.save)
 			}
 		})

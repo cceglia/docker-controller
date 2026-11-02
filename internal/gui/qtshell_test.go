@@ -17,6 +17,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/forms"
 	"dockercontroller/internal/gui/guitest"
 	"dockercontroller/internal/gui/logs"
 	guiproject "dockercontroller/internal/gui/project"
@@ -391,14 +392,14 @@ func checkEditForm(t *testing.T, s *shell) {
 	// The box proposes the Groups in use, without the empty option: an empty box
 	// is no Group, and the hint of the box says so.
 	group := s.panel.edit.group
-	if got, want := itemsOf(group), GroupSuggestions(GroupChoices(shop.Group, []compose.Project{shop, other})); !slices.Equal(got, want) {
+	if got, want := itemsOf(group), forms.GroupSuggestions(forms.GroupChoices(shop.Group, []compose.Project{shop, other})); !slices.Equal(got, want) {
 		t.Errorf("the Group field proposes %v, want %v", got, want)
 	}
 	if !slices.Contains(itemsOf(group), other.Group) {
 		t.Errorf("the Group field does not propose the Group in use %q", other.Group)
 	}
-	if got := group.PlaceholderText(); got != NoGroupText {
-		t.Errorf("an empty Group box says %q, want %q", got, NoGroupText)
+	if got := group.PlaceholderText(); got != forms.NoGroupText {
+		t.Errorf("an empty Group box says %q, want %q", got, forms.NoGroupText)
 	}
 	if !s.panel.edit.checks["debug"].IsChecked() {
 		t.Error("the form leaves the active Profile debug off")
@@ -622,7 +623,7 @@ func formOrder(p *detailPanel, project compose.Project) []string {
 	}
 	var order []string
 	for _, control := range p.controls {
-		if fields[control.label] || HasProfile(project.Profiles, control.label) {
+		if fields[control.label] || forms.HasProfile(project.Profiles, control.label) {
 			order = append(order, control.label)
 		}
 	}
@@ -919,7 +920,7 @@ func checkAddForm(t *testing.T, s *shell) {
 		}
 	}
 
-	var form AddProjectForm
+	var form forms.AddProjectForm
 	if _, err := form.Pick([]string{override, main}, compose.ProposeName); err != nil {
 		t.Fatalf("Pick error = %v", err)
 	}
@@ -997,7 +998,7 @@ func checkAddForm(t *testing.T, s *shell) {
 
 	// A form without a File compose asks for one first, and its name field is
 	// insensitive.
-	empty := newAddDialog(s.window.QWidget, AddProjectForm{},
+	empty := newAddDialog(s.window.QWidget, forms.AddProjectForm{},
 		func(string, []string, func(error)) { t.Error("an empty form sent a request") },
 		func(string) { t.Error("an empty form saved a Project") })
 	defer empty.dialog.Delete()
@@ -1012,7 +1013,7 @@ func checkAddForm(t *testing.T, s *shell) {
 
 	// Dropping the main file moves the first place down the order and proposes
 	// the name again.
-	var second AddProjectForm
+	var second forms.AddProjectForm
 	if _, err := second.Pick([]string{main, override}, compose.ProposeName); err != nil {
 		t.Fatalf("Pick error = %v", err)
 	}
@@ -2182,18 +2183,18 @@ func checkPreferences(t *testing.T, s *shell) {
 
 	// The three choices are on screen and on, and the saved one is the checked
 	// one.
-	if len(dialog.choices) != len(closeBehaviorChoices) {
-		t.Fatalf("%d choices, want %d", len(dialog.choices), len(closeBehaviorChoices))
+	if len(dialog.choices) != len(forms.CloseBehaviorChoices) {
+		t.Fatalf("%d choices, want %d", len(dialog.choices), len(forms.CloseBehaviorChoices))
 	}
 	for i, radio := range dialog.choices {
-		if radio.Text() != closeBehaviorChoices[i].label {
-			t.Errorf("choice %d = %q, want %q", i, radio.Text(), closeBehaviorChoices[i].label)
+		if radio.Text() != forms.CloseBehaviorChoices[i].Label {
+			t.Errorf("choice %d = %q, want %q", i, radio.Text(), forms.CloseBehaviorChoices[i].Label)
 		}
 		if !radio.IsEnabled() {
 			t.Errorf("choice %d is off with a tray", i)
 		}
 	}
-	if !dialog.choices[closeBehaviorIndex(settings.CloseHide)].IsChecked() {
+	if !dialog.choices[forms.CloseBehaviorIndex(settings.CloseHide)].IsChecked() {
 		t.Error("the dialog does not show the saved behavior")
 	}
 
@@ -2226,7 +2227,7 @@ func checkPreferences(t *testing.T, s *shell) {
 
 	// A valid command and another behavior save both values and close the
 	// dialog.
-	dialog.choices[closeBehaviorIndex(settings.CloseQuit)].Click()
+	dialog.choices[forms.CloseBehaviorIndex(settings.CloseQuit)].Click()
 	dialog.save.Click()
 	settle()
 	if saves != 1 {
@@ -2244,14 +2245,14 @@ func checkPreferences(t *testing.T, s *shell) {
 	// the dialog shows the quit the close really does.
 	noTray := newPreferencesDialog(s.window.QWidget, settings.Defaults(), false, nil)
 	defer noTray.dialog.Delete()
-	hide := noTray.choices[closeBehaviorIndex(settings.CloseHide)]
+	hide := noTray.choices[forms.CloseBehaviorIndex(settings.CloseHide)]
 	if hide.IsEnabled() {
 		t.Error("hiding the window is a choice without a tray")
 	}
-	if got := hide.ToolTip(); got != noTrayHintText {
+	if got := hide.ToolTip(); got != forms.NoTrayHintText {
 		t.Errorf("tooltip = %q, want the reason hiding is not a choice", got)
 	}
-	if !noTray.choices[closeBehaviorIndex(settings.CloseQuit)].IsChecked() {
+	if !noTray.choices[forms.CloseBehaviorIndex(settings.CloseQuit)].IsChecked() {
 		t.Error("without a tray the dialog does not show Esci")
 	}
 
@@ -2284,8 +2285,8 @@ func checkCloseDialog(t *testing.T, s *shell) {
 	if !question.dialog.IsModal() {
 		t.Error("the question is not modal")
 	}
-	if len(question.answers) != len(askCloseAnswers) {
-		t.Fatalf("%d answers, want %d", len(question.answers), len(askCloseAnswers))
+	if len(question.answers) != len(forms.AskCloseAnswers) {
+		t.Fatalf("%d answers, want %d", len(question.answers), len(forms.AskCloseAnswers))
 	}
 
 	// "Annulla" is the default and answers nothing, even with the option on.
@@ -2479,7 +2480,7 @@ func capturePreferences(t *testing.T, parent *qt6.QWidget, dir, name string, pre
 	if withError {
 		invalid := `konsole --workdir "shop`
 		dialog.terminal.SetText(invalid)
-		dialog.showError(validateTerminalCommand(invalid))
+		dialog.showError(forms.ValidateTerminalCommand(invalid))
 	}
 	dialog.dialog.Show()
 	settle()
@@ -2521,7 +2522,7 @@ func captureCloseQuestion(t *testing.T, parent *qt6.QWidget, dir, name string, t
 func captureAddForm(t *testing.T, parent *qt6.QWidget, dir, name string) {
 	t.Helper()
 
-	form := AddProjectForm{
+	form := forms.AddProjectForm{
 		Files: []string{"/srv/shop/compose.override.yml", "/srv/shop/docker-compose.yml"},
 		Name:  "shop",
 	}

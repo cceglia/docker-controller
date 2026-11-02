@@ -5,6 +5,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/forms"
 	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/settings"
 )
@@ -38,8 +39,8 @@ func newCloseDialog(parent *qt6.QWidget, tray bool, onAnswer func(settings.Close
 	c := &closeDialog{onAnswer: onAnswer}
 
 	c.dialog = qt6.NewQDialog(parent)
-	c.dialog.SetWindowTitle(askCloseHeading)
-	c.dialog.SetAccessibleName(askCloseHeading)
+	c.dialog.SetWindowTitle(forms.AskCloseHeading)
+	c.dialog.SetAccessibleName(forms.AskCloseHeading)
 	c.dialog.SetModal(true)
 	// The body wraps: the range keeps the sentence readable and still lets a
 	// short answer stay short.
@@ -50,15 +51,15 @@ func newCloseDialog(parent *qt6.QWidget, tray bool, onAnswer func(settings.Close
 	layout.SetContentsMargins(design.SpaceL, design.SpaceL, design.SpaceL, design.SpaceL)
 	layout.SetSpacing(design.SpaceM)
 
-	title := detailLabel(askCloseHeading, "dialogTitle")
+	title := detailLabel(forms.AskCloseHeading, "dialogTitle")
 	layout.AddWidget(title.QWidget)
 
-	body := detailLabel(closeQuestionBody(tray), "dialogMessage")
+	body := detailLabel(forms.CloseQuestionBody(tray), "dialogMessage")
 	layout.AddWidget(body.QWidget)
 
-	c.remember = qt6.NewQCheckBox3(rememberCloseText)
+	c.remember = qt6.NewQCheckBox3(forms.RememberCloseText)
 	setObjectName(c.remember.QWidget, "closeRemember")
-	c.remember.SetAccessibleName(rememberCloseText)
+	c.remember.SetAccessibleName(forms.RememberCloseText)
 	c.remember.SetAccessibleDescription("Salva la risposta come impostazione, così la prossima chiusura non chiede.")
 	keepTarget(c.remember.QWidget)
 	layout.AddWidget(c.remember.QWidget)
@@ -66,14 +67,14 @@ func newCloseDialog(parent *qt6.QWidget, tray bool, onAnswer func(settings.Close
 	// The answers read in the order the platform gives them, and "Annulla" is
 	// the default: Enter without a choice changes nothing.
 	answers := qt6.NewQDialogButtonBox2()
-	for _, answer := range availableCloseAnswers(tray) {
+	for _, answer := range forms.AvailableCloseAnswers(tray) {
 		answer := answer
 		role := qt6.QDialogButtonBox__AcceptRole
-		if answer.behavior == "" {
+		if answer.Behavior == "" {
 			role = qt6.QDialogButtonBox__RejectRole
 		}
-		button := answerButton(answers, answer.label, "closeAnswer", "", role)
-		if answer.behavior == "" {
+		button := answerButton(answers, answer.Label, "closeAnswer", "", role)
+		if answer.Behavior == "" {
 			c.cancel = button
 			button.SetDefault(true)
 			button.SetAutoDefault(true)
@@ -83,7 +84,7 @@ func newCloseDialog(parent *qt6.QWidget, tray bool, onAnswer func(settings.Close
 			// a key the user did not mean as that answer.
 			button.SetAutoDefault(false)
 			button.OnClicked(func() {
-				c.choice = answer.behavior
+				c.choice = answer.Behavior
 				c.kept = c.remember.IsChecked()
 				c.dialog.Accept()
 			})
@@ -134,10 +135,10 @@ func (a *application) closeRequested() {
 // performClose carries out a close behavior. The tray decides whether hiding is
 // possible: without one the window could not come back, so the close quits.
 func (a *application) performClose(behavior settings.CloseBehavior) {
-	switch closeActionFor(behavior, a.hasTray()) {
-	case closeQuit:
+	switch forms.CloseActionFor(behavior, a.hasTray()) {
+	case forms.CloseQuit:
 		a.quit()
-	case closeAsk:
+	case forms.CloseAsk:
 		a.askClose()
 	default:
 		a.shell.hideWindow()
@@ -170,7 +171,7 @@ func (a *application) askClose() {
 // saved first, so the choice still holds after a restart; the close waits for
 // the save, because the next close must already read the new value.
 func (a *application) answerClose(choice settings.CloseBehavior, remember bool) {
-	value, save := closeToSave(choice, remember)
+	value, save := forms.CloseToSave(choice, remember)
 	if !save {
 		a.performClose(choice)
 		return
@@ -178,7 +179,7 @@ func (a *application) answerClose(choice settings.CloseBehavior, remember bool) 
 	store := a.store
 	ctx := a.ctx
 	go func() {
-		err := saveCloseBehavior(ctx, store, value)
+		err := forms.SaveCloseBehavior(ctx, store, value)
 		mainthread.Start(func() {
 			if err != nil {
 				if a.shell != nil {

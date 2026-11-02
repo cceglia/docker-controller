@@ -7,6 +7,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/forms"
 	"dockercontroller/internal/gui/view"
 )
 
@@ -51,7 +52,7 @@ const (
 // Aggiungi.
 type addDialog struct {
 	dialog *qt6.QDialog
-	form   AddProjectForm
+	form   forms.AddProjectForm
 	// list holds the rows of the chosen File compose, which refresh builds
 	// again; drops are the commands of those rows. name is the field of the
 	// compose name and error the message of a refusal.
@@ -79,7 +80,7 @@ type addDialog struct {
 // newAddDialog builds the form on the File compose the picker returned. Nothing
 // is saved until Aggiungi, and a refusal keeps the form open with what the user
 // chose.
-func newAddDialog(parent *qt6.QWidget, form AddProjectForm, onSubmit func(string, []string, func(error)), onSaved func(string)) *addDialog {
+func newAddDialog(parent *qt6.QWidget, form forms.AddProjectForm, onSubmit func(string, []string, func(error)), onSaved func(string)) *addDialog {
 	d := &addDialog{form: form, onSubmit: onSubmit, onSaved: onSaved}
 
 	d.dialog = qt6.NewQDialog(parent)

@@ -1,4 +1,4 @@
-package gui
+package forms
 
 import (
 	"fmt"
@@ -11,15 +11,15 @@ import (
 func TestCloseBehaviorChoices_ListTheThreeBehaviors(t *testing.T) {
 	want := []settings.CloseBehavior{settings.CloseHide, settings.CloseQuit, settings.CloseAsk}
 
-	if len(closeBehaviorChoices) != len(want) {
-		t.Fatalf("%d choices, want %d", len(closeBehaviorChoices), len(want))
+	if len(CloseBehaviorChoices) != len(want) {
+		t.Fatalf("%d choices, want %d", len(CloseBehaviorChoices), len(want))
 	}
 	for i, behavior := range want {
-		choice := closeBehaviorChoices[i]
-		if choice.behavior != behavior {
-			t.Errorf("choice %d = %q, want %q", i, choice.behavior, behavior)
+		choice := CloseBehaviorChoices[i]
+		if choice.Behavior != behavior {
+			t.Errorf("choice %d = %q, want %q", i, choice.Behavior, behavior)
 		}
-		if strings.TrimSpace(choice.label) == "" {
+		if strings.TrimSpace(choice.Label) == "" {
 			t.Errorf("choice %d has no label", i)
 		}
 	}
@@ -37,8 +37,8 @@ func TestCloseBehaviorIndexAndAt_RoundTrip(t *testing.T) {
 		{"unknown shows the default", settings.CloseBehavior("maybe"), 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := closeBehaviorIndex(tc.behavior); got != tc.index {
-				t.Errorf("closeBehaviorIndex(%q) = %d, want %d", tc.behavior, got, tc.index)
+			if got := CloseBehaviorIndex(tc.behavior); got != tc.index {
+				t.Errorf("CloseBehaviorIndex(%q) = %d, want %d", tc.behavior, got, tc.index)
 			}
 			want := tc.behavior
 			if !want.Valid() {
@@ -64,8 +64,8 @@ func TestCloseBehaviorAvailable(t *testing.T) {
 		{"ask without a tray", settings.CloseAsk, false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := closeBehaviorAvailable(tc.behavior, tc.tray); got != tc.want {
-				t.Errorf("closeBehaviorAvailable(%q, %v) = %v, want %v", tc.behavior, tc.tray, got, tc.want)
+			if got := CloseBehaviorAvailable(tc.behavior, tc.tray); got != tc.want {
+				t.Errorf("CloseBehaviorAvailable(%q, %v) = %v, want %v", tc.behavior, tc.tray, got, tc.want)
 			}
 		})
 	}
@@ -89,8 +89,8 @@ func TestCloseBehaviorShown(t *testing.T) {
 		{"unknown without a tray reads as quit", settings.CloseBehavior("maybe"), false, settings.CloseQuit},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := closeBehaviorShown(tc.behavior, tc.tray); got != tc.want {
-				t.Errorf("closeBehaviorShown(%q, %v) = %q, want %q", tc.behavior, tc.tray, got, tc.want)
+			if got := CloseBehaviorShown(tc.behavior, tc.tray); got != tc.want {
+				t.Errorf("CloseBehaviorShown(%q, %v) = %q, want %q", tc.behavior, tc.tray, got, tc.want)
 			}
 		})
 	}
@@ -111,9 +111,9 @@ func TestValidateTerminalCommand(t *testing.T) {
 		{"trailing backslash", `konsole {dir}\`, "Comando del terminale non valido"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := validateTerminalCommand(tc.command)
+			got := ValidateTerminalCommand(tc.command)
 			if !strings.Contains(got, tc.want) {
-				t.Errorf("validateTerminalCommand(%q) = %q, want it to contain %q", tc.command, got, tc.want)
+				t.Errorf("ValidateTerminalCommand(%q) = %q, want it to contain %q", tc.command, got, tc.want)
 			}
 			if strings.Contains(got, "settings:") {
 				t.Errorf("the English error leaked: %q", got)
@@ -145,8 +145,8 @@ func TestStoredSettings(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := storedSettings(tc.value); got != tc.want {
-				t.Errorf("storedSettings(%+v) = %+v, want %+v", tc.value, got, tc.want)
+			if got := StoredSettings(tc.value); got != tc.want {
+				t.Errorf("StoredSettings(%+v) = %+v, want %+v", tc.value, got, tc.want)
 			}
 		})
 	}
@@ -159,7 +159,7 @@ func TestPreferencesSaveOutcome(t *testing.T) {
 		wantMessage string
 		wantSaved   bool
 	}{
-		{"saved", nil, settingsSavedText, true},
+		{"saved", nil, SettingsSavedText, true},
 		{
 			"invalid terminal command",
 			fmt.Errorf("%w: unterminated quote", settings.ErrInvalidTerminalCommand),
