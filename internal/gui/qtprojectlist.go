@@ -6,6 +6,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 )
 
 // rowKind says what a row of the list holds.
@@ -40,7 +41,7 @@ type projectList struct {
 	widget *qt6.QListWidget
 	// theme supplies the colours of the roles the style sheet does not reach,
 	// like the tack of a faulty Container.
-	theme designTheme
+	theme design.DesignTheme
 	// rows holds the Project of each row. A heading and the empty line carry
 	// the zero Project, so the row of a Project is found without a map keyed on
 	// the wrapper.
@@ -54,7 +55,7 @@ type projectList struct {
 }
 
 // newProjectList builds the empty list. The rows arrive with set.
-func newProjectList(theme designTheme) *projectList {
+func newProjectList(theme design.DesignTheme) *projectList {
 	p := &projectList{widget: qt6.NewQListWidget2(), theme: theme}
 	p.widget.SetSelectionMode(qt6.QAbstractItemView__SingleSelection)
 	// Every row has the same height, so the list can size its viewport once.
@@ -230,7 +231,7 @@ func (p *projectList) appendRow(kind rowKind, project compose.Project, widget *q
 // stays in the tooltip and in the detail, so the row never wraps. The strip of
 // the tacks comes back with the row: it is painted, not styled, so the
 // selection has to reach it in person.
-func newProjectRow(project compose.Project, theme designTheme) (*qt6.QWidget, *tackStrip) {
+func newProjectRow(project compose.Project, theme design.DesignTheme) (*qt6.QWidget, *tackStrip) {
 	status := StatusOf(project.Status)
 
 	row := qt6.NewQWidget2()

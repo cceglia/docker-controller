@@ -4,6 +4,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 	"github.com/mappu/miqt/qt6/mainthread"
 
+	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/settings"
 )
 
@@ -45,8 +46,8 @@ func newCloseDialog(parent *qt6.QWidget, tray bool, onAnswer func(settings.Close
 	c.dialog.SetMaximumWidth(dialogMaxWidth)
 
 	layout := qt6.NewQVBoxLayout(c.dialog.QWidget)
-	layout.SetContentsMargins(spaceL, spaceL, spaceL, spaceL)
-	layout.SetSpacing(spaceM)
+	layout.SetContentsMargins(design.SpaceL, design.SpaceL, design.SpaceL, design.SpaceL)
+	layout.SetSpacing(design.SpaceM)
 
 	title := detailLabel(askCloseHeading, "dialogTitle")
 	layout.AddWidget(title.QWidget)

@@ -8,6 +8,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 )
 
 const (
@@ -101,7 +102,7 @@ func newActivityPage(log *ActivityLog) *activityPage {
 	p.widget = qt6.NewQWidget2()
 	layout := qt6.NewQHBoxLayout(p.widget)
 	layout.SetContentsMargins(0, 0, 0, 0)
-	layout.SetSpacing(spaceS)
+	layout.SetSpacing(design.SpaceS)
 	layout.AddWidget(p.list.QWidget)
 	layout.AddWidget2(p.output.QWidget, 1)
 

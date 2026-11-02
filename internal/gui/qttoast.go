@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/mappu/miqt/qt6"
+
+	"dockercontroller/internal/gui/design"
 )
 
 // noticeAccessibleName is what a screen reader calls the notice before it reads
@@ -23,7 +25,7 @@ const toastDuration = 6 * time.Second
 const toastWidthLimit = 520
 
 // toastMargin is the space the notice keeps from the edges of its host.
-const toastMargin = spaceL
+const toastMargin = design.SpaceL
 
 // toast is the notice in sovrimpressione of the shell: one text over the
 // content, at the top right of the window. It sits clear of the commands at the
@@ -65,8 +67,8 @@ func newToast(host *qt6.QWidget) *toast {
 	t.frame.SetVisible(false)
 
 	layout := qt6.NewQHBoxLayout(t.frame.QWidget)
-	layout.SetContentsMargins(spaceXS, spaceXS, spaceXS, spaceXS)
-	layout.SetSpacing(spaceS)
+	layout.SetContentsMargins(design.SpaceXS, design.SpaceXS, design.SpaceXS, design.SpaceXS)
+	layout.SetSpacing(design.SpaceS)
 
 	t.label = qt6.NewQLabel3("")
 	setObjectName(t.label.QWidget, "toastText")

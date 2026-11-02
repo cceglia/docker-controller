@@ -11,6 +11,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 )
 
 // stderrPrefix marks a line of compose itself in the text. The colour of the
@@ -25,27 +26,27 @@ type logFormats struct {
 	plain     *qt6.QTextCharFormat
 	timestamp *qt6.QTextCharFormat
 	stderr    *qt6.QTextCharFormat
-	service   [ServiceHues]*qt6.QTextCharFormat
+	service   [design.ServiceHues]*qt6.QTextCharFormat
 }
 
 // newLogFormats builds the formats of one theme. The colours are the roles of
 // the tokens, so the token test reads the same values.
-func newLogFormats(theme designTheme) *logFormats {
+func newLogFormats(theme design.DesignTheme) *logFormats {
 	f := &logFormats{plain: qt6.NewQTextCharFormat()}
 
 	f.timestamp = qt6.NewQTextCharFormat()
-	f.timestamp.SetForeground(qt6.NewQBrush3(qt6.NewQColor6(theme.color(roleLogTimestamp))))
+	f.timestamp.SetForeground(qt6.NewQBrush3(qt6.NewQColor6(theme.Color(design.RoleLogTimestamp))))
 
 	// A message of compose itself is not a Service: it carries no colour of the
 	// palette, and its slant, its weight and its prefix say it too.
 	f.stderr = qt6.NewQTextCharFormat()
-	f.stderr.SetForeground(qt6.NewQBrush3(qt6.NewQColor6(theme.color(roleStatusFault))))
+	f.stderr.SetForeground(qt6.NewQBrush3(qt6.NewQColor6(theme.Color(design.RoleStatusFault))))
 	f.stderr.SetFontWeight(int(qt6.QFont__Bold))
 	f.stderr.SetFontItalic(true)
 
-	for hue := 0; hue < ServiceHues; hue++ {
+	for hue := 0; hue < design.ServiceHues; hue++ {
 		format := qt6.NewQTextCharFormat()
-		format.SetForeground(qt6.NewQBrush3(qt6.NewQColor6(ServiceColor(hue, theme))))
+		format.SetForeground(qt6.NewQBrush3(qt6.NewQColor6(design.ServiceColor(hue, theme))))
 		format.SetFontWeight(int(qt6.QFont__Bold))
 		f.service[hue] = format
 	}
@@ -73,7 +74,7 @@ func serviceHueOf(tag string) (int, bool) {
 		return 0, false
 	}
 	hue, err := strconv.Atoi(strings.TrimPrefix(tag, serviceTagPrefix))
-	if err != nil || hue < 0 || hue >= ServiceHues {
+	if err != nil || hue < 0 || hue >= design.ServiceHues {
 		return 0, false
 	}
 	return hue, true
@@ -98,7 +99,7 @@ type logPage struct {
 	status      *qt6.QLabel
 	scroller    *qt6.QTimer
 
-	theme   designTheme
+	theme   design.DesignTheme
 	formats *logFormats
 
 	// source opens the stream: it is compose.Manager.Logs in the application.
@@ -135,7 +136,7 @@ type logPage struct {
 }
 
 // newLogPage builds the page with no stream.
-func newLogPage(theme designTheme) *logPage {
+func newLogPage(theme design.DesignTheme) *logPage {
 	p := &logPage{theme: theme, formats: newLogFormats(theme)}
 
 	p.target = qt6.NewQLabel2()
@@ -180,8 +181,8 @@ func newLogPage(theme designTheme) *logPage {
 	// The bar stays on one line over the text: the search takes the room the
 	// other controls leave, so no column stays empty.
 	bar := qt6.NewQHBoxLayout2()
-	bar.SetContentsMargins(spaceM, spaceXS, spaceM, spaceXS)
-	bar.SetSpacing(spaceS)
+	bar.SetContentsMargins(design.SpaceM, design.SpaceXS, design.SpaceM, design.SpaceXS)
+	bar.SetSpacing(design.SpaceS)
 	bar.AddWidget3(p.target.QWidget, 0, qt6.AlignVCenter)
 	bar.AddWidget3(p.searchLabel.QWidget, 0, qt6.AlignVCenter)
 	bar.AddWidget2(p.search.QWidget, 1)

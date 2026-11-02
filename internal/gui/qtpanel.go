@@ -6,6 +6,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 )
 
 // panelHeight is the height the bottom panel opens at, in logical pixels, as
@@ -59,7 +60,7 @@ type bottomPanel struct {
 // newBottomPanel builds the panel closed. splitter is the vertical splitter the
 // panel shares with the detail. A nil log builds a panel that never opens by
 // itself; a nil source builds a Log page that streams nothing.
-func newBottomPanel(log *ActivityLog, source LogSource, ctx context.Context, theme designTheme, splitter *qt6.QSplitter) *bottomPanel {
+func newBottomPanel(log *ActivityLog, source LogSource, ctx context.Context, theme design.DesignTheme, splitter *qt6.QSplitter) *bottomPanel {
 	p := &bottomPanel{splitter: splitter}
 
 	p.page = newActivityPage(log)

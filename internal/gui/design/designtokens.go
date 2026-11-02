@@ -1,4 +1,4 @@
-package gui
+package design
 
 import "strconv"
 
@@ -26,9 +26,9 @@ type designRole struct {
 	kind  contrastKind
 }
 
-// designTheme is one palette: the surface the roles are drawn on and the roles
+// DesignTheme is one palette: the surface the roles are drawn on and the roles
 // themselves. The desktop theme picks the palette at startup.
-type designTheme struct {
+type DesignTheme struct {
 	name    string
 	surface string
 	roles   map[string]designRole
@@ -40,10 +40,13 @@ type designTheme struct {
 const (
 	roleStatusActive  = "statusActive"
 	roleStatusPartial = "statusPartial"
-	roleStatusFault   = "statusFault"
-	roleTackFault     = "tackFault"
-	// roleLogTimestamp dims the clock of a line of the log.
-	roleLogTimestamp = "logTimestamp"
+	// RoleStatusFault is the role of a fault: the text of a failed state and
+	// the output of compose itself.
+	RoleStatusFault = "statusFault"
+	// RoleTackFault is the role of the tack of a faulty Container.
+	RoleTackFault = "tackFault"
+	// RoleLogTimestamp is the role of the clock of a line of the log.
+	RoleLogTimestamp = "logTimestamp"
 	// serviceRolePrefix names the role of one entry of the Service palette.
 	serviceRolePrefix = "service"
 )
@@ -89,24 +92,24 @@ func withServiceRoles(roles map[string]designRole, palette [ServiceHues]string) 
 	return roles
 }
 
-// stateRole is the role of the style sheet that carries a state of the old
+// StateRole is the role of the style sheet that carries a state of the old
 // view: success reads as Attivo, warning as Parziale and error as the fault of
 // a Container. A quiet state has no role and keeps the colour of the theme.
-func stateRole(cssClass string) string {
+func StateRole(cssClass string) string {
 	switch cssClass {
 	case "success":
 		return roleStatusActive
 	case "warning":
 		return roleStatusPartial
 	case "error":
-		return roleStatusFault
+		return RoleStatusFault
 	}
 	return ""
 }
 
-// lightTheme is the palette of a light desktop. The surface is the base colour
+// LightTheme is the palette of a light desktop. The surface is the base colour
 // of the list, where the labels of state sit.
-var lightTheme = designTheme{
+var LightTheme = DesignTheme{
 	name:    "light",
 	surface: "#ffffff",
 	roles: withServiceRoles(map[string]designRole{
@@ -116,46 +119,56 @@ var lightTheme = designTheme{
 		roleStatusPartial: {color: "#8a6508", kind: contrastText},
 		// The fault reads as text too: the state of a Container carries a
 		// label, so the red must pass the 4.5:1 of text, not the 3:1 of a tack.
-		roleStatusFault: {color: "#b42318", kind: contrastText},
+		RoleStatusFault: {color: "#b42318", kind: contrastText},
 		// The tack of a faulty Container is a component, not text.
-		roleTackFault: {color: "#e05561", kind: contrastComponent},
+		RoleTackFault: {color: "#e05561", kind: contrastComponent},
 		// The clock of a log line is secondary text: it stays above the
 		// 4.5:1 of a normal text, because a smaller role does not exist.
-		roleLogTimestamp: {color: "#5c5c5c", kind: contrastText},
+		RoleLogTimestamp: {color: "#5c5c5c", kind: contrastText},
 	}, servicePaletteLight),
 }
 
-// darkTheme is the palette of a dark desktop. The surface is the base colour of
+// DarkTheme is the palette of a dark desktop. The surface is the base colour of
 // Breeze Dark. A colour that passes on white is usually too dark here, so the
 // two palettes declare their own values.
-var darkTheme = designTheme{
+var DarkTheme = DesignTheme{
 	name:    "dark",
 	surface: "#232629",
 	roles: withServiceRoles(map[string]designRole{
 		roleStatusActive:  {color: "#51b564", kind: contrastText},
 		roleStatusPartial: {color: "#e0a800", kind: contrastText},
-		roleStatusFault:   {color: "#ff8882", kind: contrastText},
-		roleTackFault:     {color: "#e05561", kind: contrastComponent},
-		roleLogTimestamp:  {color: "#b8bcbf", kind: contrastText},
+		RoleStatusFault:   {color: "#ff8882", kind: contrastText},
+		RoleTackFault:     {color: "#e05561", kind: contrastComponent},
+		RoleLogTimestamp:  {color: "#b8bcbf", kind: contrastText},
 	}, servicePaletteDark),
 }
 
 // themes lists the palettes the UI can apply. The token test checks every one.
-var themes = []designTheme{lightTheme, darkTheme}
+var themes = []DesignTheme{LightTheme, DarkTheme}
 
-// themeForLightness picks the palette from the lightness of the window colour
+// ThemeForLightness picks the palette from the lightness of the window colour
 // of the desktop palette. Qt lightness runs from 0 to 255, so 128 is the middle.
-func themeForLightness(lightness int) designTheme {
+func ThemeForLightness(lightness int) DesignTheme {
 	if lightness < 128 {
-		return darkTheme
+		return DarkTheme
 	}
-	return lightTheme
+	return LightTheme
 }
 
-// color returns the value of a role. A role missing from the theme returns the
+// Color returns the value of a role. A role missing from the theme returns the
 // empty string, and the token test fails on it.
-func (t designTheme) color(role string) string {
+func (t DesignTheme) Color(role string) string {
 	return t.roles[role].color
+}
+
+// ServiceColor is the colour of one palette entry in the theme, as "#rrggbb".
+// The colours live with the other design tokens, so the token test checks
+// them. An entry outside the palette has no colour.
+func ServiceColor(hue int, theme DesignTheme) string {
+	if hue < 0 || hue >= ServiceHues {
+		return ""
+	}
+	return theme.Color(serviceRole(hue))
 }
 
 // The type scale: the ratio 1.125 with a body of 16 px. The heading and the
@@ -170,16 +183,16 @@ const (
 // The spacing rhythm: 4, 8, 12, 16 and 24 logical pixels. The style sheet and
 // the layouts take their paddings and margins from these steps.
 const (
-	spaceXS = 4
-	spaceS  = 8
-	spaceM  = 12
-	spaceL  = 16
-	spaceXL = 24
+	SpaceXS = 4
+	SpaceS  = 8
+	SpaceM  = 12
+	SpaceL  = 16
+	SpaceXL = 24
 )
 
 // spacingSteps is the scale the token test checks a padding against.
-var spacingSteps = []int{spaceXS, spaceS, spaceM, spaceL, spaceXL}
+var spacingSteps = []int{SpaceXS, SpaceS, SpaceM, SpaceL, SpaceXL}
 
-// targetMin is the smallest side of an interactive control, in logical pixels:
+// TargetMin is the smallest side of an interactive control, in logical pixels:
 // the minimum target of WCAG 2.2 SC 2.5.8.
-const targetMin = 24
+const TargetMin = 24

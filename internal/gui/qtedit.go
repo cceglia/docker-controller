@@ -4,6 +4,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 )
 
 // The texts of the form of the settings.
@@ -152,7 +153,7 @@ func editField(caption string, field *qt6.QWidget, message, hint string) *qt6.QW
 
 	box := qt6.NewQVBoxLayout(widget)
 	box.SetContentsMargins(0, 0, 0, 0)
-	box.SetSpacing(spaceXS)
+	box.SetSpacing(design.SpaceXS)
 
 	label := detailLabel(caption, "fieldLabel")
 	label.SetBuddy(field)
@@ -183,10 +184,10 @@ func (p *detailPanel) editBlock() *qt6.QWidget {
 	block := frame.QWidget
 	block.SetAccessibleName(editTitle)
 	box := qt6.NewQVBoxLayout(block)
-	box.SetContentsMargins(spaceM, spaceM, spaceM, spaceM)
+	box.SetContentsMargins(design.SpaceM, design.SpaceM, design.SpaceM, design.SpaceM)
 	// The fields sit a step apart, further than the lines inside one field, so
 	// the eye reads where one field ends and the next starts.
-	box.SetSpacing(spaceM)
+	box.SetSpacing(design.SpaceM)
 
 	box.AddWidget(detailLabel(editTitle, "detailHeading").QWidget)
 
@@ -256,7 +257,7 @@ func (p *detailPanel) editBlock() *qt6.QWidget {
 	// The two commands close the form. Annulla comes first, so the reading order
 	// ends on Salva, the command that keeps the values.
 	buttons := qt6.NewQHBoxLayout2()
-	buttons.SetSpacing(spaceS)
+	buttons.SetSpacing(design.SpaceS)
 
 	cancel := detailButton(cancelText, "editCancel", "Lascia i valori di prima.", true)
 	cancel.OnClicked(p.cancelEdit)

@@ -2,13 +2,12 @@ package gui
 
 import (
 	"fmt"
-	"math"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 )
 
 // logLine is a short way to build a line of a Container.
@@ -356,8 +355,8 @@ func TestServiceHue(t *testing.T) {
 	t.Run("every hue is in the palette", func(t *testing.T) {
 		for i := 0; i < 500; i++ {
 			service := "s" + strconv.Itoa(i)
-			if hue := ServiceHue(service); hue < 0 || hue >= ServiceHues {
-				t.Fatalf("ServiceHue(%q) = %d, want 0..%d", service, hue, ServiceHues-1)
+			if hue := ServiceHue(service); hue < 0 || hue >= design.ServiceHues {
+				t.Fatalf("ServiceHue(%q) = %d, want 0..%d", service, hue, design.ServiceHues-1)
 			}
 		}
 	})
@@ -381,8 +380,8 @@ func TestServiceTag(t *testing.T) {
 	}
 
 	t.Run("every hue has its own tag, apart from the other tags", func(t *testing.T) {
-		seen := make(map[string]int, ServiceHues)
-		for hue := 0; hue < ServiceHues; hue++ {
+		seen := make(map[string]int, design.ServiceHues)
+		for hue := 0; hue < design.ServiceHues; hue++ {
 			tag := serviceTag(hue)
 			if want := serviceTagPrefix + strconv.Itoa(hue); tag != want {
 				t.Errorf("serviceTag(%d) = %q, want %q", hue, tag, want)
@@ -411,7 +410,7 @@ func TestServiceHueOf(t *testing.T) {
 		})
 	}
 
-	for _, tag := range []string{"", LogTimestampTag, LogStderrTag, serviceTagPrefix, serviceTagPrefix + "x", serviceTagPrefix + "-1", serviceTagPrefix + strconv.Itoa(ServiceHues)} {
+	for _, tag := range []string{"", LogTimestampTag, LogStderrTag, serviceTagPrefix, serviceTagPrefix + "x", serviceTagPrefix + "-1", serviceTagPrefix + strconv.Itoa(design.ServiceHues)} {
 		t.Run("foreign/"+tag, func(t *testing.T) {
 			if hue, ok := serviceHueOf(tag); ok {
 				t.Errorf("serviceHueOf(%q) = %d, want no hue", tag, hue)
@@ -454,42 +453,4 @@ func BenchmarkFilterLogLines(b *testing.B) {
 			b.Fatalf("%d lines, want %d", len(got), LogLineLimit)
 		}
 	}
-}
-
-// isHexColor reports whether color is a "#rrggbb" colour.
-func isHexColor(color string) bool {
-	if len(color) != 7 || color[0] != '#' {
-		return false
-	}
-	for _, c := range color[1:] {
-		if !strings.ContainsRune("0123456789abcdef", c) {
-			return false
-		}
-	}
-	return true
-}
-
-// contrastRatio is the WCAG contrast between two "#rrggbb" colours.
-func contrastRatio(a, b string) float64 {
-	la, lb := relativeLuminance(a), relativeLuminance(b)
-	if la < lb {
-		la, lb = lb, la
-	}
-	return (la + 0.05) / (lb + 0.05)
-}
-
-// relativeLuminance is the WCAG relative luminance of a "#rrggbb" colour.
-func relativeLuminance(color string) float64 {
-	channel := func(i int) float64 {
-		v, err := strconv.ParseUint(color[1+i*2:3+i*2], 16, 8)
-		if err != nil {
-			panic(err)
-		}
-		c := float64(v) / 255
-		if c <= 0.03928 {
-			return c / 12.92
-		}
-		return math.Pow((c+0.055)/1.055, 2.4)
-	}
-	return 0.2126*channel(0) + 0.7152*channel(1) + 0.0722*channel(2)
 }

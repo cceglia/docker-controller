@@ -6,6 +6,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 )
 
 const (
@@ -64,7 +65,7 @@ func newUsageCell(caption string, withBar, withNote, wrap bool) *usageCell {
 
 	heading := qt6.NewQHBoxLayout2()
 	heading.SetContentsMargins(0, 0, 0, 0)
-	heading.SetSpacing(spaceS)
+	heading.SetSpacing(design.SpaceS)
 	heading.AddWidget3(c.label.QWidget, 0, qt6.AlignVCenter)
 	if withBar {
 		c.bar = usageMeter(caption)
@@ -76,7 +77,7 @@ func newUsageCell(caption string, withBar, withNote, wrap bool) *usageCell {
 	c.value.SetWordWrap(wrap)
 	figures := qt6.NewQHBoxLayout2()
 	figures.SetContentsMargins(0, 0, 0, 0)
-	figures.SetSpacing(spaceS)
+	figures.SetSpacing(design.SpaceS)
 	figures.AddWidget3(c.value.QWidget, 0, qt6.AlignVCenter)
 	if withNote {
 		c.note = qt6.NewQLabel3("")
@@ -145,7 +146,7 @@ func newUsageRow(options usageRowOptions) *usageRow {
 
 	line := qt6.NewQHBoxLayout(r.widget)
 	line.SetContentsMargins(0, 0, 0, 0)
-	line.SetSpacing(spaceM)
+	line.SetSpacing(design.SpaceM)
 	for i, cell := range []*usageCell{r.cpu, r.memory, r.net, r.disk} {
 		if i > 0 {
 			line.AddWidget(usageRule())
@@ -192,8 +193,8 @@ func newUsageStrip() *usageStrip {
 
 	padded := qt6.NewQWidget2()
 	pad := qt6.NewQHBoxLayout(padded)
-	pad.SetContentsMargins(spaceL, spaceM, spaceL, spaceM)
-	pad.SetSpacing(spaceM)
+	pad.SetContentsMargins(design.SpaceL, design.SpaceM, design.SpaceL, design.SpaceM)
+	pad.SetSpacing(design.SpaceM)
 	pad.AddWidget2(s.body.QWidget, 1)
 
 	s.widget = qt6.NewQWidget2()
@@ -245,7 +246,7 @@ func (s *usageStrip) showMessage(text string, fault bool) {
 	s.message.SetAccessibleDescription(text)
 	role := ""
 	if fault {
-		role = roleStatusFault
+		role = design.RoleStatusFault
 	}
 	if s.message.ObjectName() != role {
 		setObjectName(s.message.QWidget, role)

@@ -8,6 +8,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/settings"
 )
 
@@ -60,7 +61,7 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 	// contrast of the labels of state.
 	theme := themeForPalette(qt6.QGuiApplication_Palette())
 
-	a.qt.SetStyleSheet(applicationStyleSheet(theme))
+	a.qt.SetStyleSheet(design.ApplicationStyleSheet(theme))
 
 	a.shell = newShell(a, theme)
 	// The click on a notification shows the window. The signal arrives on a
@@ -81,15 +82,15 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 
 // themeForPalette reads the window colour of the desktop palette. A missing
 // palette or colour falls back to the light theme.
-func themeForPalette(palette *qt6.QPalette) designTheme {
+func themeForPalette(palette *qt6.QPalette) design.DesignTheme {
 	if palette == nil {
-		return lightTheme
+		return design.LightTheme
 	}
 	window := palette.ColorWithCr(qt6.QPalette__Window)
 	if window == nil {
-		return lightTheme
+		return design.LightTheme
 	}
-	return themeForLightness(window.Lightness())
+	return design.ThemeForLightness(window.Lightness())
 }
 
 // application owns what outlives the window: the Qt application, the Manager,

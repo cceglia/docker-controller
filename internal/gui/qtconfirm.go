@@ -1,6 +1,10 @@
 package gui
 
-import "github.com/mappu/miqt/qt6"
+import (
+	"github.com/mappu/miqt/qt6"
+
+	"dockercontroller/internal/gui/design"
+)
 
 const (
 	// dialogMinWidth and dialogMaxWidth bound a modal question. Without the
@@ -63,8 +67,8 @@ func newConfirmDialog(parent *qt6.QWidget, question Confirmation, onRun func()) 
 	c.dialog.SetMaximumWidth(dialogMaxWidth)
 
 	layout := qt6.NewQVBoxLayout(c.dialog.QWidget)
-	layout.SetContentsMargins(spaceL, spaceL, spaceL, spaceL)
-	layout.SetSpacing(spaceM)
+	layout.SetContentsMargins(design.SpaceL, design.SpaceL, design.SpaceL, design.SpaceL)
+	layout.SetSpacing(design.SpaceM)
 
 	title := qt6.NewQLabel3(question.Title)
 	setObjectName(title.QWidget, "dialogTitle")

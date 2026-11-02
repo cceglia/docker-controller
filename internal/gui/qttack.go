@@ -2,6 +2,8 @@ package gui
 
 import (
 	"github.com/mappu/miqt/qt6"
+
+	"dockercontroller/internal/gui/design"
 )
 
 const (
@@ -26,7 +28,7 @@ type tackStrip struct {
 // newTackStrip draws the tacks of a Project: filled for a running Container,
 // faint for a stopped one and in the fault role for an unhealthy or dead one.
 // A strip without tacks is empty but keeps its place, so the rows line up.
-func newTackStrip(states []TackState, theme designTheme) *tackStrip {
+func newTackStrip(states []TackState, theme design.DesignTheme) *tackStrip {
 	width := 0
 	if len(states) > 0 {
 		width = len(states)*(tackWidth+tackGap) - tackGap
@@ -45,7 +47,7 @@ func newTackStrip(states []TackState, theme designTheme) *tackStrip {
 			role = qt6.QPalette__HighlightedText
 		}
 		foreground := strip.Palette().ColorWithCr(role)
-		fault := qt6.NewQColor6(theme.color(roleTackFault))
+		fault := qt6.NewQColor6(theme.Color(design.RoleTackFault))
 		if strip.selected {
 			// The fault colour keeps its meaning, but it must read on the
 			// highlight: the highlighted text is the one colour the desktop

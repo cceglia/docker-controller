@@ -5,6 +5,7 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/tray"
 )
 
@@ -17,7 +18,7 @@ type shell struct {
 	app    *application
 	window *qt6.QMainWindow
 	// theme supplies the palette the style sheet and the painted roles use.
-	theme designTheme
+	theme design.DesignTheme
 
 	// pages holds the wide layout and the two pages of the narrow one. Only one
 	// page shows at a time: under the breakpoint the window shows the list or
@@ -66,7 +67,7 @@ type shell struct {
 
 // newShell builds the window. The list on the left marks the Project the user
 // chooses; the panel on the right shows it.
-func newShell(app *application, theme designTheme) *shell {
+func newShell(app *application, theme design.DesignTheme) *shell {
 	s := &shell{app: app, theme: theme}
 
 	s.window = qt6.NewQMainWindow2()
@@ -115,7 +116,7 @@ func newShell(app *application, theme designTheme) *shell {
 // keepTarget raises the minimum size of an interactive control to the token, so
 // a desktop theme that draws a smaller control still meets the target.
 func keepTarget(widget *qt6.QWidget) {
-	widget.SetMinimumSize2(targetMin, targetMin)
+	widget.SetMinimumSize2(design.TargetMin, design.TargetMin)
 }
 
 // show puts the window on screen and starts the streams that follow it.
@@ -174,8 +175,8 @@ func (s *shell) buildSidebar() {
 	s.sidebar.SetAccessibleName("Progetti")
 
 	layout := qt6.NewQVBoxLayout(s.sidebar)
-	layout.SetContentsMargins(spaceL, spaceL, spaceM, spaceM)
-	layout.SetSpacing(spaceS)
+	layout.SetContentsMargins(design.SpaceL, design.SpaceL, design.SpaceM, design.SpaceM)
+	layout.SetSpacing(design.SpaceS)
 
 	title := qt6.NewQLabel3("Progetti")
 	setObjectName(title.QWidget, "sidebarTitle")
@@ -190,7 +191,7 @@ func (s *shell) buildSidebar() {
 	layout.AddWidget2(s.list.widget.QWidget, 1)
 
 	actions := qt6.NewQHBoxLayout2()
-	actions.SetSpacing(spaceS)
+	actions.SetSpacing(design.SpaceS)
 
 	s.add = qt6.NewQPushButton3("Aggiungi progetto")
 	s.add.SetAccessibleName("Aggiungi progetto")
@@ -343,7 +344,7 @@ func (s *shell) buildPages() {
 
 	s.narrowDetailPage = qt6.NewQWidget2()
 	s.narrowDetailLayout = qt6.NewQVBoxLayout(s.narrowDetailPage)
-	s.narrowDetailLayout.SetContentsMargins(spaceS, spaceS, spaceS, 0)
+	s.narrowDetailLayout.SetContentsMargins(design.SpaceS, design.SpaceS, design.SpaceS, 0)
 	s.narrowDetailLayout.SetSpacing(0)
 	// The way back sits above the detail and never moves: only the column of the
 	// detail and of the panel passes from the splitter to this page. It keeps

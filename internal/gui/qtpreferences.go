@@ -4,6 +4,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 	"github.com/mappu/miqt/qt6/mainthread"
 
+	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/settings"
 )
 
@@ -59,8 +60,8 @@ func newPreferencesDialog(parent *qt6.QWidget, prefs settings.Settings, tray boo
 	d.dialog.SetMaximumWidth(preferencesMaxWidth)
 
 	layout := qt6.NewQVBoxLayout(d.dialog.QWidget)
-	layout.SetContentsMargins(spaceL, spaceL, spaceL, spaceL)
-	layout.SetSpacing(spaceL)
+	layout.SetContentsMargins(design.SpaceL, design.SpaceL, design.SpaceL, design.SpaceL)
+	layout.SetSpacing(design.SpaceL)
 
 	title := detailLabel(preferencesTitle, "dialogTitle")
 	layout.AddWidget(title.QWidget)
@@ -104,8 +105,8 @@ func (d *preferencesDialog) closeGroup(tray bool, shown settings.CloseBehavior) 
 	setObjectName(group.QWidget, "preferencesGroup")
 
 	box := qt6.NewQVBoxLayout(group.QWidget)
-	box.SetContentsMargins(spaceM, spaceM, spaceM, spaceM)
-	box.SetSpacing(spaceS)
+	box.SetContentsMargins(design.SpaceM, design.SpaceM, design.SpaceM, design.SpaceM)
+	box.SetSpacing(design.SpaceS)
 
 	box.AddWidget(detailLabel(closeBehaviorGroupHint, "").QWidget)
 	if !tray {
@@ -146,8 +147,8 @@ func (d *preferencesDialog) terminalGroup(command string) *qt6.QWidget {
 	setObjectName(group.QWidget, "preferencesGroup")
 
 	box := qt6.NewQVBoxLayout(group.QWidget)
-	box.SetContentsMargins(spaceM, spaceM, spaceM, spaceM)
-	box.SetSpacing(spaceS)
+	box.SetContentsMargins(design.SpaceM, design.SpaceM, design.SpaceM, design.SpaceM)
+	box.SetSpacing(design.SpaceS)
 
 	box.AddWidget(detailLabel(terminalGroupHint, "").QWidget)
 

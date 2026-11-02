@@ -8,6 +8,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 )
 
 // The texts of the panel. They live with the widgets, so the tickets that wire
@@ -47,7 +48,7 @@ type panelControl struct {
 // commands and the entry that takes a Project off the list reach the desktop and
 // the Manager through the callbacks the shell supplies.
 type detailPanel struct {
-	theme designTheme
+	theme design.DesignTheme
 
 	// widget is what the shell puts in the splitter and in the narrow page. It
 	// holds the invitation and the detail, one at a time.
@@ -127,15 +128,15 @@ type detailPanel struct {
 
 // newDetailPanel builds the panel at rest: the invitation to choose a Project,
 // and the scroll area that will hold the detail.
-func newDetailPanel(theme designTheme) *detailPanel {
+func newDetailPanel(theme design.DesignTheme) *detailPanel {
 	p := &detailPanel{theme: theme, machineLoading: true}
 
 	p.invite = newDetailInvite()
 
 	p.content = qt6.NewQWidget2()
 	p.layout = qt6.NewQVBoxLayout(p.content)
-	p.layout.SetContentsMargins(spaceL, spaceL, spaceL, spaceL)
-	p.layout.SetSpacing(spaceL)
+	p.layout.SetContentsMargins(design.SpaceL, design.SpaceL, design.SpaceL, design.SpaceL)
+	p.layout.SetSpacing(design.SpaceL)
 
 	p.scroll = qt6.NewQScrollArea2()
 	p.scroll.SetWidgetResizable(true)
@@ -184,7 +185,7 @@ func newDetailInvite() *qt6.QWidget {
 
 	layout := qt6.NewQVBoxLayout(invite)
 	layout.SetContentsMargins(0, 0, 0, 0)
-	layout.SetSpacing(spaceS)
+	layout.SetSpacing(design.SpaceS)
 	layout.AddStretch()
 
 	title := qt6.NewQLabel3("Scegli un Progetto")
@@ -400,10 +401,10 @@ func (p *detailPanel) header() *qt6.QWidget {
 	}
 
 	line := qt6.NewQHBoxLayout2()
-	line.SetSpacing(spaceXS)
+	line.SetSpacing(design.SpaceXS)
 
 	status := StatusOf(project.Status)
-	role := stateRole(status.CSSClass)
+	role := design.StateRole(status.CSSClass)
 
 	marker := detailLabel(status.Glyph, role)
 	marker.SetMinimumWidth(14)
@@ -436,7 +437,7 @@ func (p *detailPanel) header() *qt6.QWidget {
 	// The logs of the whole Project sit under the head, where the old view put
 	// them: one press opens the panel on the tab of the logs.
 	row := qt6.NewQHBoxLayout2()
-	row.SetSpacing(spaceS)
+	row.SetSpacing(design.SpaceS)
 	logs := detailButton(showLogsText, "logButton", "Mostra i log del Progetto.", true)
 	logs.OnClicked(func() {
 		if p.onLogs != nil {
@@ -461,7 +462,7 @@ func (p *detailPanel) data() *qt6.QWidget {
 	block.SetAccessibleName(dataTitle)
 
 	heading := qt6.NewQHBoxLayout2()
-	heading.SetSpacing(spaceS)
+	heading.SetSpacing(design.SpaceS)
 	heading.AddWidget3(detailLabel(dataTitle, "detailHeading").QWidget, 0, qt6.AlignVCenter)
 	heading.AddStretch()
 	edit := detailButton(editText, "editButton", "Modifica Nome visualizzato, Gruppo e Profili attivi.", true)
@@ -497,7 +498,7 @@ func (p *detailPanel) missing() *qt6.QWidget {
 	box.AddWidget(detailLabel(MissingComposeText, "missingComposeNotice").QWidget)
 
 	row := qt6.NewQHBoxLayout2()
-	row.SetSpacing(spaceS)
+	row.SetSpacing(design.SpaceS)
 	reason := RemoveDisabledReason(p.shown.project, p.shown.dockerReachable)
 	remove := detailButton(removeText, "removeButton", removeTooltip, CanRemoveFromList(p.shown.project, p.shown.dockerReachable))
 	setCommandReason(remove, reason)
@@ -522,7 +523,7 @@ func (p *detailPanel) actions() *qt6.QWidget {
 	reason := actionReasonText(p.shown.loading, p.shown.dockerReachable, project.Activity != nil)
 
 	row := qt6.NewQHBoxLayout2()
-	row.SetSpacing(spaceS)
+	row.SetSpacing(design.SpaceS)
 	for i, view := range ProjectActions(project, p.shown.dockerReachable) {
 		// The Action the state suggests comes first: it carries the role that
 		// makes it the one the eye finds, without a colour of its own.
@@ -560,7 +561,7 @@ func (p *detailPanel) commands() *qt6.QWidget {
 	folderView, terminalView, portView := CommandViews(project)
 
 	row := qt6.NewQHBoxLayout2()
-	row.SetSpacing(spaceS)
+	row.SetSpacing(design.SpaceS)
 
 	folder := detailButton(folderCommandText, "folderButton", folderTooltip, folderView.Enabled)
 	setCommandReason(folder, folderView.Reason)
@@ -641,7 +642,7 @@ func (p *detailPanel) services() *qt6.QWidget {
 	reason := actionReasonText(p.shown.loading, p.shown.dockerReachable, project.Activity != nil)
 
 	heading := qt6.NewQHBoxLayout2()
-	heading.SetSpacing(spaceS)
+	heading.SetSpacing(design.SpaceS)
 	heading.AddWidget3(detailLabel(servicesTitle, "detailHeading").QWidget, 0, qt6.AlignVCenter)
 	if count := len(project.Services); count > 0 {
 		number := detailLabel(strconv.Itoa(count), "detailCount")
@@ -687,7 +688,7 @@ func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidg
 	block.SetAccessibleName(service.Name)
 
 	line := qt6.NewQHBoxLayout2()
-	line.SetSpacing(spaceS)
+	line.SetSpacing(design.SpaceS)
 	line.AddWidget3(detailLabel(service.Name, "serviceName").QWidget, 0, qt6.AlignVCenter)
 	line.AddWidget3(detailLabel(ServiceStateLine(service), "serviceState").QWidget, 0, qt6.AlignVCenter)
 	line.AddStretch()
@@ -734,7 +735,7 @@ func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidg
 // rules of the Actions of the Project.
 func (p *detailPanel) serviceActions(service compose.Service, reason string) *qt6.QHBoxLayout {
 	row := qt6.NewQHBoxLayout2()
-	row.SetSpacing(spaceS)
+	row.SetSpacing(design.SpaceS)
 	for _, view := range ServiceActions(p.shown.project, service, p.shown.dockerReachable) {
 		button := detailButton(view.Label, "serviceActionButton", "", view.Enabled)
 		button.SetAccessibleName(view.Label + " di " + service.Name)
@@ -889,11 +890,11 @@ func newContainerRow(container compose.Container) *qt6.QWidget {
 	row := qt6.NewQWidget2()
 
 	line := qt6.NewQHBoxLayout(row)
-	line.SetContentsMargins(spaceXS, 0, 0, 0)
-	line.SetSpacing(spaceS)
+	line.SetContentsMargins(design.SpaceXS, 0, 0, 0)
+	line.SetSpacing(design.SpaceS)
 
 	tone := ToneOfContainer(container)
-	marker := detailLabel(tone.Glyph, stateRole(tone.CSSClass))
+	marker := detailLabel(tone.Glyph, design.StateRole(tone.CSSClass))
 	marker.SetMinimumWidth(14)
 	marker.SetAccessibleName(container.State)
 	line.AddWidget3(marker.QWidget, 0, qt6.AlignVCenter)
@@ -903,7 +904,7 @@ func newContainerRow(container compose.Container) *qt6.QWidget {
 
 	if health := HealthOf(container.Health); health.Text != "" {
 		label := detailLabel(health.Text, "containerHealth")
-		if role := stateRole(health.CSSClass); role != "" {
+		if role := design.StateRole(health.CSSClass); role != "" {
 			setObjectName(label.QWidget, role)
 		}
 		line.AddWidget3(label.QWidget, 0, qt6.AlignVCenter)
@@ -922,7 +923,7 @@ func detailBlock() (*qt6.QWidget, *qt6.QVBoxLayout) {
 	block := qt6.NewQWidget2()
 	box := qt6.NewQVBoxLayout(block)
 	box.SetContentsMargins(0, 0, 0, 0)
-	box.SetSpacing(spaceS)
+	box.SetSpacing(design.SpaceS)
 	return block, box
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/gui/guitest"
 	"dockercontroller/internal/settings"
 	"dockercontroller/internal/tray"
@@ -37,9 +38,9 @@ func TestShellOffscreen(t *testing.T) {
 	app := qt6.NewQApplication([]string{"docker-controller-ui-test"})
 	defer app.Delete()
 	qt6.QCoreApplication_SetApplicationName(appID)
-	app.SetStyleSheet(applicationStyleSheet(lightTheme))
+	app.SetStyleSheet(design.ApplicationStyleSheet(design.LightTheme))
 
-	s := newShell(&application{}, lightTheme)
+	s := newShell(&application{}, design.LightTheme)
 	defer s.window.Delete()
 
 	s.show()
@@ -1047,7 +1048,7 @@ func checkBottomPanel(t *testing.T) {
 	t.Helper()
 
 	log := NewActivityLog()
-	s := newShell(&application{activities: log}, lightTheme)
+	s := newShell(&application{activities: log}, design.LightTheme)
 	defer s.window.Delete()
 	s.show()
 	settle()
@@ -1222,7 +1223,7 @@ func checkLogs(t *testing.T) {
 	t.Helper()
 
 	log := NewActivityLog()
-	s := newShell(&application{activities: log}, lightTheme)
+	s := newShell(&application{activities: log}, design.LightTheme)
 	defer s.window.Delete()
 	s.show()
 	settle()
@@ -1300,7 +1301,7 @@ func checkLogs(t *testing.T) {
 
 	// The format of a Service comes from the role of the palette.
 	hue := ServiceHue("web")
-	if got, want := s.bottom.logs.formats.service[hue].Foreground().Color().Name(), ServiceColor(hue, lightTheme); got != want {
+	if got, want := s.bottom.logs.formats.service[hue].Foreground().Color().Name(), design.ServiceColor(hue, design.LightTheme); got != want {
 		t.Errorf("the colour of the name %q is %s, want %s", "web", got, want)
 	}
 
@@ -1557,8 +1558,8 @@ func checkUsage(t *testing.T, s *shell) {
 	if got := s.panel.strip.message.Text(); got != unreachableUsageText {
 		t.Errorf("the bar says %q with Docker unreachable, want %q", got, unreachableUsageText)
 	}
-	if got := s.panel.strip.message.ObjectName(); got != roleStatusFault {
-		t.Errorf("the warning carries the role %q, want %q", got, roleStatusFault)
+	if got := s.panel.strip.message.ObjectName(); got != design.RoleStatusFault {
+		t.Errorf("the warning carries the role %q, want %q", got, design.RoleStatusFault)
 	}
 	if s.panel.strip.body.CurrentWidget().UnsafePointer() != s.panel.strip.message.QWidget.UnsafePointer() {
 		t.Error("the bar shows figures while Docker does not answer")
@@ -1832,16 +1833,16 @@ func checkMinimumTargets(t *testing.T, window *qt6.QMainWindow) {
 		hint, minimum := widget.SizeHint(), widget.MinimumSizeHint()
 		width := max(hint.Width(), minimum.Width())
 		height := max(hint.Height(), minimum.Height())
-		if width < targetMin || height < targetMin {
+		if width < design.TargetMin || height < design.TargetMin {
 			t.Errorf("control %q: target %dx%d, want at least %dx%d",
-				widget.ObjectName(), width, height, targetMin, targetMin)
+				widget.ObjectName(), width, height, design.TargetMin, design.TargetMin)
 		}
 		checked++
 	}
 	if checked == 0 {
 		t.Fatal("no interactive control found: the wiring is broken")
 	}
-	t.Logf("checked %d interactive controls against the %d px target", checked, targetMin)
+	t.Logf("checked %d interactive controls against the %d px target", checked, design.TargetMin)
 }
 
 // captureScreens writes the PNGs of the main states of the window, so a change
@@ -1854,7 +1855,7 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 		t.Fatalf("create %q: %v", dir, err)
 	}
 
-	s := newShell(&application{}, lightTheme)
+	s := newShell(&application{}, design.LightTheme)
 	defer s.window.Delete()
 	s.show()
 	settle()
@@ -1969,15 +1970,15 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 
 	// The panel of the Activities: one that runs, one that worked, and one that
 	// failed with the notice that leads to its output.
-	captureActivities(t, dir, lightTheme, "13-activities-light")
+	captureActivities(t, dir, design.LightTheme, "13-activities-light")
 	// The tab of the logs, with more Services and a message of compose itself.
-	captureLogs(t, dir, lightTheme, "16-log-light")
+	captureLogs(t, dir, design.LightTheme, "16-log-light")
 
 	// The dark desktop: the same blocks with the palette of Breeze Dark, so a
 	// role that reads on white and disappears on black shows here.
 	qt6.QApplication_SetPalette(testDarkPalette())
-	app.SetStyleSheet(applicationStyleSheet(darkTheme))
-	dark := newShell(&application{}, darkTheme)
+	app.SetStyleSheet(design.ApplicationStyleSheet(design.DarkTheme))
+	dark := newShell(&application{}, design.DarkTheme)
 	defer dark.window.Delete()
 	dark.show()
 	settle()
@@ -2000,14 +2001,14 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	darkPrefs := settings.Settings{CloseBehavior: settings.CloseAsk, TerminalCommand: "alacritty --working-directory {dir}"}
 	capturePreferences(t, dark.window.QWidget, dir, "24-preferences-dark", darkPrefs, false, false)
 	captureCloseQuestion(t, dark.window.QWidget, dir, "25-close-dark", false)
-	captureActivities(t, dir, darkTheme, "15-activities-dark")
-	captureLogs(t, dir, darkTheme, "17-log-dark")
+	captureActivities(t, dir, design.DarkTheme, "15-activities-dark")
+	captureLogs(t, dir, design.DarkTheme, "17-log-dark")
 }
 
 // captureActivities writes the PNGs of the panel of the Activities in one
 // theme: an Activity that runs with its output growing, one that worked, and
 // one that failed with the notice over the window.
-func captureActivities(t *testing.T, dir string, theme designTheme, name string) {
+func captureActivities(t *testing.T, dir string, theme design.DesignTheme, name string) {
 	t.Helper()
 
 	log := NewActivityLog()
@@ -2048,7 +2049,7 @@ func captureActivities(t *testing.T, dir string, theme designTheme, name string)
 
 // captureLogs writes the PNG of the Log tab in one theme: several Services,
 // the clock of each line and a message of compose itself.
-func captureLogs(t *testing.T, dir string, theme designTheme, name string) {
+func captureLogs(t *testing.T, dir string, theme design.DesignTheme, name string) {
 	t.Helper()
 
 	log := NewActivityLog()
@@ -2331,7 +2332,7 @@ func checkHiddenWindow(t *testing.T) {
 		prefs:      settings.Settings{CloseBehavior: settings.CloseHide, TerminalCommand: settings.DefaultTerminalCommand},
 		tray:       &trayAdapter{},
 	}
-	s := newShell(app, lightTheme)
+	s := newShell(app, design.LightTheme)
 	app.shell = s
 	defer s.window.Delete()
 	s.show()
@@ -2426,7 +2427,7 @@ func checkQuit(t *testing.T) {
 
 	log := NewActivityLog()
 	app := &application{activities: log, prefs: settings.Defaults()}
-	s := newShell(app, lightTheme)
+	s := newShell(app, design.LightTheme)
 	app.shell = s
 	defer s.window.Delete()
 	s.show()

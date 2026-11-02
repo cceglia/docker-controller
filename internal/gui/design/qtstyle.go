@@ -1,4 +1,4 @@
-package gui
+package design
 
 import "fmt"
 
@@ -16,7 +16,7 @@ import "fmt"
 // and 20 px for the title of the detail. Secondary text keeps the body size and
 // the colour of the theme: a smaller size would break the minimum of 16 px, and
 // a muted role does not guarantee the contrast a text needs.
-func applicationStyleSheet(theme designTheme) string {
+func ApplicationStyleSheet(theme DesignTheme) string {
 	return fmt.Sprintf(`
 QLabel#sidebarTitle {
     font-size: %dpx;
@@ -146,9 +146,9 @@ QWidget#projectRowSelected QLabel {
     color: palette(highlighted-text);
 }
 `,
-		headingFontSize, spaceS,
-		headingFontSize, spaceM, spaceM, spaceXS, spaceM,
-		spaceM,
+		headingFontSize, SpaceS,
+		headingFontSize, SpaceM, SpaceM, SpaceXS, SpaceM,
+		SpaceM,
 		bodyFontSize,
 		bodyFontSize,
 		bodyFontSize,
@@ -156,18 +156,18 @@ QWidget#projectRowSelected QLabel {
 		titleFontSize,
 		headingFontSize,
 		headingFontSize,
-		spaceXS,
-		spaceS, spaceM,
-		spaceS, spaceS,
-		spaceS, spaceS,
-		spaceS,
-		spaceS, spaceS, spaceS,
-		theme.color(roleStatusFault),
-		spaceXS,
-		theme.color(roleStatusActive),
-		theme.color(roleStatusPartial),
-		theme.color(roleStatusFault),
-		theme.color(roleStatusFault),
-		spaceS,
+		SpaceXS,
+		SpaceS, SpaceM,
+		SpaceS, SpaceS,
+		SpaceS, SpaceS,
+		SpaceS,
+		SpaceS, SpaceS, SpaceS,
+		theme.Color(RoleStatusFault),
+		SpaceXS,
+		theme.Color(roleStatusActive),
+		theme.Color(roleStatusPartial),
+		theme.Color(RoleStatusFault),
+		theme.Color(RoleStatusFault),
+		SpaceS,
 	)
 }

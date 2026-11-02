@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 )
 
 // LogLineLimit is the most lines the Log page keeps; the oldest go first.
@@ -100,7 +101,7 @@ func ServiceHue(service string) int {
 	for _, r := range service {
 		h = h*31 + uint32(r)
 	}
-	return int(h % ServiceHues)
+	return int(h % design.ServiceHues)
 }
 
 // ServiceTag is the name of the buffer tag of the colour of a Service.
@@ -111,16 +112,6 @@ func ServiceTag(service string) string {
 // serviceTag is the name of the buffer tag of one palette entry.
 func serviceTag(hue int) string {
 	return serviceTagPrefix + strconv.Itoa(hue)
-}
-
-// ServiceColor is the colour of one palette entry in the theme, as "#rrggbb".
-// The colours live with the other design tokens, so the token test checks
-// them. An entry outside the palette has no colour.
-func ServiceColor(hue int, theme designTheme) string {
-	if hue < 0 || hue >= ServiceHues {
-		return ""
-	}
-	return theme.color(serviceRole(hue))
 }
 
 // LogTargetText is the target the Log page names: the Display name of the

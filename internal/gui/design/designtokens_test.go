@@ -1,4 +1,4 @@
-package gui
+package design
 
 import (
 	"math"
@@ -84,7 +84,7 @@ func TestServiceColoursComeFromTheRoles(t *testing.T) {
 
 	t.Run("an entry outside the palette has no colour", func(t *testing.T) {
 		for _, hue := range []int{-1, ServiceHues} {
-			if got := ServiceColor(hue, lightTheme); got != "" {
+			if got := ServiceColor(hue, LightTheme); got != "" {
 				t.Errorf("ServiceColor(%d) = %q, want no colour", hue, got)
 			}
 		}
@@ -92,7 +92,7 @@ func TestServiceColoursComeFromTheRoles(t *testing.T) {
 
 	t.Run("the two themes differ on every entry", func(t *testing.T) {
 		for hue := 0; hue < ServiceHues; hue++ {
-			if ServiceColor(hue, lightTheme) == ServiceColor(hue, darkTheme) {
+			if ServiceColor(hue, LightTheme) == ServiceColor(hue, DarkTheme) {
 				t.Errorf("hue %d is the same colour on both themes", hue)
 			}
 		}
@@ -115,7 +115,7 @@ func TestServiceColoursComeFromTheRoles(t *testing.T) {
 func TestStyleSheetColoursComeFromTheRoles(t *testing.T) {
 	for _, theme := range themes {
 		t.Run(theme.name, func(t *testing.T) {
-			sheet := applicationStyleSheet(theme)
+			sheet := ApplicationStyleSheet(theme)
 			found := hexColorPattern.FindAllString(sheet, -1)
 			if len(found) == 0 {
 				t.Fatal("the style sheet declares no colour: the sheet is not built from the tokens")
@@ -156,7 +156,7 @@ func TestTypeScale(t *testing.T) {
 	for _, theme := range themes {
 		chooser := theme
 		t.Run("sheet/"+chooser.name, func(t *testing.T) {
-			sizes := fontSizePattern.FindAllStringSubmatch(applicationStyleSheet(chooser), -1)
+			sizes := fontSizePattern.FindAllStringSubmatch(ApplicationStyleSheet(chooser), -1)
 			if len(sizes) == 0 {
 				t.Fatal("the style sheet declares no font size")
 			}
@@ -184,7 +184,7 @@ func TestStyleSheetPaddingComesFromTheSpacingScale(t *testing.T) {
 	for _, theme := range themes {
 		chooser := theme
 		t.Run(chooser.name, func(t *testing.T) {
-			paddings := paddingPattern.FindAllStringSubmatch(applicationStyleSheet(chooser), -1)
+			paddings := paddingPattern.FindAllStringSubmatch(ApplicationStyleSheet(chooser), -1)
 			if len(paddings) == 0 {
 				t.Fatal("the style sheet declares no padding")
 			}
@@ -207,16 +207,16 @@ func TestThemeForLightness(t *testing.T) {
 	tests := []struct {
 		name      string
 		lightness int
-		want      designTheme
+		want      DesignTheme
 	}{
-		{name: "light surface", lightness: 255, want: lightTheme},
-		{name: "dark surface", lightness: 0, want: darkTheme},
-		{name: "middle reads as light", lightness: 128, want: lightTheme},
+		{name: "light surface", lightness: 255, want: LightTheme},
+		{name: "dark surface", lightness: 0, want: DarkTheme},
+		{name: "middle reads as light", lightness: 128, want: LightTheme},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := themeForLightness(tt.lightness); got.name != tt.want.name {
-				t.Errorf("themeForLightness(%d) = %q, want %q", tt.lightness, got.name, tt.want.name)
+			if got := ThemeForLightness(tt.lightness); got.name != tt.want.name {
+				t.Errorf("ThemeForLightness(%d) = %q, want %q", tt.lightness, got.name, tt.want.name)
 			}
 		})
 	}
@@ -227,7 +227,7 @@ func TestThemeForLightness(t *testing.T) {
 // must draw them back.
 func TestPrimaryActionShowsItsStates(t *testing.T) {
 	for _, theme := range themes {
-		sheet := applicationStyleSheet(theme)
+		sheet := ApplicationStyleSheet(theme)
 		for _, state := range []string{
 			"QPushButton#primaryAction:hover",
 			"QPushButton#primaryAction:focus",
@@ -238,4 +238,42 @@ func TestPrimaryActionShowsItsStates(t *testing.T) {
 			}
 		}
 	}
+}
+
+// isHexColor reports whether color is a "#rrggbb" colour.
+func isHexColor(color string) bool {
+	if len(color) != 7 || color[0] != '#' {
+		return false
+	}
+	for _, c := range color[1:] {
+		if !strings.ContainsRune("0123456789abcdef", c) {
+			return false
+		}
+	}
+	return true
+}
+
+// contrastRatio is the WCAG contrast between two "#rrggbb" colours.
+func contrastRatio(a, b string) float64 {
+	la, lb := relativeLuminance(a), relativeLuminance(b)
+	if la < lb {
+		la, lb = lb, la
+	}
+	return (la + 0.05) / (lb + 0.05)
+}
+
+// relativeLuminance is the WCAG relative luminance of a "#rrggbb" colour.
+func relativeLuminance(color string) float64 {
+	channel := func(i int) float64 {
+		v, err := strconv.ParseUint(color[1+i*2:3+i*2], 16, 8)
+		if err != nil {
+			panic(err)
+		}
+		c := float64(v) / 255
+		if c <= 0.03928 {
+			return c / 12.92
+		}
+		return math.Pow((c+0.055)/1.055, 2.4)
+	}
+	return 0.2126*channel(0) + 0.7152*channel(1) + 0.0722*channel(2)
 }

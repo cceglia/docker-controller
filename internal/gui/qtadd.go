@@ -6,6 +6,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/design"
 )
 
 // The texts of the form of a new Project and of its picker.
@@ -88,8 +89,8 @@ func newAddDialog(parent *qt6.QWidget, form AddProjectForm, onSubmit func(string
 	d.dialog.SetMaximumWidth(addDialogMaxWidth)
 
 	layout := qt6.NewQVBoxLayout(d.dialog.QWidget)
-	layout.SetContentsMargins(spaceL, spaceL, spaceL, spaceL)
-	layout.SetSpacing(spaceM)
+	layout.SetContentsMargins(design.SpaceL, design.SpaceL, design.SpaceL, design.SpaceL)
+	layout.SetSpacing(design.SpaceM)
 
 	title := detailLabel(addProjectTitle, "dialogTitle")
 	layout.AddWidget(title.QWidget)
@@ -98,13 +99,13 @@ func newAddDialog(parent *qt6.QWidget, form AddProjectForm, onSubmit func(string
 	files := qt6.NewQWidget2()
 	box := qt6.NewQVBoxLayout(files)
 	box.SetContentsMargins(0, 0, 0, 0)
-	box.SetSpacing(spaceXS)
+	box.SetSpacing(design.SpaceXS)
 	box.AddWidget(detailLabel(addFilesTitle, "detailHeading").QWidget)
 
 	d.list = qt6.NewQWidget2()
 	rows := qt6.NewQVBoxLayout(d.list)
 	rows.SetContentsMargins(0, 0, 0, 0)
-	rows.SetSpacing(spaceXS)
+	rows.SetSpacing(design.SpaceXS)
 	box.AddWidget(d.list)
 
 	d.pick = detailButton(pickFirstFileText, "pickFilesButton", "Scegli uno o più File compose.", true)
@@ -117,7 +118,7 @@ func newAddDialog(parent *qt6.QWidget, form AddProjectForm, onSubmit func(string
 	field := qt6.NewQWidget2()
 	fieldBox := qt6.NewQVBoxLayout(field)
 	fieldBox.SetContentsMargins(0, 0, 0, 0)
-	fieldBox.SetSpacing(spaceXS)
+	fieldBox.SetSpacing(design.SpaceXS)
 
 	caption := detailLabel(addNameLabelText, "fieldLabel")
 	d.name = qt6.NewQLineEdit2()
@@ -241,7 +242,7 @@ func (d *addDialog) fileRow(index int, file string) *qt6.QWidget {
 
 	line := qt6.NewQHBoxLayout(row)
 	line.SetContentsMargins(0, 0, 0, 0)
-	line.SetSpacing(spaceS)
+	line.SetSpacing(design.SpaceS)
 
 	name := detailLabel(filepath.Base(file), "fileComposeName")
 	name.SetToolTip(file)
