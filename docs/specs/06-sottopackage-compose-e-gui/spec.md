@@ -130,10 +130,10 @@ sono coperti solo attraverso `Manager` ricevono test di package.
 
 **Compose.** Il package radice resta il punto di composizione e conserva `Manager`, `Config`, `New`, `Snapshot`, `Watch`, `Refresh`, `Run`, `Do`, `Logs`, `Usage`, `AddProject`, `RemoveFromList`, `UpdateSettings` e la cache dei Profili. I metodi non diventano componenti separati: sono metodi su `*Manager`, e spostarli richiederebbe un ridisegno del modulo senza un guadagno di profondità.
 
-- `model`: tipi di dominio (`Project`, `Service`, `Container`, `Port`, `Snapshot`, `Status`, `ActionKind`, `ActivityID`, `ActivityRef`, `Settings`, `Discovered`, `LogRequest`, `LogLine`), helper puri (`StatusOf`, `Folder`) e sentinelle usate dai sottopackage.
+- `model`: tipi di dominio (`Project`, `Service`, `Container`, `Port`, `Snapshot`, `Status`, `ActionKind`, `ActivityID`, `ActivityRef`, `Settings`, `Discovered`, `LogRequest`, `LogLine`, `Measures`), helper puri (`StatusOf`, `Folder`) e sentinelle usate dai sottopackage.
 - `docker`: la porta `Docker`, l'adattatore `ExecDocker` e il doppio di test sotto `fake`.
 - `store`: la persistenza, con `Store` e `New` esportati, i metodi `UpsertDiscovered`, `Add`, `UpdateSettings`, `List` e `Remove`, e il database ricevuto dal chiamante.
-- `parse`: le funzioni pure che leggono l'output della CLI (elenco Progetti, stato Container, Log, Utilizzo risorse, Profili, dimensione macchina), con i tipi di appoggio del parsing (`Machine`, `StatsRow`) accanto a loro.
+- `parse`: le funzioni pure che leggono l'output della CLI (elenco Progetti, stato Container, Log, Utilizzo risorse, Profili, dimensione macchina), con i tipi di appoggio del parsing (`Machine`, `StatsRow`, `ContainerRow`) e il raggruppamento delle righe di `docker stats` accanto a loro.
 
 La radice riesporta con alias solo la superficie usata fuori da compose (gui, tray, main) e nelle firme di `Manager`. Dentro compose i sottopackage parlano direttamente `model.*`. La direzione delle dipendenze è `model` ← `docker`/`store`/`parse` ← radice; nessun sottopackage importa la radice.
 

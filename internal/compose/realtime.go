@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose/model"
+	"dockercontroller/internal/compose/parse"
 )
 
 const (
@@ -137,9 +138,9 @@ func (m *Manager) refreshProject(ctx context.Context, name string) error {
 	defer m.refreshMu.Unlock()
 
 	out, err := m.docker.Run(ctx, "compose", "-p", name, "ps", "-a", "--format", "json")
-	var cs []psContainer
+	var cs []parse.ContainerRow
 	if err == nil {
-		cs, err = parsePs(out)
+		cs, err = parse.Ps(out)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
@@ -155,10 +156,10 @@ func (m *Manager) refreshProject(ctx context.Context, name string) error {
 		return nil
 	}
 	projects := append([]Project(nil), base.Projects...)
-	running := runningCount(cs)
+	running := parse.RunningCount(cs)
 	projects[idx].Running, projects[idx].Total = running, len(cs)
 	projects[idx].Status = model.StatusOf(running, len(cs))
-	projects[idx].Services = groupByService(cs)
+	projects[idx].Services = parse.GroupByService(cs)
 	projects[idx].ComposeMissing = composeMissing(projects[idx].ComposeFiles)
 	m.publish(Snapshot{DockerReachable: true, Projects: projects})
 	return nil

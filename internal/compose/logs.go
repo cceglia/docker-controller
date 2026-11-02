@@ -3,11 +3,10 @@ package compose
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
-	"time"
 
 	"dockercontroller/internal/compose/model"
+	"dockercontroller/internal/compose/parse"
 )
 
 // logTail is how many past lines a log stream starts with before following.
@@ -54,7 +53,7 @@ func (m *Manager) Logs(ctx context.Context, req LogRequest, onLine func(LogLine)
 			onLine(LogLine{Text: line, Stderr: true})
 			return
 		}
-		onLine(parseLogLine(line, owners))
+		onLine(parse.LogLine(line, owners))
 	})
 	if ctx.Err() != nil {
 		return nil
@@ -76,7 +75,7 @@ func (m *Manager) project(name string) (Project, bool) {
 
 // logOwners maps what compose can print as a line prefix to a Service: the
 // name of a Container (when it was given its own name) or the Service itself.
-// The usual prefix, "<service>-<replica>", is resolved by parseLogLine.
+// The usual prefix, "<service>-<replica>", is resolved by parse.LogLine.
 func logOwners(p Project) map[string]string {
 	owners := map[string]string{}
 	for _, s := range p.Services {
@@ -86,55 +85,4 @@ func logOwners(p Project) map[string]string {
 		}
 	}
 	return owners
-}
-
-// ansi matches the terminal escape sequences Containers write for colours.
-var ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
-
-// parseLogLine splits "<prefix> | <timestamp> <text>".
-func parseLogLine(line string, owners map[string]string) LogLine {
-	prefix, rest, found := strings.Cut(line, " | ")
-	prefix = strings.TrimRight(prefix, " ")
-	if !found || prefix == "" || strings.ContainsAny(prefix, " \t") {
-		return LogLine{Text: ansi.ReplaceAllString(line, "")}
-	}
-	out := LogLine{Service: serviceOf(prefix, owners), Text: rest}
-	ts, text, hasText := strings.Cut(rest, " ")
-	if _, err := time.Parse(time.RFC3339Nano, ts); err == nil {
-		out.Timestamp = ts
-		out.Text = ""
-		if hasText {
-			out.Text = text
-		}
-	}
-	out.Text = ansi.ReplaceAllString(out.Text, "")
-	return out
-}
-
-// serviceOf resolves a compose line prefix to a Service name.
-func serviceOf(prefix string, owners map[string]string) string {
-	if s, ok := owners[prefix]; ok {
-		return s
-	}
-	if i := strings.LastIndexByte(prefix, '-'); i > 0 && isNumber(prefix[i+1:]) {
-		if s, ok := owners[prefix[:i]]; ok {
-			return s
-		}
-		// A Service of a Project Docker no longer shows: the replica number
-		// is not part of its name.
-		return prefix[:i]
-	}
-	return prefix
-}
-
-func isNumber(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
 }

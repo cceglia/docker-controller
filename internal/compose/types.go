@@ -11,6 +11,7 @@ type (
 	Port      = model.Port
 	Snapshot  = model.Snapshot
 	Status    = model.Status
+	Measures  = model.Measures
 )
 
 const (

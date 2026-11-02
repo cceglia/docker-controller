@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
+
+	"dockercontroller/internal/compose/parse"
 )
 
 // profileCache is what `config --profiles` said for one Project, valid while
@@ -34,7 +35,7 @@ func (m *Manager) availableProfiles(ctx context.Context, p Project) []string {
 	if ctx.Err() != nil {
 		return orEmpty(prev.names) // interrupted: say nothing new, try again later
 	}
-	names := parseProfiles(out)
+	names := parse.Profiles(out)
 	if err != nil {
 		// compose cannot read the files (invalid YAML, say): that does not
 		// change until they do, so remember it instead of failing again at
@@ -65,17 +66,4 @@ func filesSignature(p Project) string {
 		}
 	}
 	return b.String()
-}
-
-// parseProfiles parses the output of `compose config --profiles`: one name per
-// line. The result is sorted and never nil.
-func parseProfiles(out []byte) []string {
-	names := []string{}
-	for _, line := range strings.Split(string(out), "\n") {
-		if line = strings.TrimSpace(line); line != "" {
-			names = append(names, line)
-		}
-	}
-	sort.Strings(names)
-	return names
 }

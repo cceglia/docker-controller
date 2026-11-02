@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose/model"
+	"dockercontroller/internal/compose/parse"
 	"dockercontroller/internal/compose/store"
 )
 
@@ -150,7 +151,7 @@ func (m *Manager) build(ctx context.Context) (Snapshot, error) {
 		}
 		return m.unreachable(ctx)
 	}
-	found, err := parseLs(out)
+	found, err := parse.Ls(out)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -165,11 +166,11 @@ func (m *Manager) build(ctx context.Context) (Snapshot, error) {
 		if err != nil {
 			return Snapshot{}, fmt.Errorf("compose: ps %s: %w", d.Name, err)
 		}
-		cs, err := parsePs(psOut)
+		cs, err := parse.Ps(psOut)
 		if err != nil {
 			return Snapshot{}, err
 		}
-		seen[d.Name] = observed{running: runningCount(cs), total: len(cs), services: groupByService(cs)}
+		seen[d.Name] = observed{running: parse.RunningCount(cs), total: len(cs), services: parse.GroupByService(cs)}
 		if err := m.store.UpsertDiscovered(ctx, d); err != nil {
 			return Snapshot{}, err
 		}

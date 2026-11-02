@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"dockercontroller/internal/compose/model"
+	"dockercontroller/internal/compose/parse"
 )
 
 // The sentinel errors live in model; the root re-exports them for gui, tray
@@ -42,7 +43,7 @@ func (m *Manager) RemoveFromList(ctx context.Context, name string) error {
 		}
 		return fmt.Errorf("%w: cannot tell whether %s has Containers: %v", ErrDockerUnreachable, name, err)
 	}
-	containers, err := parsePs(out)
+	containers, err := parse.Ps(out)
 	if err != nil {
 		return err
 	}
