@@ -1,4 +1,4 @@
-package gui
+package usage
 
 import (
 	"math"
@@ -69,8 +69,8 @@ func TestMeterValue_StepsOfTenthsOfAPercent(t *testing.T) {
 		{"not a number", math.NaN(), 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := meterValue(tc.percent); got != tc.want {
-				t.Errorf("meterValue(%v) = %d, want %d", tc.percent, got, tc.want)
+			if got := MeterValue(tc.percent); got != tc.want {
+				t.Errorf("MeterValue(%v) = %d, want %d", tc.percent, got, tc.want)
 			}
 		})
 	}

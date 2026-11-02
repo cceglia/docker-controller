@@ -1,4 +1,4 @@
-package gui
+package usage
 
 import (
 	"context"
@@ -49,11 +49,11 @@ func idleSource(starts chan<- struct{}) UsageSource {
 }
 
 // testFeed builds a feed that ends with the test.
-func testFeed(t *testing.T, source UsageSource, dispatch func(func())) *usageFeed {
+func testFeed(t *testing.T, source UsageSource, dispatch func(func())) *UsageFeed {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	return newUsageFeed(ctx, source, dispatch)
+	return NewUsageFeed(ctx, source, dispatch)
 }
 
 func TestUsageFeed_WithoutDockerThereIsNoStream(t *testing.T) {

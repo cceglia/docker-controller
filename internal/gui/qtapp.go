@@ -10,6 +10,7 @@ import (
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/gui/logs"
+	"dockercontroller/internal/gui/usage"
 	"dockercontroller/internal/settings"
 )
 
@@ -140,7 +141,7 @@ func (a *application) logSource() logs.LogSource {
 // usageSource is the stream the detail opens for the Utilizzo risorse. A
 // Manager that is not wired yet leaves it with no source, so no `docker stats`
 // starts and the window still builds.
-func (a *application) usageSource() UsageSource {
+func (a *application) usageSource() usage.UsageSource {
 	if a.manager == nil {
 		return nil
 	}

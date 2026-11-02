@@ -1,14 +1,14 @@
-package gui
+package usage
 
 import "dockercontroller/internal/compose"
 
 const (
-	// waitingUsageText is the line before the first sample arrives.
-	waitingUsageText = "In attesa della prima misura…"
-	// unreachableUsageText is the warning that takes the place of the figures.
-	unreachableUsageText = "Docker non raggiungibile"
-	// usageTitle names the figures: they are the machine's, not the Project's.
-	usageTitle = "Utilizzo risorse"
+	// WaitingText is the line before the first sample arrives.
+	WaitingText = "In attesa della prima misura…"
+	// UnreachableText is the warning that takes the place of the figures.
+	UnreachableText = "Docker non raggiungibile"
+	// Title names the figures: they are the machine's, not the Project's.
+	Title = "Utilizzo risorse"
 )
 
 // UsageState is what a Service block shows for the Utilizzo risorse.

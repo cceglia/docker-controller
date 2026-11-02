@@ -6,6 +6,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/usage"
 	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/tray"
 )
@@ -46,7 +47,7 @@ type shell struct {
 	bottom *bottomPanel
 	// usage runs the stream of the Utilizzo risorse: the figures of the machine,
 	// the same for every Project.
-	usage    *usageFeed
+	usage    *usage.UsageFeed
 	add      *qt6.QPushButton
 	settings *qt6.QPushButton
 	back     *qt6.QPushButton
@@ -230,7 +231,7 @@ func (s *shell) buildDetail() {
 	s.detail = s.panel.widget
 	// The figures of the machine reach the panel on the Qt thread, and only
 	// while the Project on screen has a Container to measure.
-	s.usage = newUsageFeed(s.app.ctx, s.app.usageSource(), mainthread.Start)
+	s.usage = usage.NewUsageFeed(s.app.ctx, s.app.usageSource(), mainthread.Start)
 	s.usage.OnSample = s.panel.setUsage
 }
 

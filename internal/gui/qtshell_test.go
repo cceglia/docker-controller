@@ -21,6 +21,7 @@ import (
 	"dockercontroller/internal/gui/guitest"
 	"dockercontroller/internal/gui/logs"
 	guiproject "dockercontroller/internal/gui/project"
+	"dockercontroller/internal/gui/usage"
 	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/settings"
 	"dockercontroller/internal/tray"
@@ -1448,8 +1449,8 @@ func checkUsage(t *testing.T, s *shell) {
 	if s.panel.strip.body.CurrentWidget().UnsafePointer() != s.panel.strip.message.QWidget.UnsafePointer() {
 		t.Error("the bar shows figures before the first sample")
 	}
-	if got := s.panel.strip.message.Text(); got != waitingUsageText {
-		t.Errorf("the bar says %q before the first sample, want %q", got, waitingUsageText)
+	if got := s.panel.strip.message.Text(); got != usage.WaitingText {
+		t.Errorf("the bar says %q before the first sample, want %q", got, usage.WaitingText)
 	}
 	for key, row := range s.panel.usageRows {
 		if row.widget.IsVisible() {
@@ -1559,8 +1560,8 @@ func checkUsage(t *testing.T, s *shell) {
 	unreachable := compose.UsageSample{Error: "Cannot connect to the Docker daemon"}
 	s.panel.setUsage(&unreachable)
 	settle()
-	if got := s.panel.strip.message.Text(); got != unreachableUsageText {
-		t.Errorf("the bar says %q with Docker unreachable, want %q", got, unreachableUsageText)
+	if got := s.panel.strip.message.Text(); got != usage.UnreachableText {
+		t.Errorf("the bar says %q with Docker unreachable, want %q", got, usage.UnreachableText)
 	}
 	if got := s.panel.strip.message.ObjectName(); got != design.RoleStatusFault {
 		t.Errorf("the warning carries the role %q, want %q", got, design.RoleStatusFault)
@@ -1574,8 +1575,8 @@ func checkUsage(t *testing.T, s *shell) {
 	s.panel.setUsage(nil)
 	s.apply(compose.Snapshot{DockerReachable: false, Projects: []compose.Project{grown}})
 	settle()
-	if got := s.panel.strip.message.Text(); got != unreachableUsageText {
-		t.Errorf("the bar says %q from an unreachable snapshot, want %q", got, unreachableUsageText)
+	if got := s.panel.strip.message.Text(); got != usage.UnreachableText {
+		t.Errorf("the bar says %q from an unreachable snapshot, want %q", got, usage.UnreachableText)
 	}
 
 	// The bar belongs to Docker, not to the Project on screen: with no Project
@@ -1586,8 +1587,8 @@ func checkUsage(t *testing.T, s *shell) {
 	if !s.panel.strip.widget.IsVisible() {
 		t.Error("the bar of the machine leaves the screen with no Project open")
 	}
-	if got := s.panel.strip.message.Text(); got != waitingUsageText {
-		t.Errorf("the bar says %q with no Project open, want %q", got, waitingUsageText)
+	if got := s.panel.strip.message.Text(); got != usage.WaitingText {
+		t.Errorf("the bar says %q with no Project open, want %q", got, usage.WaitingText)
 	}
 }
 
@@ -2562,7 +2563,7 @@ func screenshotUsage(project compose.Project) *compose.UsageSample {
 		},
 	}
 	for i, service := range project.Services {
-		if !ServiceRuns(service) {
+		if !usage.ServiceRuns(service) {
 			continue
 		}
 		sample.Containers += len(service.Containers)

@@ -10,6 +10,7 @@ import (
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
 	guiproject "dockercontroller/internal/gui/project"
+	"dockercontroller/internal/gui/usage"
 	"dockercontroller/internal/gui/view"
 )
 
@@ -350,15 +351,15 @@ func (p *detailPanel) applyUsage() {
 	unreachable := !p.shown.Loading && !p.shown.DockerReachable
 	byService := make(map[string]compose.ServiceUsage, len(p.usageRows))
 	if p.usage != nil {
-		for _, usage := range p.usage.Services {
-			byService[usage.Project+"/"+usage.Service] = usage
+		for _, serviceUsage := range p.usage.Services {
+			byService[serviceUsage.Project+"/"+serviceUsage.Service] = serviceUsage
 		}
 	}
 	for key, row := range p.usageRows {
 		entry, ok := byService[key]
-		state := UsageNone
+		state := usage.UsageNone
 		if !unreachable {
-			state = UsageStateOf(p.usage, ok, row.running)
+			state = usage.UsageStateOf(p.usage, ok, row.running)
 		}
 		row.set(state, entry)
 	}
@@ -722,9 +723,9 @@ func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidg
 
 	// The Utilizzo risorse of the Service sits under its Containers, where the
 	// old view put it. It takes no room until a sample carries the Service.
-	usage := newServiceUsageRow(p.shown.Project.Name, service.Name, ServiceRuns(service))
-	p.usageRows[usage.key] = usage
-	box.AddWidget(usage.widget)
+	indicator := newServiceUsageRow(p.shown.Project.Name, service.Name, usage.ServiceRuns(service))
+	p.usageRows[indicator.key] = indicator
+	box.AddWidget(indicator.widget)
 
 	// The Actions close the block, so the Containers stay under their own
 	// Service and the row of the next Service starts after a divider.

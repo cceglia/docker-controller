@@ -1,4 +1,4 @@
-package gui
+package usage
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"dockercontroller/internal/compose"
 )
 
-// usageFeed runs the stream of the Utilizzo risorse. The figures are the
+// UsageFeed runs the stream of the Utilizzo risorse. The figures are the
 // machine's, not a Project's: the stream starts while the window is on screen
 // and Docker answers, and no choice of Project starts or ends it. Every sample
 // reaches OnSample on the thread that draw posts to.
@@ -15,7 +15,7 @@ import (
 // Every sample carries the generation of the stream that delivered it. A sample
 // that was queued before a stop reaches OnSample only while its generation is
 // still the current one, so a late figure never comes back on screen.
-type usageFeed struct {
+type UsageFeed struct {
 	// OnSample receives one sample of the stream on screen, or nil when the
 	// stream stops and the figures must leave the screen. It runs on the thread
 	// draw posts to, never on the goroutine of the stream.
@@ -43,14 +43,14 @@ type usageFeed struct {
 	on bool
 }
 
-// newUsageFeed builds a feed that starts no stream. ctx is the application and
+// NewUsageFeed builds a feed that starts no stream. ctx is the application and
 // ends every stream. draw posts to the thread that draws; a nil draw runs the
 // sample where it arrives, which is what a test wants and a window never does.
-func newUsageFeed(ctx context.Context, source UsageSource, draw func(func())) *usageFeed {
+func NewUsageFeed(ctx context.Context, source UsageSource, draw func(func())) *UsageFeed {
 	if draw == nil {
 		draw = func(run func()) { run() }
 	}
-	f := &usageFeed{source: source, draw: draw}
+	f := &UsageFeed{source: source, draw: draw}
 	f.stream = NewUsageStreamer(ctx, func(ctx context.Context, _ func(compose.UsageSample)) error {
 		if f.source == nil {
 			return nil
@@ -69,7 +69,7 @@ func newUsageFeed(ctx context.Context, source UsageSource, draw func(func())) *u
 // Follow keeps the state of Docker the snapshot reports and starts or stops the
 // stream. The stream runs while the window is on screen and Docker answers; no
 // Project takes part, because the figures of the machine do not belong to one.
-func (f *usageFeed) Follow(dockerReachable bool) {
+func (f *UsageFeed) Follow(dockerReachable bool) {
 	f.mu.Lock()
 	f.reachable = dockerReachable
 	f.mu.Unlock()
@@ -79,7 +79,7 @@ func (f *usageFeed) Follow(dockerReachable bool) {
 // SetHidden stops the stream when the window leaves the screen and starts it
 // again when the window comes back. The Docker state stays, so the return reads
 // no snapshot to know what to measure.
-func (f *usageFeed) SetHidden(hidden bool) {
+func (f *UsageFeed) SetHidden(hidden bool) {
 	f.mu.Lock()
 	changed := f.hidden != hidden
 	f.hidden = hidden
@@ -92,7 +92,7 @@ func (f *usageFeed) SetHidden(hidden bool) {
 // refresh starts or stops the stream the current state asks for. Only a change
 // of the answer touches the stream, so a new snapshot that changes nothing keeps
 // `docker stats` running.
-func (f *usageFeed) refresh() {
+func (f *UsageFeed) refresh() {
 	f.mu.Lock()
 	want := !f.hidden && f.reachable && f.source != nil
 	was := f.on
@@ -118,14 +118,14 @@ func (f *usageFeed) refresh() {
 }
 
 // generation returns the generation of the stream wanted now.
-func (f *usageFeed) generation() uint64 {
+func (f *UsageFeed) generation() uint64 {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.gen
 }
 
 // current reports whether gen is still the generation of the stream wanted now.
-func (f *usageFeed) current(gen uint64) bool {
+func (f *UsageFeed) current(gen uint64) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.gen == gen
@@ -134,7 +134,7 @@ func (f *usageFeed) current(gen uint64) bool {
 // deliver hands one sample of the stream gen to the thread that draws, unless
 // the feed moved on in the meantime: the generation is what keeps a figure of a
 // stopped stream off the screen. A nil sample takes the figures away.
-func (f *usageFeed) deliver(gen uint64, sample *compose.UsageSample) {
+func (f *UsageFeed) deliver(gen uint64, sample *compose.UsageSample) {
 	f.draw(func() {
 		if !f.current(gen) {
 			return

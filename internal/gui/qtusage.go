@@ -1,40 +1,29 @@
 package gui
 
 import (
-	"math"
-
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
-	"dockercontroller/internal/gui/view"
+	"dockercontroller/internal/gui/usage"
 )
 
 const (
 	// usageStripName names the bar of the machine: its figures are not a
 	// Project's, and the strip says so.
-	usageStripName = usageTitle + " della macchina"
+	usageStripName = usage.Title + " della macchina"
 	// usageServiceName begins the name of the indicator of one Service.
-	usageServiceName = usageTitle + " del Servizio "
-	// meterSteps is the number of steps of a bar of a percentage: the tenth of
-	// a percent is the smallest change a row shows.
-	meterSteps = 1000
+	usageServiceName = usage.Title + " del Servizio "
 	// usageBarWidth is the length of the bar of a percentage. A figure keeps its
 	// length, so a row never moves when a number grows.
 	usageBarWidth = 64
 )
 
-// meterValue turns a percentage into the steps of a bar: a value that is not a
-// number and a value outside 0-100 stay inside the bar.
-func meterValue(percent float64) int {
-	return int(math.Round(view.LevelValue(percent) * meterSteps))
-}
-
 // usageMeter builds the bar of a percentage. It is a figure, not a control, so
 // it takes no focus and no tab stop.
 func usageMeter(name string) *qt6.QProgressBar {
 	bar := qt6.NewQProgressBar2()
-	bar.SetRange(0, meterSteps)
+	bar.SetRange(0, usage.MeterSteps)
 	bar.SetValue(0)
 	bar.SetTextVisible(false)
 	bar.SetFixedWidth(usageBarWidth)
@@ -105,7 +94,7 @@ func (c *usageCell) set(value, note string, percent float64) {
 		c.note.SetVisible(note != "")
 	}
 	if c.bar != nil {
-		c.bar.SetValue(meterValue(percent))
+		c.bar.SetValue(usage.MeterValue(percent))
 	}
 	description := value
 	if note != "" {
@@ -162,11 +151,11 @@ func newUsageRow(options usageRowOptions) *usageRow {
 
 // set shows the figures of one row. cpuPercent is the value of the CPU bar and
 // memoryShare the value of the memory bar; a row without a bar ignores them.
-func (r *usageRow) set(texts usageTexts, cpuPercent, memoryShare float64) {
-	r.cpu.set(texts.cpu.value, texts.cpu.note, cpuPercent)
-	r.memory.set(texts.memory.value, texts.memory.note, memoryShare)
-	r.net.set(texts.net.value, texts.net.note, 0)
-	r.disk.set(texts.disk.value, texts.disk.note, 0)
+func (r *usageRow) set(texts usage.Texts, cpuPercent, memoryShare float64) {
+	r.cpu.set(texts.CPU.Value, texts.CPU.Note, cpuPercent)
+	r.memory.set(texts.Memory.Value, texts.Memory.Note, memoryShare)
+	r.net.set(texts.Net.Value, texts.Net.Note, 0)
+	r.disk.set(texts.Disk.Value, texts.Disk.Note, 0)
 }
 
 // usageStrip is the Utilizzo risorse of the machine, above the detail: one row
@@ -184,7 +173,7 @@ type usageStrip struct {
 func newUsageStrip() *usageStrip {
 	s := &usageStrip{row: newUsageRow(usageRowOptions{cpuBar: true, memoryBar: true, wrap: true})}
 
-	s.message = qt6.NewQLabel3(waitingUsageText)
+	s.message = qt6.NewQLabel3(usage.WaitingText)
 	s.message.SetWordWrap(true)
 
 	s.body = qt6.NewQStackedWidget2()
@@ -212,20 +201,20 @@ func newUsageStrip() *usageStrip {
 // answer, a line takes the place of the figures: the strip never shows the
 // numbers of a stream that stopped.
 func (s *usageStrip) set(sample *compose.UsageSample) {
-	switch StripStateOf(sample) {
-	case StripWaiting:
+	switch usage.StripStateOf(sample) {
+	case usage.StripWaiting:
 		s.widget.SetToolTip("")
-		s.showMessage(waitingUsageText, false)
-	case StripUnreachable:
+		s.showMessage(usage.WaitingText, false)
+	case usage.StripUnreachable:
 		s.widget.SetToolTip(sample.Error)
-		s.showMessage(unreachableUsageText, true)
+		s.showMessage(usage.UnreachableText, true)
 	default:
 		s.widget.SetToolTip("")
-		s.row.set(usageTextsOf(usageFigures{
-			measures:    sample.Total,
-			rate:        sample.Rate,
-			cpuPercent:  sample.CPUMachinePercent,
-			memoryTotal: sample.MemoryTotalBytes,
+		s.row.set(usage.TextsOf(usage.Figures{
+			Measures:    sample.Total,
+			Rate:        sample.Rate,
+			CPUPercent:  sample.CPUMachinePercent,
+			MemoryTotal: sample.MemoryTotalBytes,
 		}), sample.CPUMachinePercent, sample.MemoryMachinePercent)
 		s.body.SetCurrentWidget(s.row.widget)
 	}
@@ -235,7 +224,7 @@ func (s *usageStrip) set(sample *compose.UsageSample) {
 // snapshot knows before any sample does.
 func (s *usageStrip) setUnreachable() {
 	s.widget.SetToolTip("")
-	s.showMessage(unreachableUsageText, true)
+	s.showMessage(usage.UnreachableText, true)
 }
 
 // showMessage puts one line in place of the figures, in the role of a fault when
@@ -287,16 +276,16 @@ func newServiceUsageRow(project, service string, running bool) *serviceUsageRow 
 
 // set shows one sample for the Service. A Service without figures takes its
 // indicator off the layout: a row of zeros would read as a measure.
-func (r *serviceUsageRow) set(state UsageState, usage compose.ServiceUsage) {
-	if !r.running || state != UsageFigures {
+func (r *serviceUsageRow) set(state usage.UsageState, sample compose.ServiceUsage) {
+	if !r.running || state != usage.UsageFigures {
 		r.widget.SetVisible(false)
 		return
 	}
-	r.row.set(usageTextsOf(usageFigures{
-		measures:   usage.Measures,
-		rate:       usage.Rate,
-		cpuPercent: usage.Measures.CPUPercent,
-	}), usage.Measures.CPUPercent, 0)
+	r.row.set(usage.TextsOf(usage.Figures{
+		Measures:   sample.Measures,
+		Rate:       sample.Rate,
+		CPUPercent: sample.Measures.CPUPercent,
+	}), sample.Measures.CPUPercent, 0)
 	r.widget.SetVisible(true)
 }
 
