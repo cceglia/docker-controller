@@ -7,10 +7,10 @@ import (
 	"dockercontroller/internal/compose"
 )
 
-// usageFeed runs the stream of the Utilizzo risorse for the detail. It starts
-// the stream only while the detail has a Project with a Container in execution
-// and Docker answers, ends it when the Project changes or goes away, and hands
-// every sample to OnSample on the thread that draw posts to.
+// usageFeed runs the stream of the Utilizzo risorse. The figures are the
+// machine's, not a Project's: the stream starts while the window is on screen
+// and Docker answers, and no choice of Project starts or ends it. Every sample
+// reaches OnSample on the thread that draw posts to.
 //
 // Every sample carries the generation of the stream that delivered it. A sample
 // that was queued before a stop reaches OnSample only while its generation is
@@ -30,12 +30,8 @@ type usageFeed struct {
 	draw func(func())
 
 	mu sync.Mutex
-	// project is the Project the stream follows, "" when none is open. A change
-	// of Project ends the stream of the old one before the new one starts.
-	project string
-	// followed is the Project the window shows and reachable is what the last
-	// snapshot said of Docker: the two decide the stream together with hidden.
-	followed  compose.Project
+	// reachable is what the last snapshot said of Docker: it decides the stream
+	// together with hidden.
 	reachable bool
 	// hidden is true while the window is off screen: `docker stats` runs only
 	// while the figures can be seen.
@@ -70,21 +66,19 @@ func newUsageFeed(ctx context.Context, source UsageSource, draw func(func())) *u
 	return f
 }
 
-// Follow keeps the Project the detail shows and its Docker state, and starts or
-// stops the stream. The stream runs while the window is on screen, Docker
-// answers and the Project has a Container in execution; a Project without one, a
-// Docker that leaves and a hidden window end it, so no `docker stats` outlives
-// what it measures.
-func (f *usageFeed) Follow(project compose.Project, dockerReachable bool) {
+// Follow keeps the state of Docker the snapshot reports and starts or stops the
+// stream. The stream runs while the window is on screen and Docker answers; no
+// Project takes part, because the figures of the machine do not belong to one.
+func (f *usageFeed) Follow(dockerReachable bool) {
 	f.mu.Lock()
-	f.followed, f.reachable = project, dockerReachable
+	f.reachable = dockerReachable
 	f.mu.Unlock()
 	f.refresh()
 }
 
 // SetHidden stops the stream when the window leaves the screen and starts it
-// again when the window comes back. The Project and its Docker state stay, so
-// the return reads no snapshot to know what to measure.
+// again when the window comes back. The Docker state stays, so the return reads
+// no snapshot to know what to measure.
 func (f *usageFeed) SetHidden(hidden bool) {
 	f.mu.Lock()
 	changed := f.hidden != hidden
@@ -100,15 +94,12 @@ func (f *usageFeed) SetHidden(hidden bool) {
 // `docker stats` running.
 func (f *usageFeed) refresh() {
 	f.mu.Lock()
-	project := f.followed
-	want := !f.hidden && f.reachable && f.source != nil && project.Running > 0
-	changed := f.project != project.Name
+	want := !f.hidden && f.reachable && f.source != nil
 	was := f.on
-	restart := want && (!was || changed)
+	start := want && !was
 	stop := !want && was
-	f.project = project.Name
 	f.on = want
-	if !restart && !stop {
+	if !start && !stop {
 		f.mu.Unlock()
 		return
 	}
@@ -116,17 +107,12 @@ func (f *usageFeed) refresh() {
 	gen := f.gen
 	f.mu.Unlock()
 
-	if was && stop {
+	if stop {
 		f.stream.Stop()
 		// The figures of the stream that ended leave the screen at once: the
 		// next stream may take a while to deliver.
 		f.deliver(gen, nil)
 		return
-	}
-	if changed && was {
-		// The Project changed: the old `docker stats` goes before the new one
-		// starts, and the streamer waits for it in any case.
-		f.stream.Stop()
 	}
 	f.stream.Start()
 }

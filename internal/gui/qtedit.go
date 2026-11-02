@@ -174,8 +174,16 @@ func editField(caption string, field *qt6.QWidget, message, hint string) *qt6.QW
 func (p *detailPanel) editBlock() *qt6.QWidget {
 	form, project := p.edit, p.shown.project
 
-	block, box := detailBlock()
+	// The form is a card of its own. The border separates it from the row of the
+	// Project's commands below, so Salva and Annulla never read as two more
+	// commands in that row.
+	frame := qt6.NewQFrame2()
+	frame.SetFrameShape(qt6.QFrame__NoFrame)
+	setObjectName(frame.QWidget, "editPanel")
+	block := frame.QWidget
 	block.SetAccessibleName(editTitle)
+	box := qt6.NewQVBoxLayout(block)
+	box.SetContentsMargins(spaceM, spaceM, spaceM, spaceM)
 	// The fields sit a step apart, further than the lines inside one field, so
 	// the eye reads where one field ends and the next starts.
 	box.SetSpacing(spaceM)

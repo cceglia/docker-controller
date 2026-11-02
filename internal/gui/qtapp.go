@@ -52,7 +52,7 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 	// The display name is what the window list of the desktop reads.
 	qt6.QGuiApplication_SetApplicationDisplayName(windowTitle)
 	// Closing the window hides it, so the application does not end with its last
-	// window: the close event decides, and "Esci" is what quits.
+	// window: the close event decides, and the tray's "Esci" is what quits.
 	qt6.QGuiApplication_SetQuitOnLastWindowClosed(false)
 
 	// The window colour of the desktop palette picks the palette of the roles
@@ -70,7 +70,7 @@ func Run(ctx context.Context, manager *compose.Manager, activities *ActivityLog,
 	}
 	// The tray comes before the first snapshot and before the window shows, so
 	// the icon is on the panel while the list is still loading. Without a tray
-	// the field stays nil and the window keeps "Esci" and "Impostazioni".
+	// the field stays nil, the window keeps "Impostazioni" and closing it quits.
 	a.tray = startTray(a.snapshot, a.present, a.quit, a.chooseTray)
 	a.watch(ctx)
 	a.shell.show()

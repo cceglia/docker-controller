@@ -42,14 +42,12 @@ type shell struct {
 	list   *projectList
 	panel  *detailPanel
 	bottom *bottomPanel
-	// usage runs the stream of the Utilizzo risorse for the Project on screen.
+	// usage runs the stream of the Utilizzo risorse: the figures of the machine,
+	// the same for every Project.
 	usage    *usageFeed
 	add      *qt6.QPushButton
 	settings *qt6.QPushButton
-	// quit closes the application. Without a tray it is the way out of a window
-	// that has no other one.
-	quit *qt6.QPushButton
-	back *qt6.QPushButton
+	back     *qt6.QPushButton
 	// notice shows a message in sovrimpressione, off the commands. A refused
 	// Action shows its Italian message there, a failed Activity the same with
 	// the way to its output.
@@ -109,8 +107,7 @@ func newShell(app *application, theme designTheme) *shell {
 	// controls after the entry the width chooses.
 	qt6.QWidget_SetTabOrder(s.list.widget.QWidget, s.add.QWidget)
 	qt6.QWidget_SetTabOrder(s.add.QWidget, s.settings.QWidget)
-	qt6.QWidget_SetTabOrder(s.settings.QWidget, s.quit.QWidget)
-	qt6.QWidget_SetTabOrder(s.quit.QWidget, s.back.QWidget)
+	qt6.QWidget_SetTabOrder(s.settings.QWidget, s.back.QWidget)
 
 	return s
 }
@@ -170,7 +167,7 @@ func (s *shell) startStreams() {
 }
 
 // buildSidebar builds the column of the Projects: the title, the list that
-// takes the height and the actions of the column, the way out last.
+// takes the height and the actions of the column, the settings last.
 func (s *shell) buildSidebar() {
 	s.sidebar = qt6.NewQWidget2()
 	s.sidebar.SetMinimumWidth(260)
@@ -215,22 +212,6 @@ func (s *shell) buildSidebar() {
 	actions.AddWidget(s.settings.QWidget)
 
 	layout.AddLayout(actions.QLayout)
-
-	// "Esci" has a row of its own, so the three labels never squeeze the column
-	// and the list keeps its width. A later ticket may make the close of the
-	// window hide it, so the application needs one plain way out of its own.
-	quitRow := qt6.NewQHBoxLayout2()
-	quitRow.SetSpacing(spaceS)
-	quitRow.AddStretch()
-
-	s.quit = qt6.NewQPushButton3("Esci")
-	s.quit.SetAccessibleName("Esci")
-	s.quit.SetToolTip("Chiude l'applicazione.")
-	s.quit.OnClicked(func() { s.app.quit() })
-	keepTarget(s.quit.QWidget)
-	quitRow.AddWidget(s.quit.QWidget)
-
-	layout.AddLayout(quitRow.QLayout)
 }
 
 // buildDetail builds the panel of the right. The panel starts at rest, with the
@@ -435,7 +416,7 @@ func (s *shell) open(project compose.Project) {
 	s.selected = project.Name
 	s.panel.setProjects(s.snapshot.Projects)
 	s.panel.set(project, s.snapshot.DockerReachable, s.snapshot.Loading)
-	s.usage.Follow(project, s.snapshot.DockerReachable)
+	s.usage.Follow(s.snapshot.DockerReachable)
 	s.bottom.setProject(project)
 	s.linkTabChain()
 	if s.narrow {
@@ -449,11 +430,12 @@ func (s *shell) open(project compose.Project) {
 // selection.
 func (s *shell) apply(snapshot compose.Snapshot) {
 	s.snapshot = snapshot
+	s.usage.Follow(snapshot.DockerReachable)
+	s.panel.setDocker(snapshot.DockerReachable, snapshot.Loading)
 	s.list.set(snapshot.Projects, s.selected, snapshot.Loading)
 	s.panel.setProjects(snapshot.Projects)
 	if s.selected == "" {
 		s.panel.clear()
-		s.usage.Follow(compose.Project{}, false)
 		s.bottom.setProject(compose.Project{})
 		return
 	}
@@ -461,7 +443,6 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 	if !ok {
 		s.selected = ""
 		s.panel.clear()
-		s.usage.Follow(compose.Project{}, false)
 		s.bottom.setProject(compose.Project{})
 		if s.narrow {
 			s.showNarrowPage()
@@ -469,7 +450,6 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 		return
 	}
 	s.panel.set(project, snapshot.DockerReachable, snapshot.Loading)
-	s.usage.Follow(project, snapshot.DockerReachable)
 	s.bottom.setProject(project)
 	s.linkTabChain()
 }
@@ -481,7 +461,7 @@ func (s *shell) tabEntry() *qt6.QWidget {
 	if s.narrow {
 		return s.back.QWidget
 	}
-	return s.quit.QWidget
+	return s.settings.QWidget
 }
 
 // linkTabChain puts the detail and the panel after the entry the width chooses,

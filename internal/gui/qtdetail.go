@@ -107,8 +107,16 @@ type detailPanel struct {
 	visible bool
 
 	// strip is the Utilizzo risorse of the machine, above the detail: it is the
-	// machine's, so it stays out of the blocks a Project rebuilds.
+	// machine's, so it stays out of the blocks a Project rebuilds and it does
+	// not depend on the Project on screen.
 	strip *usageStrip
+	// machineReachable and machineLoading are the state of Docker the bar of the
+	// machine reads. They belong to the window, not to a Project: closing the
+	// Project leaves them as they are. machineLoading starts true, so the bar
+	// waits for the first snapshot instead of claiming a Docker that is
+	// unreachable before anyone asked it.
+	machineReachable bool
+	machineLoading   bool
 	// usage is the sample the panel draws, nil until the first one arrives and
 	// after the stream stops. usageRows holds the indicator of each Service of
 	// the Project on screen, by "project/service": a render builds them again
@@ -120,7 +128,7 @@ type detailPanel struct {
 // newDetailPanel builds the panel at rest: the invitation to choose a Project,
 // and the scroll area that will hold the detail.
 func newDetailPanel(theme designTheme) *detailPanel {
-	p := &detailPanel{theme: theme}
+	p := &detailPanel{theme: theme, machineLoading: true}
 
 	p.invite = newDetailInvite()
 
@@ -146,9 +154,9 @@ func newDetailPanel(theme designTheme) *detailPanel {
 
 	// The bar of the machine sits above the stack, so it keeps its place while
 	// the detail scrolls. It stays out of the blocks: a render of a Project
-	// never rebuilds a figure of the machine.
+	// never rebuilds a figure of the machine, and the bar stays on screen while
+	// no Project is open.
 	p.strip = newUsageStrip()
-	p.strip.widget.SetVisible(false)
 	p.usageRows = make(map[string]*serviceUsageRow)
 
 	p.widget = qt6.NewQWidget2()
@@ -199,6 +207,7 @@ func newDetailInvite() *qt6.QWidget {
 // of the scroll bar and the focus, so a refresh never moves the page under the
 // eyes of the user.
 func (p *detailPanel) set(project compose.Project, dockerReachable, loading bool) {
+	p.setDocker(dockerReachable, loading)
 	data := detailData{project: project, dockerReachable: dockerReachable, loading: loading}
 	if p.visible && p.shown.sameDraw(data) {
 		return
@@ -207,9 +216,6 @@ func (p *detailPanel) set(project compose.Project, dockerReachable, loading bool
 	p.shown = data
 	p.guard.snapshot(project.Activity != nil)
 	p.stack.SetCurrentWidget(p.scroll.QWidget)
-	// The bar of the machine belongs to the detail: with no Project open there
-	// is nothing to measure it for.
-	p.strip.widget.SetVisible(true)
 	if p.question != nil || p.edit != nil {
 		// The question belongs to the command on screen and the form holds what
 		// the user typed: the panel keeps both, then draws the data that arrived.
@@ -234,12 +240,10 @@ func (p *detailPanel) clear() {
 	// The form belongs to the Project on screen: it goes with it, so a render of
 	// the next Project never builds it again.
 	p.edit = nil
-	// The figures of a Project that left the screen go with it: the stream
-	// stops, and nothing may stay behind as if it were current.
-	p.usage = nil
+	// The indicators of the Services go with the Project, and so does their
+	// share of the sample. The machine's figures stay: the bar belongs to
+	// Docker, not to the Project that left.
 	p.usageRows = make(map[string]*serviceUsageRow)
-	p.strip.set(nil)
-	p.strip.widget.SetVisible(false)
 	clearDetailLayout(p.layout.QLayout)
 	p.stack.SetCurrentWidget(p.invite)
 	if p.question != nil {
@@ -313,11 +317,22 @@ func (p *detailPanel) setUsage(sample *compose.UsageSample) {
 	p.applyUsage()
 }
 
+// setDocker tells the bar of the machine what the snapshot says of Docker. The
+// state belongs to the window, not to the Project on screen, so the shell hands
+// it over even while the invitation is up and the bar stays at the top.
+func (p *detailPanel) setDocker(reachable, loading bool) {
+	if p.machineReachable == reachable && p.machineLoading == loading {
+		return
+	}
+	p.machineReachable, p.machineLoading = reachable, loading
+	p.showUsage()
+}
+
 // showUsage puts the bar in the state the panel knows: a Docker that does not
 // answer shows the warning in place of the figures, whatever the last sample
 // said, and a sample otherwise says what it saw at its instant.
 func (p *detailPanel) showUsage() {
-	if !p.shown.loading && !p.shown.dockerReachable {
+	if !p.machineLoading && !p.machineReachable {
 		p.strip.setUnreachable()
 		return
 	}

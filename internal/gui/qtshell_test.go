@@ -56,7 +56,7 @@ func TestShellOffscreen(t *testing.T) {
 	if s.list == nil || s.list.widget == nil {
 		t.Fatal("the list of the Projects is not wired")
 	}
-	if s.add == nil || s.settings == nil || s.quit == nil || s.back == nil {
+	if s.add == nil || s.settings == nil || s.back == nil {
 		t.Fatal("an action button is not wired")
 	}
 	if got := app.StyleSheet(); got == "" {
@@ -1572,11 +1572,16 @@ func checkUsage(t *testing.T, s *shell) {
 		t.Errorf("the bar says %q from an unreachable snapshot, want %q", got, unreachableUsageText)
 	}
 
-	// With no Project open there is nothing to measure: the bar leaves too.
+	// The bar belongs to Docker, not to the Project on screen: with no Project
+	// open it stays, at the figures or the waiting line the machine state asks
+	// for.
 	s.apply(compose.Snapshot{DockerReachable: true})
 	settle()
-	if s.panel.strip.widget.IsVisible() {
-		t.Error("the bar stays on screen with no Project open")
+	if !s.panel.strip.widget.IsVisible() {
+		t.Error("the bar of the machine leaves the screen with no Project open")
+	}
+	if got := s.panel.strip.message.Text(); got != waitingUsageText {
+		t.Errorf("the bar says %q with no Project open, want %q", got, waitingUsageText)
 	}
 }
 
@@ -2410,10 +2415,11 @@ func checkHiddenWindow(t *testing.T) {
 	s.bottom.Close()
 }
 
-// checkQuit ends the application the way "Esci" of the window and of the tray
-// does: the streams stop before the event loop does, so no `docker compose logs`
-// and no `docker stats` outlives the window. It is the last step of the smoke
-// test, because Quit leaves the application of the process closing.
+// checkQuit ends the application the way the tray does, and the close of the
+// window on a desktop without one: the streams stop before the event loop does,
+// so no `docker compose logs` and no `docker stats` outlives the window. It is
+// the last step of the smoke test, because Quit leaves the application of the
+// process closing.
 func checkQuit(t *testing.T) {
 	t.Helper()
 

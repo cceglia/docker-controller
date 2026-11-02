@@ -106,6 +106,11 @@ QLabel#fieldError {
 QLabel#fieldLabel {
     font-weight: 600;
 }
+QFrame#editPanel {
+    background: palette(base);
+    border: 1px solid palette(mid);
+    border-radius: %dpx;
+}
 QPushButton#primaryAction {
     background: palette(highlight);
     color: palette(highlighted-text);
@@ -163,5 +168,6 @@ QWidget#projectRowSelected QLabel {
 		theme.color(roleStatusPartial),
 		theme.color(roleStatusFault),
 		theme.color(roleStatusFault),
+		spaceS,
 	)
 }

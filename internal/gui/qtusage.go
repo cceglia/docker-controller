@@ -41,9 +41,9 @@ func usageMeter(name string) *qt6.QProgressBar {
 	return bar
 }
 
-// usageCell is one measure of a row of the Utilizzo risorse: its caption, the
-// bar when the measure has a percentage, the figure, and the line under it that
-// says what the figure alone cannot.
+// usageCell is one measure of a row of the Utilizzo risorse. The first line is
+// the caption, with the bar when the measure has a percentage; the second line
+// is the figure, followed by what the figure alone cannot say.
 type usageCell struct {
 	widget *qt6.QWidget
 	label  *qt6.QLabel
@@ -53,35 +53,43 @@ type usageCell struct {
 }
 
 // newUsageCell builds one measure. withBar gives it the bar of a percentage and
-// withNote the second line. A cell that may wrap shrinks at a narrow window; a
-// cell that may not keeps one line, so the row of a Service never changes height
-// with the width of the window.
+// withNote the explanation after the figure. The figure always sits under the
+// caption, so the value of every cell starts on the same line and the bar keeps
+// the caption to itself. A cell that may wrap shrinks at a narrow window; a
+// cell that may not keeps one line, so the row of a Service never changes
+// height with the width of the window.
 func newUsageCell(caption string, withBar, withNote, wrap bool) *usageCell {
 	c := &usageCell{widget: qt6.NewQWidget2()}
 	c.label = qt6.NewQLabel3(caption)
 
-	line := qt6.NewQHBoxLayout2()
-	line.SetContentsMargins(0, 0, 0, 0)
-	line.SetSpacing(spaceS)
-	line.AddWidget3(c.label.QWidget, 0, qt6.AlignVCenter)
+	heading := qt6.NewQHBoxLayout2()
+	heading.SetContentsMargins(0, 0, 0, 0)
+	heading.SetSpacing(spaceS)
+	heading.AddWidget3(c.label.QWidget, 0, qt6.AlignVCenter)
 	if withBar {
 		c.bar = usageMeter(caption)
-		line.AddWidget3(c.bar.QWidget, 0, qt6.AlignVCenter)
+		heading.AddWidget3(c.bar.QWidget, 0, qt6.AlignVCenter)
 	}
+	heading.AddStretch()
+
 	c.value = qt6.NewQLabel3("")
 	c.value.SetWordWrap(wrap)
-	line.AddWidget3(c.value.QWidget, 0, qt6.AlignVCenter)
-	line.AddStretch()
+	figures := qt6.NewQHBoxLayout2()
+	figures.SetContentsMargins(0, 0, 0, 0)
+	figures.SetSpacing(spaceS)
+	figures.AddWidget3(c.value.QWidget, 0, qt6.AlignVCenter)
+	if withNote {
+		c.note = qt6.NewQLabel3("")
+		c.note.SetWordWrap(wrap)
+		figures.AddWidget3(c.note.QWidget, 0, qt6.AlignVCenter)
+	}
+	figures.AddStretch()
 
 	box := qt6.NewQVBoxLayout(c.widget)
 	box.SetContentsMargins(0, 0, 0, 0)
 	box.SetSpacing(0)
-	box.AddLayout2(line.QLayout, 0)
-	if withNote {
-		c.note = qt6.NewQLabel3("")
-		c.note.SetWordWrap(wrap)
-		box.AddWidget(c.note.QWidget)
-	}
+	box.AddLayout2(heading.QLayout, 0)
+	box.AddLayout2(figures.QLayout, 0)
 	c.widget.SetAccessibleName(caption)
 	return c
 }

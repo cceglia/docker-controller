@@ -55,29 +55,27 @@ func testFeed(t *testing.T, source UsageSource, dispatch func(func())) *usageFee
 	return newUsageFeed(ctx, source, dispatch)
 }
 
-func TestUsageFeed_WithoutDockerOrARunningContainerThereIsNoStream(t *testing.T) {
+func TestUsageFeed_WithoutDockerThereIsNoStream(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
-		running   int
 		reachable bool
 		want      bool
 	}{
-		{"Docker answers and a Container runs", 2, true, true},
-		{"Docker does not answer", 2, false, false},
-		{"no Container runs", 0, true, false},
+		{"Docker answers", true, true},
+		{"Docker does not answer", false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			starts := make(chan struct{}, 1)
 			f := testFeed(t, idleSource(starts), nil)
-			f.Follow(compose.Project{Name: "shop", Running: tc.running}, tc.reachable)
+			f.Follow(tc.reachable)
 			select {
 			case <-starts:
 				if !tc.want {
-					t.Fatal("the stream started without a running Container or without Docker")
+					t.Fatal("the stream started without Docker")
 				}
 			case <-time.After(50 * time.Millisecond):
 				if tc.want {
-					t.Fatal("the stream did not start with Docker and a running Container")
+					t.Fatal("the stream did not start with Docker reachable")
 				}
 			}
 		})
@@ -97,7 +95,7 @@ func TestUsageFeed_DeliversTheSamples(t *testing.T) {
 	var got []*compose.UsageSample
 	f.OnSample = func(sample *compose.UsageSample) { got = append(got, sample) }
 
-	f.Follow(compose.Project{Name: "shop", Running: 1}, true)
+	f.Follow(true)
 	waitSignal(t, reported, "the sample")
 
 	if len(got) != 1 || got[0] == nil || got[0].Containers != want.Containers {
@@ -105,34 +103,34 @@ func TestUsageFeed_DeliversTheSamples(t *testing.T) {
 	}
 }
 
-func TestUsageFeed_TheSameProjectKeepsOneStream(t *testing.T) {
+func TestUsageFeed_TheSameDockerStateKeepsOneStream(t *testing.T) {
 	starts := make(chan struct{}, 3)
 	f := testFeed(t, idleSource(starts), nil)
-	project := compose.Project{Name: "shop", Running: 1}
 
-	f.Follow(project, true)
+	f.Follow(true)
 	waitSignal(t, starts, "the stream")
 
-	// A new snapshot of the same Project draws the same figures: it must not
+	// A new snapshot of the same state draws the same figures: it must not
 	// terminate and restart `docker stats`.
-	f.Follow(project, true)
-	f.Follow(project, true)
+	f.Follow(true)
+	f.Follow(true)
 
 	select {
 	case <-starts:
-		t.Fatal("a new snapshot of the same Project started a second stream")
+		t.Fatal("a new snapshot of the same Docker state started a second stream")
 	case <-time.After(50 * time.Millisecond):
 	}
 }
 
-func TestUsageFeed_AChangeOfProjectStartsANewStream(t *testing.T) {
+func TestUsageFeed_ADockerThatLeavesAndReturnsStartsANewStream(t *testing.T) {
 	starts := make(chan struct{}, 2)
 	f := testFeed(t, idleSource(starts), nil)
 
-	f.Follow(compose.Project{Name: "shop", Running: 1}, true)
+	f.Follow(true)
 	waitSignal(t, starts, "the first stream")
-	f.Follow(compose.Project{Name: "blog", Running: 1}, true)
-	waitSignal(t, starts, "the second stream")
+	f.Follow(false)
+	f.Follow(true)
+	waitSignal(t, starts, "the stream after Docker came back")
 }
 
 func TestUsageFeed_AStopTakesTheFiguresOffTheScreen(t *testing.T) {
@@ -140,8 +138,8 @@ func TestUsageFeed_AStopTakesTheFiguresOffTheScreen(t *testing.T) {
 	var got []*compose.UsageSample
 	f.OnSample = func(sample *compose.UsageSample) { got = append(got, sample) }
 
-	f.Follow(compose.Project{Name: "shop", Running: 1}, true)
-	f.Follow(compose.Project{}, false)
+	f.Follow(true)
+	f.Follow(false)
 
 	if len(got) != 1 || got[0] != nil {
 		t.Fatalf("samples = %v, want the nil sample of the stop", got)
@@ -154,8 +152,7 @@ func TestUsageFeed_AHiddenWindowStopsTheStreamAndTheReturnStartsIt(t *testing.T)
 	var got []*compose.UsageSample
 	f.OnSample = func(sample *compose.UsageSample) { got = append(got, sample) }
 
-	project := compose.Project{Name: "shop", Running: 1}
-	f.Follow(project, true)
+	f.Follow(true)
 	waitSignal(t, starts, "the stream")
 
 	// The window leaves the screen: `docker stats` stops and the figures go, so
@@ -166,14 +163,14 @@ func TestUsageFeed_AHiddenWindowStopsTheStreamAndTheReturnStartsIt(t *testing.T)
 	}
 
 	// A snapshot of the hidden window starts nothing.
-	f.Follow(project, true)
+	f.Follow(true)
 	select {
 	case <-starts:
 		t.Fatal("a hidden window started docker stats")
 	case <-time.After(50 * time.Millisecond):
 	}
 
-	// The window comes back: the stream of the same Project starts again.
+	// The window comes back: the stream starts again.
 	f.SetHidden(false)
 	waitSignal(t, starts, "the stream of the window back")
 }
@@ -191,11 +188,11 @@ func TestUsageFeed_ASampleQueuedBeforeTheStopNeverArrives(t *testing.T) {
 	var got []*compose.UsageSample
 	f.OnSample = func(sample *compose.UsageSample) { got = append(got, sample) }
 
-	f.Follow(compose.Project{Name: "shop", Running: 1}, true)
+	f.Follow(true)
 	waitSignal(t, reported, "the sample")
 
 	// The sample waits for the thread that draws; the stop arrives first.
-	f.Follow(compose.Project{}, false)
+	f.Follow(false)
 	queue.drain()
 
 	if len(got) != 1 || got[0] != nil {
@@ -208,7 +205,7 @@ func TestUsageFeed_WithoutASourceThereIsNothingToStream(t *testing.T) {
 	var got []*compose.UsageSample
 	f.OnSample = func(sample *compose.UsageSample) { got = append(got, sample) }
 
-	f.Follow(compose.Project{Name: "shop", Running: 1}, true)
+	f.Follow(true)
 
 	if len(got) != 0 {
 		t.Fatalf("samples = %v, want none from a feed without a source", got)

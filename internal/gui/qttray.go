@@ -37,10 +37,9 @@ type trayAdapter struct {
 }
 
 // startTray creates the tray when the desktop has one. Without a tray it
-// returns nil and the application runs as before: the window keeps "Esci" and
-// "Impostazioni", so the user never depends on an icon that is not there. The
-// first snapshot goes on the icon before it shows, so the icon never appears
-// without a picture.
+// returns nil and the application runs as before: the window keeps
+// "Impostazioni", and its close is the way out. The first snapshot goes on the
+// icon before it shows, so the icon never appears without a picture.
 func startTray(initial compose.Snapshot, onShow, onQuit func(), onChoose func(trayNode)) *trayAdapter {
 	if !qt6.QSystemTrayIcon_IsSystemTrayAvailable() {
 		return nil
