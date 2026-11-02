@@ -2,6 +2,7 @@ package gui
 
 import (
 	"dockercontroller/internal/compose"
+	guiproject "dockercontroller/internal/gui/project"
 	"dockercontroller/internal/tray"
 )
 
@@ -100,11 +101,11 @@ func trayTooltip(s compose.Snapshot) string {
 // nil when the entry asks nothing. The message is the one the tray description
 // carries, and the label of the entry is the affirmative answer. Down con volumi
 // also asks for the name of the Project, because it deletes data.
-func trayQuestion(node trayNode) *Confirmation {
+func trayQuestion(node trayNode) *guiproject.Confirmation {
 	if node.Action == nil || node.Confirm == "" {
 		return nil
 	}
-	question := &Confirmation{
+	question := &guiproject.Confirmation{
 		Title:        windowTitle,
 		Message:      node.Confirm,
 		ConfirmLabel: node.Label,

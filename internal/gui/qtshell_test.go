@@ -19,6 +19,7 @@ import (
 	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/gui/guitest"
 	"dockercontroller/internal/gui/logs"
+	guiproject "dockercontroller/internal/gui/project"
 	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/settings"
 	"dockercontroller/internal/tray"
@@ -118,7 +119,7 @@ func checkDetailPanel(t *testing.T, s *shell) {
 	if got := s.panel.stack.CurrentWidget(); got == nil || got.UnsafePointer() != s.panel.scroll.UnsafePointer() {
 		t.Fatal("the detail does not show after the Project is opened")
 	}
-	if got := s.panel.shown.project.Name; got != project.Name {
+	if got := s.panel.shown.Project.Name; got != project.Name {
 		t.Errorf("the panel shows %q, want %q", got, project.Name)
 	}
 	for _, name := range []string{
@@ -197,8 +198,8 @@ func checkDetailPanel(t *testing.T, s *shell) {
 	if remove.IsEnabled() {
 		t.Error("the remove entry is enabled on a Project that still has Containers")
 	}
-	if got := remove.ToolTip(); got != ContainerRefusalText {
-		t.Errorf("the remove entry says %q, want %q", got, ContainerRefusalText)
+	if got := remove.ToolTip(); got != guiproject.ContainerRefusalText {
+		t.Errorf("the remove entry says %q, want %q", got, guiproject.ContainerRefusalText)
 	}
 
 	// Before the first snapshot the row of the Actions claims no reason: the
@@ -257,14 +258,14 @@ func checkActions(t *testing.T, s *shell) {
 		t.Fatal("the panel has no row of Actions")
 	}
 	commands := projectActionButtons(actions)
-	if got, want := len(commands), len(ProjectActions(project, true)); got != want {
+	if got, want := len(commands), len(guiproject.ProjectActions(project, true)); got != want {
 		t.Fatalf("the row of Actions carries %d commands, want %d", got, want)
 	}
 	primary := widgetsNamed(actions, "primaryAction")
 	if len(primary) != 1 {
 		t.Fatalf("the row of Actions carries %d primary commands, want 1", len(primary))
 	}
-	if got, want := primary[0].AccessibleName(), ProjectActions(project, true)[0].Label; got != want {
+	if got, want := primary[0].AccessibleName(), guiproject.ProjectActions(project, true)[0].Label; got != want {
 		t.Errorf("the primary command is %q, want the one the state suggests: %q", got, want)
 	}
 	for _, button := range commands {
@@ -277,7 +278,7 @@ func checkActions(t *testing.T, s *shell) {
 	if services == nil {
 		t.Fatal("the panel has no block of Services")
 	}
-	perService := len(ServiceActions(project, project.Services[0], true))
+	perService := len(guiproject.ServiceActions(project, project.Services[0], true))
 	if got, want := len(widgetsNamed(services, "serviceActionButton")), len(project.Services)*perService; got != want {
 		t.Errorf("the Services carry %d commands, want %d", got, want)
 	}
@@ -293,23 +294,23 @@ func checkActions(t *testing.T, s *shell) {
 		if button.IsEnabled() {
 			t.Errorf("the command %q is enabled during an Activity", button.AccessibleName())
 		}
-		if got := button.AccessibleDescription(); got != ActivityRunningText {
-			t.Errorf("the command %q says %q, want %q", button.AccessibleName(), got, ActivityRunningText)
+		if got := button.AccessibleDescription(); got != guiproject.ActivityRunningText {
+			t.Errorf("the command %q says %q, want %q", button.AccessibleName(), got, guiproject.ActivityRunningText)
 		}
 	}
 	if !hasWidgetNamed(actions, "actionsReason") {
 		t.Error("the row of Actions hides the reason of an insensitive command")
 	}
 	for _, button := range widgetsNamed(blockNamed(s.panel, "Servizi del Progetto"), "serviceActionButton") {
-		if got := button.AccessibleDescription(); got != ActivityRunningText {
-			t.Errorf("the command %q says %q, want %q", button.AccessibleName(), got, ActivityRunningText)
+		if got := button.AccessibleDescription(); got != guiproject.ActivityRunningText {
+			t.Errorf("the command %q says %q, want %q", button.AccessibleName(), got, guiproject.ActivityRunningText)
 		}
 	}
 
 	// Down opens its question, and a rejection launches nothing.
 	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{project}})
 	settle()
-	down, ok := actionKind(ProjectActions(project, true), compose.ActionDown)
+	down, ok := actionKind(guiproject.ProjectActions(project, true), compose.ActionDown)
 	if !ok {
 		t.Fatal("the Project offers no Down")
 	}
@@ -332,13 +333,13 @@ func checkActions(t *testing.T, s *shell) {
 }
 
 // actionKind finds the view of an ActionKind in a row.
-func actionKind(views []ActionView, kind compose.ActionKind) (ActionView, bool) {
+func actionKind(views []guiproject.ActionView, kind compose.ActionKind) (guiproject.ActionView, bool) {
 	for _, view := range views {
 		if view.Action.Kind == kind {
 			return view, true
 		}
 	}
-	return ActionView{}, false
+	return guiproject.ActionView{}, false
 }
 
 // checkEditForm drives the form of the settings: the command of the data opens
@@ -500,7 +501,7 @@ func checkEditForm(t *testing.T, s *shell) {
 	after.ActiveProfiles = []string{"debug", "metrics"}
 	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{after, other}})
 	settle()
-	if got := s.panel.shown.project.DisplayName; got != "Negozio nuovo" {
+	if got := s.panel.shown.Project.DisplayName; got != "Negozio nuovo" {
 		t.Errorf("the detail shows the Display name %q after the save, want %q", got, "Negozio nuovo")
 	}
 	if !slices.Contains(listNames(s.list.widget), "Negozio nuovo") {
@@ -519,7 +520,7 @@ func checkEditForm(t *testing.T, s *shell) {
 	if blockNamed(s.panel, editTitle) != nil {
 		t.Error("Annulla leaves the form open")
 	}
-	if got := s.panel.shown.project.DisplayName; got != "Negozio nuovo" {
+	if got := s.panel.shown.Project.DisplayName; got != "Negozio nuovo" {
 		t.Errorf("Annulla changed the Project to %q", got)
 	}
 
@@ -541,7 +542,7 @@ func checkEditForm(t *testing.T, s *shell) {
 	cleared.DisplayName = ""
 	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{cleared, other}})
 	settle()
-	if got := view.ProjectName(s.panel.shown.project); got != cleared.Name {
+	if got := view.ProjectName(s.panel.shown.Project); got != cleared.Name {
 		t.Errorf("the detail names the Project %q, want the compose name %q", got, cleared.Name)
 	}
 	if !slices.Contains(listNames(s.list.widget), cleared.Name) {
@@ -644,7 +645,7 @@ func errorUnder(form *qt6.QWidget) string {
 func checkConfirmDialog(t *testing.T, s *shell) {
 	t.Helper()
 
-	question := Confirmation{
+	question := guiproject.Confirmation{
 		Title:         "Down con volumi di shop",
 		Message:       "Rimuove i Container e ELIMINA i volumi del Progetto: i dati nei volumi andranno persi per sempre.",
 		ConfirmLabel:  "Down con volumi",
@@ -815,7 +816,7 @@ func checkCommands(t *testing.T, s *shell) {
 	if s.panel.question == nil {
 		t.Fatal("the remove entry opens no question")
 	}
-	want := RemoveConfirmation(removable)
+	want := guiproject.RemoveConfirmation(removable)
 	if got := s.panel.question.dialog.WindowTitle(); got != want.Title {
 		t.Errorf("the question is titled %q, want %q", got, want.Title)
 	}
@@ -1205,13 +1206,13 @@ func checkBottomPanel(t *testing.T) {
 	}
 
 	// A message without an action keeps the notice as it was: no button.
-	s.showNotice(ActivityRunningText)
+	s.showNotice(guiproject.ActivityRunningText)
 	settle()
 	if s.notice.action.IsVisible() {
 		t.Error("a notice without an action shows the button of the previous one")
 	}
-	if got := s.notice.label.Text(); got != ActivityRunningText {
-		t.Errorf("the notice reads %q, want %q", got, ActivityRunningText)
+	if got := s.notice.label.Text(); got != guiproject.ActivityRunningText {
+		t.Errorf("the notice reads %q, want %q", got, guiproject.ActivityRunningText)
 	}
 
 	checkMinimumTargets(t, s.window)
@@ -1907,7 +1908,7 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 
 	s.open(projects[1])
 	settle()
-	s.showNotice(ActivityRunningText)
+	s.showNotice(guiproject.ActivityRunningText)
 	shot("04-notice")
 	s.notice.hide()
 
@@ -1945,7 +1946,7 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 
 	// The modal question is grabbed on its own: the window behind it would hide
 	// the size of the dialog, which is what the check is about.
-	confirm := Confirmation{
+	confirm := guiproject.Confirmation{
 		Title:        "Down di " + view.ProjectName(projects[0]),
 		Message:      "Ferma e rimuove i Container del Progetto. I volumi restano. Il Progetto resta in lista come Rimosso.",
 		ConfirmLabel: "Down",
@@ -1961,7 +1962,7 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 
 	// The question of "Rimuovi dalla lista" and the form of a new Project, with
 	// two File compose in the order the picker returned them.
-	captureDialog(t, s.window.QWidget, dir, "21-confirm-remove", RemoveConfirmation(projects[3]))
+	captureDialog(t, s.window.QWidget, dir, "21-confirm-remove", guiproject.RemoveConfirmation(projects[3]))
 	captureAddForm(t, s.window.QWidget, dir, "20-add-form")
 
 	// The settings and the question of a close, with a tray: the three choices
@@ -2143,7 +2144,7 @@ func saveGrab(t *testing.T, window *qt6.QMainWindow, dir, name string) {
 
 // captureDialog writes the PNG of a modal question, so its size and its text
 // can be reviewed without a desktop.
-func captureDialog(t *testing.T, parent *qt6.QWidget, dir, name string, question Confirmation) {
+func captureDialog(t *testing.T, parent *qt6.QWidget, dir, name string, question guiproject.Confirmation) {
 	t.Helper()
 
 	dialog := newConfirmDialog(parent, question, func() {})
@@ -2405,7 +2406,7 @@ func checkHiddenWindow(t *testing.T) {
 	if s.selected != projects[1].Name {
 		t.Errorf("selection = %q after the return, want %q", s.selected, projects[1].Name)
 	}
-	if got := s.panel.shown.project.Name; got != projects[1].Name {
+	if got := s.panel.shown.Project.Name; got != projects[1].Name {
 		t.Errorf("the detail shows %q after the return, want %q", got, projects[1].Name)
 	}
 	if got := s.bottom.page.list.Count(); got != wantHistory {

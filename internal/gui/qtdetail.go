@@ -9,6 +9,7 @@ import (
 
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/design"
+	guiproject "dockercontroller/internal/gui/project"
 	"dockercontroller/internal/gui/view"
 )
 
@@ -105,7 +106,7 @@ type detailPanel struct {
 
 	// shown is the data the panel draws now, and visible says whether it draws
 	// a Project at all.
-	shown   detailData
+	shown   guiproject.DetailData
 	visible bool
 
 	// strip is the Utilizzo risorse of the machine, above the detail: it is the
@@ -210,8 +211,8 @@ func newDetailInvite() *qt6.QWidget {
 // eyes of the user.
 func (p *detailPanel) set(project compose.Project, dockerReachable, loading bool) {
 	p.setDocker(dockerReachable, loading)
-	data := detailData{project: project, dockerReachable: dockerReachable, loading: loading}
-	if p.visible && p.shown.sameDraw(data) {
+	data := guiproject.DetailData{Project: project, DockerReachable: dockerReachable, Loading: loading}
+	if p.visible && p.shown.SameDraw(data) {
 		return
 	}
 	p.visible = true
@@ -234,7 +235,7 @@ func (p *detailPanel) clear() {
 		return
 	}
 	p.visible = false
-	p.shown = detailData{}
+	p.shown = guiproject.DetailData{}
 	p.pendingOffset = 0
 	p.waitingDraw = false
 	p.controls = p.controls[:0]
@@ -296,7 +297,7 @@ func (p *detailPanel) render() {
 	} else {
 		p.layout.AddWidget(p.data())
 	}
-	if p.shown.project.ComposeMissing {
+	if p.shown.Project.ComposeMissing {
 		p.layout.AddWidget(p.missing())
 	}
 	p.layout.AddWidget(p.actions())
@@ -346,7 +347,7 @@ func (p *detailPanel) showUsage() {
 // without figures shows no indicator at all, and a Docker that does not answer
 // takes every indicator away.
 func (p *detailPanel) applyUsage() {
-	unreachable := !p.shown.loading && !p.shown.dockerReachable
+	unreachable := !p.shown.Loading && !p.shown.DockerReachable
 	byService := make(map[string]compose.ServiceUsage, len(p.usageRows))
 	if p.usage != nil {
 		for _, usage := range p.usage.Services {
@@ -392,7 +393,7 @@ func (p *detailPanel) linkTabOrder() {
 // answer, the notice takes the place of the numbers: the count and the tacks of
 // the last snapshot would read as the current ones.
 func (p *detailPanel) header() *qt6.QWidget {
-	project := p.shown.project
+	project := p.shown.Project
 	block, box := detailBlock()
 	block.SetAccessibleName("Intestazione del Progetto")
 
@@ -413,9 +414,9 @@ func (p *detailPanel) header() *qt6.QWidget {
 	line.AddWidget3(marker.QWidget, 0, qt6.AlignVCenter)
 	line.AddWidget3(detailLabel(status.Label, role).QWidget, 0, qt6.AlignVCenter)
 
-	notice := DockerNotice(p.shown.loading, p.shown.dockerReachable)
+	notice := guiproject.DockerNotice(p.shown.Loading, p.shown.DockerReachable)
 	if notice == "" {
-		line.AddWidget3(detailLabel(ContainerCountLine(project), "detailCount").QWidget, 0, qt6.AlignVCenter)
+		line.AddWidget3(detailLabel(guiproject.ContainerCountLine(project), "detailCount").QWidget, 0, qt6.AlignVCenter)
 
 		tacks, more := view.Tacks(project.Services)
 		line.AddWidget3(newTackStrip(tacks, p.theme).QWidget, 0, qt6.AlignVCenter)
@@ -458,7 +459,7 @@ func (p *detailPanel) header() *qt6.QWidget {
 // line without a value stays hidden, so the block never shows a fact with
 // nothing after it.
 func (p *detailPanel) data() *qt6.QWidget {
-	project := p.shown.project
+	project := p.shown.Project
 	block, box := detailBlock()
 	block.SetAccessibleName(dataTitle)
 
@@ -472,13 +473,13 @@ func (p *detailPanel) data() *qt6.QWidget {
 	box.AddLayout2(heading.QLayout, 0)
 	p.controls = append(p.controls, panelControl{widget: edit.QWidget, label: editText})
 
-	box.AddWidget(detailLabel(GroupLine(project.Group), "detailData").QWidget)
+	box.AddWidget(detailLabel(guiproject.GroupLine(project.Group), "detailData").QWidget)
 
-	if line := ActiveProfilesLine(project.ActiveProfiles); line != "" {
+	if line := guiproject.ActiveProfilesLine(project.ActiveProfiles); line != "" {
 		box.AddWidget(detailLabel(line, "detailData").QWidget)
 	}
 
-	if line := ComposeFilesLine(project.ComposeFiles); line != "" {
+	if line := guiproject.ComposeFilesLine(project.ComposeFiles); line != "" {
 		files := detailLabel(line, "detailData")
 		// The line names the files by their base name; the tooltip carries the
 		// whole paths, so the block keeps one line per fact.
@@ -491,7 +492,8 @@ func (p *detailPanel) data() *qt6.QWidget {
 
 // missing is the notice of a Project whose Compose files are gone, with the
 // entry that takes it off the list. The entry is present and follows
-// CanRemoveFromList, so a Project that still has Containers says why it stays.
+// guiproject.CanRemoveFromList, so a Project that still has Containers says why
+// it stays.
 func (p *detailPanel) missing() *qt6.QWidget {
 	block, box := detailBlock()
 	block.SetAccessibleName("File compose mancante")
@@ -500,14 +502,14 @@ func (p *detailPanel) missing() *qt6.QWidget {
 
 	row := qt6.NewQHBoxLayout2()
 	row.SetSpacing(design.SpaceS)
-	reason := RemoveDisabledReason(p.shown.project, p.shown.dockerReachable)
-	remove := detailButton(removeText, "removeButton", removeTooltip, CanRemoveFromList(p.shown.project, p.shown.dockerReachable))
+	reason := guiproject.RemoveDisabledReason(p.shown.Project, p.shown.DockerReachable)
+	remove := detailButton(guiproject.RemoveText, "removeButton", guiproject.RemoveTooltip, guiproject.CanRemoveFromList(p.shown.Project, p.shown.DockerReachable))
 	setCommandReason(remove, reason)
 	remove.OnClicked(p.confirmRemove)
 	row.AddWidget(remove.QWidget)
 	row.AddStretch()
 	box.AddLayout2(row.QLayout, 0)
-	p.controls = append(p.controls, panelControl{widget: remove.QWidget, label: removeText})
+	p.controls = append(p.controls, panelControl{widget: remove.QWidget, label: guiproject.RemoveText})
 
 	return block
 }
@@ -517,15 +519,15 @@ func (p *detailPanel) missing() *qt6.QWidget {
 // insensitive Action, when there is one, sits beside the row: the tooltip alone
 // would hide it from the keyboard and from the screen reader.
 func (p *detailPanel) actions() *qt6.QWidget {
-	project := p.shown.project
+	project := p.shown.Project
 	block, box := detailBlock()
 	block.SetAccessibleName("Azioni del Progetto")
 
-	reason := actionReasonText(p.shown.loading, p.shown.dockerReachable, project.Activity != nil)
+	reason := guiproject.ActionReasonText(p.shown.Loading, p.shown.DockerReachable, project.Activity != nil)
 
 	row := qt6.NewQHBoxLayout2()
 	row.SetSpacing(design.SpaceS)
-	for i, view := range ProjectActions(project, p.shown.dockerReachable) {
+	for i, view := range guiproject.ProjectActions(project, p.shown.DockerReachable) {
 		// The Action the state suggests comes first: it carries the role that
 		// makes it the one the eye finds, without a colour of its own.
 		name := "actionButton"
@@ -555,7 +557,7 @@ func (p *detailPanel) actions() *qt6.QWidget {
 // in it and its first published port. A command that the Project does not allow
 // stays insensitive, and its reason reaches the tooltip and the screen reader.
 func (p *detailPanel) commands() *qt6.QWidget {
-	project := p.shown.project
+	project := p.shown.Project
 	block, box := detailBlock()
 	block.SetAccessibleName("Comandi del Progetto")
 
@@ -603,10 +605,10 @@ func (p *detailPanel) commands() *qt6.QWidget {
 	// a file is missing the notice above already carries the entry, and one
 	// command per screen is enough.
 	if !project.ComposeMissing {
-		removeKey := removeText + " (comandi)"
-		remove := detailButton(removeText, "removeCommandButton", removeTooltip,
-			CanRemoveFromList(project, p.shown.dockerReachable))
-		setCommandReason(remove, RemoveDisabledReason(project, p.shown.dockerReachable))
+		removeKey := guiproject.RemoveText + " (comandi)"
+		remove := detailButton(guiproject.RemoveText, "removeCommandButton", guiproject.RemoveTooltip,
+			guiproject.CanRemoveFromList(project, p.shown.DockerReachable))
+		setCommandReason(remove, guiproject.RemoveDisabledReason(project, p.shown.DockerReachable))
 		remove.OnClicked(func() { p.confirmRemoveFrom(removeKey) })
 		row.AddWidget(remove.QWidget)
 		p.controls = append(p.controls, panelControl{widget: remove.QWidget, label: removeKey})
@@ -636,11 +638,11 @@ func setCommandReason(button *qt6.QPushButton, reason string) {
 // row of the Actions of the Project already writes it in full, and the detail
 // does not repeat it for every Service.
 func (p *detailPanel) services() *qt6.QWidget {
-	project := p.shown.project
+	project := p.shown.Project
 	block, box := detailBlock()
 	block.SetAccessibleName("Servizi del Progetto")
 
-	reason := actionReasonText(p.shown.loading, p.shown.dockerReachable, project.Activity != nil)
+	reason := guiproject.ActionReasonText(p.shown.Loading, p.shown.DockerReachable, project.Activity != nil)
 
 	heading := qt6.NewQHBoxLayout2()
 	heading.SetSpacing(design.SpaceS)
@@ -653,7 +655,7 @@ func (p *detailPanel) services() *qt6.QWidget {
 	box.AddLayout2(heading.QLayout, 0)
 
 	if len(project.Services) == 0 {
-		box.AddWidget(detailLabel(NoServicesText(project), "detailEmpty").QWidget)
+		box.AddWidget(detailLabel(guiproject.NoServicesText(project), "detailEmpty").QWidget)
 		return block
 	}
 
@@ -691,7 +693,7 @@ func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidg
 	line := qt6.NewQHBoxLayout2()
 	line.SetSpacing(design.SpaceS)
 	line.AddWidget3(detailLabel(service.Name, "serviceName").QWidget, 0, qt6.AlignVCenter)
-	line.AddWidget3(detailLabel(ServiceStateLine(service), "serviceState").QWidget, 0, qt6.AlignVCenter)
+	line.AddWidget3(detailLabel(guiproject.ServiceStateLine(service), "serviceState").QWidget, 0, qt6.AlignVCenter)
 	line.AddStretch()
 
 	tacks, more := view.Tacks([]compose.Service{service})
@@ -707,7 +709,7 @@ func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidg
 	logs.SetAccessibleName(serviceLogText + " di " + service.Name)
 	logs.OnClicked(func() {
 		if p.onLogs != nil {
-			p.onLogs(p.shown.project, service.Name)
+			p.onLogs(p.shown.Project, service.Name)
 		}
 	})
 	line.AddWidget3(logs.QWidget, 0, qt6.AlignVCenter)
@@ -720,7 +722,7 @@ func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidg
 
 	// The Utilizzo risorse of the Service sits under its Containers, where the
 	// old view put it. It takes no room until a sample carries the Service.
-	usage := newServiceUsageRow(p.shown.project.Name, service.Name, ServiceRuns(service))
+	usage := newServiceUsageRow(p.shown.Project.Name, service.Name, ServiceRuns(service))
 	p.usageRows[usage.key] = usage
 	box.AddWidget(usage.widget)
 
@@ -737,7 +739,7 @@ func (p *detailPanel) service(service compose.Service, reason string) *qt6.QWidg
 func (p *detailPanel) serviceActions(service compose.Service, reason string) *qt6.QHBoxLayout {
 	row := qt6.NewQHBoxLayout2()
 	row.SetSpacing(design.SpaceS)
-	for _, view := range ServiceActions(p.shown.project, service, p.shown.dockerReachable) {
+	for _, view := range guiproject.ServiceActions(p.shown.Project, service, p.shown.DockerReachable) {
 		button := detailButton(view.Label, "serviceActionButton", "", view.Enabled)
 		button.SetAccessibleName(view.Label + " di " + service.Name)
 		if reason != "" {
@@ -756,7 +758,7 @@ func (p *detailPanel) serviceActions(service compose.Service, reason string) *qt
 // choose runs an Action of the detail. A destructive Action asks its question
 // first, and an insensitive one does nothing, so a stale button never starts a
 // command.
-func (p *detailPanel) choose(view ActionView, button *qt6.QPushButton, key string) {
+func (p *detailPanel) choose(view guiproject.ActionView, button *qt6.QPushButton, key string) {
 	if !view.Enabled {
 		return
 	}
@@ -771,7 +773,7 @@ func (p *detailPanel) choose(view ActionView, button *qt6.QPushButton, key strin
 // hands the name to the shell, which never stops a Container: Docker and the
 // files stay as they are. The entry is present only while the Project may leave.
 func (p *detailPanel) confirmRemove() {
-	p.confirmRemoveFrom(removeText)
+	p.confirmRemoveFrom(guiproject.RemoveText)
 }
 
 // confirmRemoveFrom asks the same question for the entry named by key, so the
@@ -780,11 +782,11 @@ func (p *detailPanel) confirmRemoveFrom(key string) {
 	if p.question != nil || !p.visible {
 		return
 	}
-	if !CanRemoveFromList(p.shown.project, p.shown.dockerReachable) {
+	if !guiproject.CanRemoveFromList(p.shown.Project, p.shown.DockerReachable) {
 		return
 	}
-	name := p.shown.project.Name
-	p.ask(RemoveConfirmation(p.shown.project), key, func() {
+	name := p.shown.Project.Name
+	p.ask(guiproject.RemoveConfirmation(p.shown.Project), key, func() {
 		if p.onRemove != nil {
 			p.onRemove(name)
 		}
@@ -794,7 +796,7 @@ func (p *detailPanel) confirmRemoveFrom(key string) {
 // ask opens a question. Annulling, Escape and closing run nothing. When the
 // question closes, the panel draws a snapshot that waited and gives the focus
 // back to the command named by key.
-func (p *detailPanel) ask(question Confirmation, key string, run func()) {
+func (p *detailPanel) ask(question guiproject.Confirmation, key string, run func()) {
 	if p.question != nil {
 		return
 	}
@@ -811,7 +813,7 @@ func (p *detailPanel) ask(question Confirmation, key string, run func()) {
 // launch hands the Action to the shell. The command that launched it stays
 // insensitive until the result comes back, and the guard refuses a second
 // click, so one click starts one Activity.
-func (p *detailPanel) launch(view ActionView, button *qt6.QPushButton) {
+func (p *detailPanel) launch(view guiproject.ActionView, button *qt6.QPushButton) {
 	if !p.guard.begin() {
 		return
 	}
@@ -894,7 +896,7 @@ func newContainerRow(container compose.Container) *qt6.QWidget {
 	line.SetContentsMargins(design.SpaceXS, 0, 0, 0)
 	line.SetSpacing(design.SpaceS)
 
-	tone := ToneOfContainer(container)
+	tone := guiproject.ToneOfContainer(container)
 	marker := detailLabel(tone.Glyph, design.StateRole(tone.CSSClass))
 	marker.SetMinimumWidth(14)
 	marker.SetAccessibleName(container.State)
@@ -903,7 +905,7 @@ func newContainerRow(container compose.Container) *qt6.QWidget {
 	line.AddWidget3(detailLabel(container.Name, "containerName").QWidget, 1, qt6.AlignVCenter)
 	line.AddWidget3(detailLabel(container.State, "containerState").QWidget, 0, qt6.AlignVCenter)
 
-	if health := HealthOf(container.Health); health.Text != "" {
+	if health := guiproject.HealthOf(container.Health); health.Text != "" {
 		label := detailLabel(health.Text, "containerHealth")
 		if role := design.StateRole(health.CSSClass); role != "" {
 			setObjectName(label.QWidget, role)
@@ -912,7 +914,7 @@ func newContainerRow(container compose.Container) *qt6.QWidget {
 	}
 
 	for _, port := range container.Ports {
-		line.AddWidget3(detailLabel(PortText(port), "containerPort").QWidget, 0, qt6.AlignVCenter)
+		line.AddWidget3(detailLabel(guiproject.PortText(port), "containerPort").QWidget, 0, qt6.AlignVCenter)
 	}
 
 	return row

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"dockercontroller/internal/compose"
+	guiproject "dockercontroller/internal/gui/project"
 	"dockercontroller/internal/tray"
 )
 
@@ -338,7 +339,7 @@ func TestTrayQuestion(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		node trayNode
-		want *Confirmation
+		want *guiproject.Confirmation
 	}{
 		{
 			name: "an Action without a question launches at once",
@@ -356,7 +357,7 @@ func TestTrayQuestion(t *testing.T) {
 				Confirm: "Fermare e rimuovere i Container di shop? I volumi restano.",
 				Action:  trayAction(compose.Action{Project: "shop", Kind: compose.ActionDown}),
 			},
-			want: &Confirmation{
+			want: &guiproject.Confirmation{
 				Title:        "Docker Controller",
 				Message:      "Fermare e rimuovere i Container di shop? I volumi restano.",
 				ConfirmLabel: "Down",
@@ -370,7 +371,7 @@ func TestTrayQuestion(t *testing.T) {
 				Confirm: "Fermare e rimuovere i Container del Servizio web di shop? I volumi restano.",
 				Action:  trayAction(compose.Action{Project: "shop", Service: "web", Kind: compose.ActionDownService}),
 			},
-			want: &Confirmation{
+			want: &guiproject.Confirmation{
 				Title:        "Docker Controller",
 				Message:      "Fermare e rimuovere i Container del Servizio web di shop? I volumi restano.",
 				ConfirmLabel: "Down",
@@ -384,7 +385,7 @@ func TestTrayQuestion(t *testing.T) {
 				Confirm: "Rimuove i Container e ELIMINA i volumi del Progetto: i dati nei volumi andranno persi per sempre.",
 				Action:  trayAction(compose.Action{Project: "shop", Kind: compose.ActionDownVolumes}),
 			},
-			want: &Confirmation{
+			want: &guiproject.Confirmation{
 				Title:         "Docker Controller",
 				Message:       "Rimuove i Container e ELIMINA i volumi del Progetto: i dati nei volumi andranno persi per sempre.",
 				ConfirmLabel:  "Down con volumi",

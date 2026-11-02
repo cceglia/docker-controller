@@ -1,4 +1,4 @@
-package gui
+package project
 
 import (
 	"reflect"
@@ -7,25 +7,25 @@ import (
 	"dockercontroller/internal/compose"
 )
 
-// detailData is what the panel of the detail draws of a Project and of Docker.
+// DetailData is what the panel of the detail draws of a Project and of Docker.
 // A snapshot whose data equals the one on screen draws the same panel, so the
 // panel keeps its widgets, the value of the scroll bar and the focus.
-type detailData struct {
-	project         compose.Project
-	dockerReachable bool
-	loading         bool
+type DetailData struct {
+	Project         compose.Project
+	DockerReachable bool
+	Loading         bool
 }
 
-// sameDraw reports whether two sets of data draw the same panel. It compares
+// SameDraw reports whether two sets of data draw the same panel. It compares
 // the fields the panel draws, not the pointer of the snapshot: a change of the
 // Profiles the compose files define reaches the list and the form of the
 // settings, not the detail, so it alone does not rebuild it.
-func (d detailData) sameDraw(other detailData) bool {
-	if d.dockerReachable != other.dockerReachable || d.loading != other.loading {
+func (d DetailData) SameDraw(other DetailData) bool {
+	if d.DockerReachable != other.DockerReachable || d.Loading != other.Loading {
 		return false
 	}
 
-	a, b := d.project, other.project
+	a, b := d.Project, other.Project
 	if a.Name != b.Name || a.DisplayName != b.DisplayName || a.Group != b.Group ||
 		a.Folder != b.Folder ||
 		a.Status != b.Status || a.Running != b.Running || a.Total != b.Total ||

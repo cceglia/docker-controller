@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"dockercontroller/internal/compose"
+	guiproject "dockercontroller/internal/gui/project"
 )
 
 // ActivityLineLimit is the most output lines kept for one Activity. The old
@@ -59,7 +60,7 @@ func ActivityTarget(project, service string) string {
 
 // ActivityLabel is the Action and its target: "Up su shop/db".
 func ActivityLabel(a Activity) string {
-	return ActionLabel(a.Kind) + " su " + ActivityTarget(a.Project, a.Service)
+	return guiproject.ActionLabel(a.Kind) + " su " + ActivityTarget(a.Project, a.Service)
 }
 
 // ActivityGlyph is the marker of a state, the one the old view showed.
@@ -78,7 +79,7 @@ func ActivityGlyph(state ActivityState) string {
 // ActivityHeader is the row of the history: the state, the Action and its
 // target, as "⏳ Up · shop/db".
 func ActivityHeader(a Activity) string {
-	row := ActionLabel(a.Kind) + " · " + ActivityTarget(a.Project, a.Service)
+	row := guiproject.ActionLabel(a.Kind) + " · " + ActivityTarget(a.Project, a.Service)
 	if glyph := ActivityGlyph(a.State); glyph != "" {
 		return glyph + " " + row
 	}

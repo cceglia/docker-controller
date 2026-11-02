@@ -1,4 +1,4 @@
-package gui
+package project
 
 import (
 	"testing"
@@ -21,15 +21,15 @@ func TestDetailData_SameDrawComparesOnlyWhatThePanelDraws(t *testing.T) {
 		Profiles:       []string{"debug", "metrics"},
 		ActiveProfiles: []string{"debug"},
 	}
-	edited := func(edit func(*compose.Project)) detailData {
+	edited := func(edit func(*compose.Project)) DetailData {
 		project := base
 		edit(&project)
-		return detailData{project: project, dockerReachable: true}
+		return DetailData{Project: project, DockerReachable: true}
 	}
 
 	for _, tc := range []struct {
 		name  string
-		other detailData
+		other DetailData
 		want  bool
 	}{
 		{"the same Project", edited(func(*compose.Project) {}), true},
@@ -98,24 +98,24 @@ func TestDetailData_SameDrawComparesOnlyWhatThePanelDraws(t *testing.T) {
 		},
 		{
 			"Docker stops answering",
-			detailData{project: base, dockerReachable: false},
+			DetailData{Project: base, DockerReachable: false},
 			false,
 		},
 		{
 			"the first snapshot arrives",
-			detailData{project: base, dockerReachable: true, loading: true},
+			DetailData{Project: base, DockerReachable: true, Loading: true},
 			false,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			shown := detailData{project: base, dockerReachable: true}
-			if got := shown.sameDraw(tc.other); got != tc.want {
-				t.Errorf("sameDraw = %v, want %v", got, tc.want)
+			shown := DetailData{Project: base, DockerReachable: true}
+			if got := shown.SameDraw(tc.other); got != tc.want {
+				t.Errorf("SameDraw = %v, want %v", got, tc.want)
 			}
 			// The comparison is symmetric: a panel that would be rebuilt on the
 			// next snapshot must also rebuild on the one before.
-			if got := tc.other.sameDraw(shown); got != tc.want {
-				t.Errorf("sameDraw the other way = %v, want %v", got, tc.want)
+			if got := tc.other.SameDraw(shown); got != tc.want {
+				t.Errorf("SameDraw the other way = %v, want %v", got, tc.want)
 			}
 		})
 	}

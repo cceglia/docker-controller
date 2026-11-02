@@ -1,16 +1,16 @@
-package gui
+package project
 
 import (
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/view"
 )
 
-// removeText is the label of the entry that takes a Project off the list.
-const removeText = "Rimuovi dalla lista"
+// RemoveText is the label of the entry that takes a Project off the list.
+const RemoveText = "Rimuovi dalla lista"
 
-// removeTooltip says what the entry does while it can be pressed: it leaves
+// RemoveTooltip says what the entry does while it can be pressed: it leaves
 // Docker and the files of the Project alone.
-const removeTooltip = "Togli il Progetto dalla lista: Docker e i file non vengono toccati."
+const RemoveTooltip = "Togli il Progetto dalla lista: Docker e i file non vengono toccati."
 
 // ContainerRefusalText explains the entry that cannot be pressed because the
 // Project still has Containers.
@@ -51,7 +51,7 @@ func RemoveConfirmation(project compose.Project) Confirmation {
 	return Confirmation{
 		Title:        "Rimuovi " + view.ProjectName(project) + " dalla lista",
 		Message:      "Il Progetto sparisce dalla lista dell'app. Docker e i file non vengono toccati.",
-		ConfirmLabel: removeText,
+		ConfirmLabel: RemoveText,
 		Destructive:  true,
 	}
 }

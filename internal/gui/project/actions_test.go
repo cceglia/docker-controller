@@ -1,4 +1,4 @@
-package gui
+package project
 
 import (
 	"testing"
@@ -273,8 +273,8 @@ func TestActionReasonText_SaysNothingBeforeTheFirstSnapshot(t *testing.T) {
 		{"an Activity runs and docker does not answer", false, false, true, DockerUnreachableText},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := actionReasonText(tc.loading, tc.reachable, tc.busy); got != tc.want {
-				t.Errorf("actionReasonText(%v, %v, %v) = %q, want %q",
+			if got := ActionReasonText(tc.loading, tc.reachable, tc.busy); got != tc.want {
+				t.Errorf("ActionReasonText(%v, %v, %v) = %q, want %q",
 					tc.loading, tc.reachable, tc.busy, got, tc.want)
 			}
 		})

@@ -60,7 +60,7 @@ func (p *detailPanel) startEdit() {
 	if p.edit != nil || !p.visible {
 		return
 	}
-	p.edit = &editForm{edit: NewProjectEdit(p.shown.project)}
+	p.edit = &editForm{edit: NewProjectEdit(p.shown.Project)}
 	p.render()
 	p.focusEdit()
 }
@@ -174,7 +174,7 @@ func editField(caption string, field *qt6.QWidget, message, hint string) *qt6.QW
 // the active Profiles, and the two commands. Every change goes to the pending
 // form, so a render builds it again from the same values.
 func (p *detailPanel) editBlock() *qt6.QWidget {
-	form, project := p.edit, p.shown.project
+	form, project := p.edit, p.shown.Project
 
 	// The form is a card of its own. The border separates it from the row of the
 	// Project's commands below, so Salva and Annulla never read as two more

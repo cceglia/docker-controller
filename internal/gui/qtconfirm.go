@@ -4,6 +4,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/gui/design"
+	guiproject "dockercontroller/internal/gui/project"
 )
 
 const (
@@ -53,7 +54,7 @@ type confirmDialog struct {
 
 // newConfirmDialog builds the question and the two answers. The texts are the
 // ones of the Confirmation, so the dialog asks what the old view asked.
-func newConfirmDialog(parent *qt6.QWidget, question Confirmation, onRun func()) *confirmDialog {
+func newConfirmDialog(parent *qt6.QWidget, question guiproject.Confirmation, onRun func()) *confirmDialog {
 	c := &confirmDialog{onRun: onRun}
 
 	c.dialog = qt6.NewQDialog(parent)
