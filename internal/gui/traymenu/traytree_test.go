@@ -1,4 +1,4 @@
-package gui
+package traymenu
 
 import (
 	"reflect"
@@ -18,7 +18,7 @@ func TestTrayTree(t *testing.T) {
 	tests := []struct {
 		name  string
 		items []tray.Item
-		want  []trayNode
+		want  []TrayNode
 	}{
 		{
 			name: "an empty description gives no node",
@@ -26,12 +26,12 @@ func TestTrayTree(t *testing.T) {
 		{
 			name:  "a separator",
 			items: []tray.Item{{Separator: true}},
-			want:  []trayNode{{Separator: true}},
+			want:  []TrayNode{{Separator: true}},
 		},
 		{
 			name:  "a notice is a disabled leaf",
 			items: []tray.Item{{Label: "Docker non raggiungibile"}},
-			want:  []trayNode{{Label: "Docker non raggiungibile"}},
+			want:  []TrayNode{{Label: "Docker non raggiungibile"}},
 		},
 		{
 			name: "an Action with its question",
@@ -41,7 +41,7 @@ func TestTrayTree(t *testing.T) {
 				Action:  &compose.Action{Project: "shop", Kind: compose.ActionDown},
 				Confirm: "Fermare e rimuovere i Container di shop? I volumi restano.",
 			}},
-			want: []trayNode{{
+			want: []TrayNode{{
 				Label:   "Down",
 				Enabled: true,
 				Action:  trayAction(compose.Action{Project: "shop", Kind: compose.ActionDown}),
@@ -51,7 +51,7 @@ func TestTrayTree(t *testing.T) {
 		{
 			name:  "a Command",
 			items: []tray.Item{{Label: "Esci", Enabled: true, Command: tray.CommandQuit}},
-			want:  []trayNode{{Label: "Esci", Enabled: true, Command: tray.CommandQuit}},
+			want:  []TrayNode{{Label: "Esci", Enabled: true, Command: tray.CommandQuit}},
 		},
 		{
 			name: "a submenu keeps the order of its children",
@@ -63,10 +63,10 @@ func TestTrayTree(t *testing.T) {
 					{Label: "○ blog", Enabled: true},
 				},
 			}},
-			want: []trayNode{{
+			want: []TrayNode{{
 				Label:   "Lavoro",
 				Enabled: true,
-				Children: []trayNode{
+				Children: []TrayNode{
 					{Label: "● shop", Enabled: true},
 					{Label: "○ blog", Enabled: true},
 				},
@@ -86,13 +86,13 @@ func TestTrayTree(t *testing.T) {
 					}},
 				},
 			}},
-			want: []trayNode{{
+			want: []TrayNode{{
 				Label:   "● shop",
 				Enabled: true,
-				Children: []trayNode{
+				Children: []TrayNode{
 					{Separator: true},
-					{Label: "Servizi", Enabled: true, Children: []trayNode{
-						{Label: "web", Enabled: true, Children: []trayNode{
+					{Label: "Servizi", Enabled: true, Children: []TrayNode{
+						{Label: "web", Enabled: true, Children: []TrayNode{
 							{Label: "Start", Enabled: true, Action: trayAction(compose.Action{Project: "shop", Service: "web", Kind: compose.ActionStart})},
 						}},
 					}},
@@ -103,9 +103,9 @@ func TestTrayTree(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := trayTree(tt.items)
+			got := Tree(tt.items)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("trayTree() = %+v, want %+v", got, tt.want)
+				t.Errorf("Tree() = %+v, want %+v", got, tt.want)
 			}
 		})
 	}
@@ -123,20 +123,20 @@ func TestTrayTree_DoesNotShareMemoryWithTheDescription(t *testing.T) {
 		},
 	}}
 
-	nodes := trayTree(items)
+	nodes := Tree(items)
 	items[0].Label = "cambiato"
 	items[0].Children[0].Label = "cambiato"
 	up.Kind = compose.ActionDown
 
-	want := []trayNode{{
+	want := []TrayNode{{
 		Label:   "● shop",
 		Enabled: true,
-		Children: []trayNode{
+		Children: []TrayNode{
 			{Label: "Up", Enabled: true, Action: trayAction(compose.Action{Project: "shop", Kind: compose.ActionUp})},
 		},
 	}}
 	if !reflect.DeepEqual(nodes, want) {
-		t.Errorf("trayTree() = %+v, want %+v", nodes, want)
+		t.Errorf("Tree() = %+v, want %+v", nodes, want)
 	}
 }
 
@@ -155,7 +155,7 @@ func TestTrayTree_BuildMenuKeepsTheHierarchy(t *testing.T) {
 		}},
 	}
 
-	nodes := trayTree(tray.BuildMenu(snapshot))
+	nodes := Tree(tray.BuildMenu(snapshot))
 	if len(nodes) != 4 {
 		t.Fatalf("top level = %d entries, want the Group, a separator, Mostra finestra and Esci", len(nodes))
 	}
@@ -194,11 +194,11 @@ func TestTrayTree_BuildMenuKeepsTheHierarchy(t *testing.T) {
 }
 
 func TestSameTrayTree(t *testing.T) {
-	base := func() []trayNode {
-		return []trayNode{{
+	base := func() []TrayNode {
+		return []TrayNode{{
 			Label:   "● shop",
 			Enabled: true,
-			Children: []trayNode{
+			Children: []TrayNode{
 				{Label: "Up", Enabled: true, Action: trayAction(compose.Action{Project: "shop", Kind: compose.ActionUp})},
 				{Label: "Down", Enabled: false, Confirm: "Fermare?", Action: trayAction(compose.Action{Project: "shop", Kind: compose.ActionDown})},
 				{Separator: true},
@@ -209,7 +209,7 @@ func TestSameTrayTree(t *testing.T) {
 
 	tests := []struct {
 		name string
-		b    []trayNode
+		b    []TrayNode
 		want bool
 	}{
 		{
@@ -224,7 +224,7 @@ func TestSameTrayTree(t *testing.T) {
 		},
 		{
 			name: "a different label",
-			b: func() []trayNode {
+			b: func() []TrayNode {
 				tree := base()
 				tree[0].Children[0].Label = "Start"
 				return tree
@@ -233,7 +233,7 @@ func TestSameTrayTree(t *testing.T) {
 		},
 		{
 			name: "a different state",
-			b: func() []trayNode {
+			b: func() []TrayNode {
 				tree := base()
 				tree[0].Children[0].Enabled = false
 				return tree
@@ -242,7 +242,7 @@ func TestSameTrayTree(t *testing.T) {
 		},
 		{
 			name: "a different question",
-			b: func() []trayNode {
+			b: func() []TrayNode {
 				tree := base()
 				tree[0].Children[1].Confirm = "Fermare e rimuovere?"
 				return tree
@@ -251,7 +251,7 @@ func TestSameTrayTree(t *testing.T) {
 		},
 		{
 			name: "a different Command",
-			b: func() []trayNode {
+			b: func() []TrayNode {
 				tree := base()
 				tree[0].Children[3].Command = tray.CommandShowWindow
 				return tree
@@ -260,7 +260,7 @@ func TestSameTrayTree(t *testing.T) {
 		},
 		{
 			name: "an Action against no Action",
-			b: func() []trayNode {
+			b: func() []TrayNode {
 				tree := base()
 				tree[0].Children[0].Action = nil
 				return tree
@@ -269,7 +269,7 @@ func TestSameTrayTree(t *testing.T) {
 		},
 		{
 			name: "a different Action",
-			b: func() []trayNode {
+			b: func() []TrayNode {
 				tree := base()
 				tree[0].Children[0].Action = trayAction(compose.Action{Project: "shop", Kind: compose.ActionStop})
 				return tree
@@ -278,7 +278,7 @@ func TestSameTrayTree(t *testing.T) {
 		},
 		{
 			name: "a different Service of the same Action",
-			b: func() []trayNode {
+			b: func() []TrayNode {
 				tree := base()
 				tree[0].Children[0].Action = trayAction(compose.Action{Project: "shop", Service: "web", Kind: compose.ActionUp})
 				return tree
@@ -287,16 +287,16 @@ func TestSameTrayTree(t *testing.T) {
 		},
 		{
 			name: "a separator against an entry",
-			b: func() []trayNode {
+			b: func() []TrayNode {
 				tree := base()
-				tree[0].Children[2] = trayNode{Label: "Servizi", Enabled: true}
+				tree[0].Children[2] = TrayNode{Label: "Servizi", Enabled: true}
 				return tree
 			}(),
 			want: false,
 		},
 		{
 			name: "a missing child",
-			b: func() []trayNode {
+			b: func() []TrayNode {
 				tree := base()
 				tree[0].Children = tree[0].Children[:2]
 				return tree
@@ -307,11 +307,11 @@ func TestSameTrayTree(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := sameTrayTree(base(), tt.b); got != tt.want {
-				t.Errorf("sameTrayTree() = %v, want %v", got, tt.want)
+			if got := SameTree(base(), tt.b); got != tt.want {
+				t.Errorf("SameTree() = %v, want %v", got, tt.want)
 			}
-			if got := sameTrayTree(tt.b, base()); got != tt.want {
-				t.Errorf("sameTrayTree() with the operands swapped = %v, want %v", got, tt.want)
+			if got := SameTree(tt.b, base()); got != tt.want {
+				t.Errorf("SameTree() with the operands swapped = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -328,8 +328,8 @@ func TestTrayTooltip_NamesTheApplicationAndTheStateOfDocker(t *testing.T) {
 		{"Docker does not answer", compose.Snapshot{DockerReachable: false}, "Docker Controller · Docker non risponde"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := trayTooltip(tc.snapshot); got != tc.want {
-				t.Errorf("trayTooltip() = %q, want %q", got, tc.want)
+			if got := Tooltip(tc.snapshot); got != tc.want {
+				t.Errorf("Tooltip() = %q, want %q", got, tc.want)
 			}
 		})
 	}
@@ -338,20 +338,20 @@ func TestTrayTooltip_NamesTheApplicationAndTheStateOfDocker(t *testing.T) {
 func TestTrayQuestion(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		node trayNode
+		node TrayNode
 		want *guiproject.Confirmation
 	}{
 		{
 			name: "an Action without a question launches at once",
-			node: trayNode{Label: "Up", Enabled: true, Action: trayAction(compose.Action{Project: "shop", Kind: compose.ActionUp})},
+			node: TrayNode{Label: "Up", Enabled: true, Action: trayAction(compose.Action{Project: "shop", Kind: compose.ActionUp})},
 		},
 		{
 			name: "a notice asks nothing",
-			node: trayNode{Label: "Docker non raggiungibile"},
+			node: TrayNode{Label: "Docker non raggiungibile"},
 		},
 		{
 			name: "Down of a Project",
-			node: trayNode{
+			node: TrayNode{
 				Label:   "Down",
 				Enabled: true,
 				Confirm: "Fermare e rimuovere i Container di shop? I volumi restano.",
@@ -365,7 +365,7 @@ func TestTrayQuestion(t *testing.T) {
 		},
 		{
 			name: "Down of a Service",
-			node: trayNode{
+			node: TrayNode{
 				Label:   "Down",
 				Enabled: true,
 				Confirm: "Fermare e rimuovere i Container del Servizio web di shop? I volumi restano.",
@@ -379,7 +379,7 @@ func TestTrayQuestion(t *testing.T) {
 		},
 		{
 			name: "Down con volumi asks for the name of the Project",
-			node: trayNode{
+			node: TrayNode{
 				Label:   "Down con volumi",
 				Enabled: true,
 				Confirm: "Rimuove i Container e ELIMINA i volumi del Progetto: i dati nei volumi andranno persi per sempre.",
@@ -395,9 +395,9 @@ func TestTrayQuestion(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := trayQuestion(tc.node)
+			got := Question(tc.node)
 			if !reflect.DeepEqual(got, tc.want) {
-				t.Errorf("trayQuestion() = %+v, want %+v", got, tc.want)
+				t.Errorf("Question() = %+v, want %+v", got, tc.want)
 			}
 		})
 	}

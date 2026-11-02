@@ -22,6 +22,7 @@ import (
 	"dockercontroller/internal/gui/guitest"
 	"dockercontroller/internal/gui/logs"
 	guiproject "dockercontroller/internal/gui/project"
+	"dockercontroller/internal/gui/traymenu"
 	"dockercontroller/internal/gui/usage"
 	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/settings"
@@ -1734,11 +1735,11 @@ func checkTray(t *testing.T) {
 	}
 
 	var shown, quit int
-	var chosen trayNode
+	var chosen traymenu.TrayNode
 	adapter := newTrayAdapter(
 		func() { shown++ },
 		func() { quit++ },
-		func(node trayNode) { chosen = node },
+		func(node traymenu.TrayNode) { chosen = node },
 	)
 	defer adapter.icon.Delete()
 	defer adapter.menu.Delete()
@@ -1788,7 +1789,7 @@ func checkTray(t *testing.T) {
 	}
 
 	// A leaf of the tree reaches its handler the same way the menu does.
-	adapter.choose(trayNode{
+	adapter.choose(traymenu.TrayNode{
 		Label:   "Up",
 		Enabled: true,
 		Action:  &compose.Action{Project: "shop", Kind: compose.ActionUp},

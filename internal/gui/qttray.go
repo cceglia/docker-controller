@@ -5,13 +5,14 @@ import (
 	"github.com/mappu/miqt/qt6/mainthread"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/gui/traymenu"
 	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/tray"
 )
 
 // trayAdapter puts the menu of internal/tray on the system tray. It is the only
 // file of the package that knows QSystemTrayIcon: the description of the menu
-// stays pure, and the tree it applies has a test without Qt (traytree.go).
+// stays pure, and the tree it applies has a test without Qt (package traymenu).
 //
 // On Wayland the icon is a StatusNotifierItem and the desktop draws the menu
 // through com.canonical.dbusmenu, so the context menu is a QMenu exported to the
@@ -24,7 +25,7 @@ type trayAdapter struct {
 	// keeps the same object and SetContextMenu runs once.
 	menu *qt6.QMenu
 	// tree is the menu on the tray, the last one applied.
-	tree []trayNode
+	tree []traymenu.TrayNode
 	// submenus are the menus this adapter created, so a rebuild can delete the
 	// ones of the previous tree: Clear removes their actions but not the menus.
 	submenus []*qt6.QMenu
@@ -34,14 +35,14 @@ type trayAdapter struct {
 
 	onShow   func()
 	onQuit   func()
-	onChoose func(trayNode)
+	onChoose func(traymenu.TrayNode)
 }
 
 // startTray creates the tray when the desktop has one. Without a tray it
 // returns nil and the application runs as before: the window keeps
 // "Impostazioni", and its close is the way out. The first snapshot goes on the
 // icon before it shows, so the icon never appears without a picture.
-func startTray(initial compose.Snapshot, onShow, onQuit func(), onChoose func(trayNode)) *trayAdapter {
+func startTray(initial compose.Snapshot, onShow, onQuit func(), onChoose func(traymenu.TrayNode)) *trayAdapter {
 	if !qt6.QSystemTrayIcon_IsSystemTrayAvailable() {
 		return nil
 	}
@@ -54,7 +55,7 @@ func startTray(initial compose.Snapshot, onShow, onQuit func(), onChoose func(tr
 // newTrayAdapter builds the icon and the menu without showing them, so a test
 // drives the adapter with no desktop. Only startTray asks the platform for a
 // tray and shows the icon.
-func newTrayAdapter(onShow, onQuit func(), onChoose func(trayNode)) *trayAdapter {
+func newTrayAdapter(onShow, onQuit func(), onChoose func(traymenu.TrayNode)) *trayAdapter {
 	t := &trayAdapter{
 		onShow:   onShow,
 		onQuit:   onQuit,
@@ -65,7 +66,7 @@ func newTrayAdapter(onShow, onQuit func(), onChoose func(trayNode)) *trayAdapter
 	t.menu.SetAccessibleName(windowTitle)
 	t.icon = qt6.NewQSystemTrayIcon()
 	t.icon.SetContextMenu(t.menu)
-	t.icon.SetToolTip(trayTooltip(compose.Snapshot{Loading: true}))
+	t.icon.SetToolTip(traymenu.Tooltip(compose.Snapshot{Loading: true}))
 	t.icon.OnActivated(func(reason qt6.QSystemTrayIcon__ActivationReason) {
 		// A left click, and the double click of a desktop that uses it, show the
 		// window. The right click belongs to the context menu the desktop draws,
@@ -87,10 +88,10 @@ func (t *trayAdapter) apply(snapshot compose.Snapshot) {
 		t.icon.SetIcon(systemTrayIcon(kind))
 		t.iconKind, t.hasIcon = kind, true
 	}
-	t.icon.SetToolTip(trayTooltip(snapshot))
+	t.icon.SetToolTip(traymenu.Tooltip(snapshot))
 
-	nodes := trayTree(tray.BuildMenu(snapshot))
-	if sameTrayTree(nodes, t.tree) {
+	nodes := traymenu.Tree(tray.BuildMenu(snapshot))
+	if traymenu.SameTree(nodes, t.tree) {
 		return
 	}
 	t.tree = nodes
@@ -117,7 +118,7 @@ func (t *trayAdapter) rebuild() {
 // add appends one node to menu, or to the submenu it builds. A leaf with an
 // Action or a Command gets a callback; a disabled entry cannot fire, and a
 // notice has nothing to trigger.
-func (t *trayAdapter) add(menu *qt6.QMenu, node trayNode) {
+func (t *trayAdapter) add(menu *qt6.QMenu, node traymenu.TrayNode) {
 	if node.Separator {
 		menu.AddSeparator()
 		return
@@ -143,7 +144,7 @@ func (t *trayAdapter) add(menu *qt6.QMenu, node trayNode) {
 
 // choose runs the entry the user clicked. It runs on the Qt thread: the
 // confirmation opens there, and only the Manager call moves to a goroutine.
-func (t *trayAdapter) choose(node trayNode) {
+func (t *trayAdapter) choose(node traymenu.TrayNode) {
 	switch node.Command {
 	case tray.CommandShowWindow:
 		t.activate()
@@ -212,7 +213,7 @@ func (a *application) quit() {
 
 // chooseTray runs an entry chosen in the tray menu. A destructive Action asks
 // its question first, and the answer runs it.
-func (a *application) chooseTray(node trayNode) {
+func (a *application) chooseTray(node traymenu.TrayNode) {
 	if node.Action == nil {
 		return
 	}
@@ -225,8 +226,8 @@ func (a *application) chooseTray(node trayNode) {
 
 // askTray opens the question of a destructive Action chosen in the tray. The
 // window comes first, so the modal question has a parent the user can see.
-func (a *application) askTray(node trayNode) {
-	question := trayQuestion(node)
+func (a *application) askTray(node traymenu.TrayNode) {
+	question := traymenu.Question(node)
 	if question == nil || a.shell == nil || a.question != nil {
 		return
 	}

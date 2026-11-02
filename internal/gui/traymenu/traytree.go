@@ -1,8 +1,9 @@
-package gui
+package traymenu
 
 import (
 	"dockercontroller/internal/compose"
 	guiproject "dockercontroller/internal/gui/project"
+	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/tray"
 )
 
@@ -14,8 +15,8 @@ const (
 	trayTooltipOffline = "Docker non risponde"
 )
 
-// trayNode is one entry of the menu on the tray, built from a tray.Item.
-type trayNode struct {
+// TrayNode is one entry of the menu on the tray, built from a tray.Item.
+type TrayNode struct {
 	Label     string
 	Enabled   bool
 	Separator bool
@@ -24,20 +25,20 @@ type trayNode struct {
 	// Confirm, when not empty, is the question to ask before launching Action.
 	Confirm  string
 	Command  tray.Command
-	Children []trayNode
+	Children []TrayNode
 }
 
-// trayTree maps the description of the pure tray package to the tree the Qt
+// Tree maps the description of the pure tray package to the tree the Qt
 // adapter applies. Every call returns fresh nodes: a tree never shares memory
 // with the description it came from, and an Action is a copy, so a later
 // snapshot cannot change a tree that is already on the tray.
-func trayTree(items []tray.Item) []trayNode {
+func Tree(items []tray.Item) []TrayNode {
 	if len(items) == 0 {
 		return nil
 	}
-	nodes := make([]trayNode, 0, len(items))
+	nodes := make([]TrayNode, 0, len(items))
 	for _, item := range items {
-		node := trayNode{
+		node := TrayNode{
 			Label:     item.Label,
 			Enabled:   item.Enabled,
 			Separator: item.Separator,
@@ -48,29 +49,29 @@ func trayTree(items []tray.Item) []trayNode {
 			action := *item.Action
 			node.Action = &action
 		}
-		node.Children = trayTree(item.Children)
+		node.Children = Tree(item.Children)
 		nodes = append(nodes, node)
 	}
 	return nodes
 }
 
-// sameTrayTree reports whether two trees describe the same menu: the same
-// entries, in the same order, with the same labels, states, questions, Commands
-// and Actions. The adapter rebuilds the menu only when this answer is false.
-func sameTrayTree(a, b []trayNode) bool {
+// SameTree reports whether two trees describe the same menu: the same entries,
+// in the same order, with the same labels, states, questions, Commands and
+// Actions. The adapter rebuilds the menu only when this answer is false.
+func SameTree(a, b []TrayNode) bool {
 	if len(a) != len(b) {
 		return false
 	}
 	for i := range a {
-		if !sameTrayNode(a[i], b[i]) {
+		if !sameNode(a[i], b[i]) {
 			return false
 		}
 	}
 	return true
 }
 
-// sameTrayNode compares one entry and, when it has any, its children.
-func sameTrayNode(a, b trayNode) bool {
+// sameNode compares one entry and, when it has any, its children.
+func sameNode(a, b TrayNode) bool {
 	if a.Label != b.Label || a.Enabled != b.Enabled || a.Separator != b.Separator ||
 		a.Confirm != b.Confirm || a.Command != b.Command {
 		return false
@@ -81,32 +82,32 @@ func sameTrayNode(a, b trayNode) bool {
 	if a.Action != nil && *a.Action != *b.Action {
 		return false
 	}
-	return sameTrayTree(a.Children, b.Children)
+	return SameTree(a.Children, b.Children)
 }
 
-// trayTooltip is the text of the tooltip of the icon: the name of the
-// application and the state of Docker. Before the first snapshot Docker has not
-// been asked yet, so the tooltip says the application is checking.
-func trayTooltip(s compose.Snapshot) string {
+// Tooltip is the text of the tooltip of the icon: the name of the application
+// and the state of Docker. Before the first snapshot Docker has not been asked
+// yet, so the tooltip says the application is checking.
+func Tooltip(s compose.Snapshot) string {
 	switch {
 	case s.Loading:
-		return windowTitle + " · " + trayTooltipLoading
+		return view.AppTitle + " · " + trayTooltipLoading
 	case !s.DockerReachable:
-		return windowTitle + " · " + trayTooltipOffline
+		return view.AppTitle + " · " + trayTooltipOffline
 	}
-	return windowTitle + " · " + trayTooltipOnline
+	return view.AppTitle + " · " + trayTooltipOnline
 }
 
-// trayQuestion is the confirmation an entry asks before launching its Action,
-// nil when the entry asks nothing. The message is the one the tray description
+// Question is the confirmation an entry asks before launching its Action, nil
+// when the entry asks nothing. The message is the one the tray description
 // carries, and the label of the entry is the affirmative answer. Down con volumi
 // also asks for the name of the Project, because it deletes data.
-func trayQuestion(node trayNode) *guiproject.Confirmation {
+func Question(node TrayNode) *guiproject.Confirmation {
 	if node.Action == nil || node.Confirm == "" {
 		return nil
 	}
 	question := &guiproject.Confirmation{
-		Title:        windowTitle,
+		Title:        view.AppTitle,
 		Message:      node.Confirm,
 		ConfirmLabel: node.Label,
 	}
