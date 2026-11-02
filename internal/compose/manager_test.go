@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/compose/docker"
 	"dockercontroller/internal/compose/docker/fake"
 	"dockercontroller/internal/db"
 )
@@ -69,14 +70,14 @@ func realDocker(t *testing.T) *fake.Fake {
 	return f
 }
 
-func newManager(t *testing.T, docker compose.Docker, dbPath string) *compose.Manager {
+func newManager(t *testing.T, port docker.Docker, dbPath string) *compose.Manager {
 	t.Helper()
 	conn, err := db.Open(dbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = conn.Close() })
-	m, err := compose.New(compose.Config{Docker: docker, DB: conn})
+	m, err := compose.New(compose.Config{Docker: port, DB: conn})
 	if err != nil {
 		t.Fatal(err)
 	}

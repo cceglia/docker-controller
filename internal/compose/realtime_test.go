@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/compose/docker"
 	"dockercontroller/internal/compose/docker/fake"
 	"dockercontroller/internal/db"
 )
@@ -23,14 +24,14 @@ const (
 
 // startRun creates a Manager with the given intervals and runs it until the
 // test ends. Run is observed through Watch only.
-func startRun(t *testing.T, docker compose.Docker, refreshEvery, retryEvery time.Duration) (*compose.Manager, <-chan compose.Snapshot) {
+func startRun(t *testing.T, port docker.Docker, refreshEvery, retryEvery time.Duration) (*compose.Manager, <-chan compose.Snapshot) {
 	t.Helper()
 	conn, err := db.Open(tempDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = conn.Close() })
-	m, err := compose.New(compose.Config{Docker: docker, DB: conn, RefreshEvery: refreshEvery, RetryEvery: retryEvery})
+	m, err := compose.New(compose.Config{Docker: port, DB: conn, RefreshEvery: refreshEvery, RetryEvery: retryEvery})
 	if err != nil {
 		t.Fatal(err)
 	}

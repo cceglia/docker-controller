@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/compose/docker"
 	"dockercontroller/internal/compose/docker/fake"
+	"dockercontroller/internal/compose/model"
 	"dockercontroller/internal/db"
 )
 
@@ -52,7 +54,7 @@ func (r *recorder) finished(t *testing.T, id compose.ActivityID) []compose.Activ
 	return nil
 }
 
-func activityManager(t *testing.T, docker compose.Docker) (*compose.Manager, *recorder) {
+func activityManager(t *testing.T, port docker.Docker) (*compose.Manager, *recorder) {
 	t.Helper()
 	conn, err := db.Open(tempDB(t))
 	if err != nil {
@@ -60,7 +62,7 @@ func activityManager(t *testing.T, docker compose.Docker) (*compose.Manager, *re
 	}
 	t.Cleanup(func() { _ = conn.Close() })
 	rec := &recorder{}
-	m, err := compose.New(compose.Config{Docker: docker, DB: conn, OnActivity: rec.on})
+	m, err := compose.New(compose.Config{Docker: port, DB: conn, OnActivity: rec.on})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -564,7 +566,7 @@ func TestDo_DownOfAServiceIsRefusedForTheWholeProject(t *testing.T) {
 	f := realDocker(t)
 	m, _ := activityManager(t, f)
 	_, err := m.Do(context.Background(), compose.Action{Project: "sunlinkdocker", Kind: compose.ActionDownService})
-	if !errors.Is(err, compose.ErrServiceOnly) {
+	if !errors.Is(err, model.ErrServiceOnly) {
 		t.Errorf("err = %v, want ErrServiceOnly", err)
 	}
 }

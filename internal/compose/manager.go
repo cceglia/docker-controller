@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"dockercontroller/internal/compose/docker"
 	"dockercontroller/internal/compose/model"
 	"dockercontroller/internal/compose/parse"
 	"dockercontroller/internal/compose/store"
@@ -19,7 +20,7 @@ import (
 // Config wires a Manager.
 type Config struct {
 	// Docker is the port towards the Docker CLI.
-	Docker Docker
+	Docker docker.Docker
 	// DB is the app database, already migrated (see package db).
 	DB *sql.DB
 	// OnActivity, when not nil, receives the events of every Activity (see
@@ -35,7 +36,7 @@ type Config struct {
 
 // Manager is the interface of the compose module.
 type Manager struct {
-	docker Docker
+	docker docker.Docker
 	store  *store.Store
 
 	refreshEvery, retryEvery time.Duration

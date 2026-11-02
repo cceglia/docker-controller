@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/compose/docker"
 	"dockercontroller/internal/compose/docker/fake"
 	"dockercontroller/internal/db"
 )
@@ -58,14 +59,14 @@ func followingDocker(t *testing.T) *fake.Fake {
 }
 
 // usageManager is a refreshed Manager that retries quickly.
-func usageManager(t *testing.T, docker compose.Docker) *compose.Manager {
+func usageManager(t *testing.T, port docker.Docker) *compose.Manager {
 	t.Helper()
 	conn, err := db.Open(tempDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = conn.Close() })
-	m, err := compose.New(compose.Config{Docker: docker, DB: conn, RetryEvery: 5 * time.Millisecond})
+	m, err := compose.New(compose.Config{Docker: port, DB: conn, RetryEvery: 5 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}

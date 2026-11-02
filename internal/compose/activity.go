@@ -133,7 +133,6 @@ var (
 	ErrUnknownProject  = model.ErrUnknownProject
 	ErrUnknownAction   = model.ErrUnknownAction
 	ErrInvalidService  = model.ErrInvalidService
-	ErrServiceOnly     = model.ErrServiceOnly
 	ErrProjectOnly     = model.ErrProjectOnly
 )
 
@@ -160,7 +159,7 @@ func composeArgs(p Project, a Action) ([]string, error) {
 		return nil, fmt.Errorf("%w: %s on %q", ErrProjectOnly, a.Kind, a.Service)
 	}
 	if a.Service == "" && serviceOnly[a.Kind] {
-		return nil, fmt.Errorf("%w: %s", ErrServiceOnly, a.Kind)
+		return nil, fmt.Errorf("%w: %s", model.ErrServiceOnly, a.Kind)
 	}
 	if strings.HasPrefix(a.Service, "-") {
 		return nil, fmt.Errorf("%w: %q", ErrInvalidService, a.Service)
