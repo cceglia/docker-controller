@@ -11,7 +11,6 @@ import (
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/compose/docker"
 	"dockercontroller/internal/compose/docker/fake"
-	"dockercontroller/internal/compose/model"
 	"dockercontroller/internal/db"
 )
 
@@ -566,7 +565,7 @@ func TestDo_DownOfAServiceIsRefusedForTheWholeProject(t *testing.T) {
 	f := realDocker(t)
 	m, _ := activityManager(t, f)
 	_, err := m.Do(context.Background(), compose.Action{Project: "sunlinkdocker", Kind: compose.ActionDownService})
-	if !errors.Is(err, model.ErrServiceOnly) {
+	if !errors.Is(err, compose.ErrServiceOnly) {
 		t.Errorf("err = %v, want ErrServiceOnly", err)
 	}
 }

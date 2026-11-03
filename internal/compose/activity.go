@@ -134,6 +134,7 @@ var (
 	ErrUnknownAction   = model.ErrUnknownAction
 	ErrInvalidService  = model.ErrInvalidService
 	ErrProjectOnly     = model.ErrProjectOnly
+	ErrServiceOnly     = model.ErrServiceOnly
 )
 
 // projectArgs selects the Project (name, compose files, folder) for any
