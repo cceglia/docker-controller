@@ -20,7 +20,7 @@ import (
 // Config wires a Manager.
 type Config struct {
 	// Docker is the port towards the Docker CLI.
-	Docker docker.Docker
+	Docker Docker
 	// DB is the app database, already migrated (see package db).
 	DB *sql.DB
 	// OnActivity, when not nil, receives the events of every Activity (see

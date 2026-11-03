@@ -14,6 +14,6 @@
 // persistence in store, and the parsing of the CLI output in parse.
 //
 // The root re-exports with aliases the surface that gui, tray and main use.
-// Dependency direction: model ← docker/store/parse ← root. No subpackage
-// imports the root.
+// Dependency direction: model ← store/parse ← root. The docker subpackage is
+// independent of model. No subpackage imports the root.
 package compose

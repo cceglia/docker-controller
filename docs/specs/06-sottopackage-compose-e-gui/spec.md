@@ -65,7 +65,7 @@ sono coperti solo attraverso `Manager` ricevono test di package.
 16. Come manutentore, voglio che i tipi usati da gui, tray e main restino raggiungibili con alias, così da non toccare quegli import.
 17. Come manutentore, voglio che `Do`, `Logs` e `Usage` restino metodi su `Manager`, così da non introdurre componenti pass-through.
 18. Come manutentore, voglio che `Config`, `New` e le sentinelle mantengano lo stesso contratto, così da non rompere l'avvio.
-19. Come manutentore, voglio che la direzione delle dipendenze sia `model` ← `docker`/`store`/`parse` ← radice, così da non creare cicli.
+19. Come manutentore, voglio che la direzione delle dipendenze sia `model` ← `store`/`parse` ← radice, con `docker` indipendente, così da non creare cicli.
 20. Come manutentore, voglio che `model` contenga anche gli helper puri (`StatusOf`, `Folder`), così da non lasciare logica sparsa.
 21. Come manutentore, voglio che i test di `exec` seguano l'adattatore in `docker`, così da provare il codice dove vive.
 22. Come manutentore, voglio che le sentinelle usate dai sottopackage stiano in `model`, così che `store` e `parse` non importino la radice.
@@ -135,7 +135,7 @@ sono coperti solo attraverso `Manager` ricevono test di package.
 - `store`: la persistenza, con `Store` e `New` esportati, i metodi `UpsertDiscovered`, `Add`, `UpdateSettings`, `List` e `Remove`, e il database ricevuto dal chiamante.
 - `parse`: le funzioni pure che leggono l'output della CLI (elenco Progetti, stato Container, Log, Utilizzo risorse, Profili, dimensione macchina), con i tipi di appoggio del parsing (`Machine`, `StatsRow`, `ContainerRow`) e il raggruppamento delle righe di `docker stats` accanto a loro.
 
-La radice riesporta con alias solo la superficie usata fuori da compose (gui, tray, main) e nelle firme di `Manager`. Dentro compose i sottopackage parlano direttamente `model.*`. La direzione delle dipendenze è `model` ← `docker`/`store`/`parse` ← radice; nessun sottopackage importa la radice.
+La radice riesporta con alias solo la superficie usata fuori da compose (gui, tray, main) e nelle firme di `Manager`. Dentro compose i sottopackage parlano direttamente `model.*`. La direzione delle dipendenze è `model` ← `store`/`parse` ← radice, con `docker` indipendente da `model`; nessun sottopackage importa la radice.
 
 **Gui.** Il package radice resta la composizione Qt: applicazione, shell, pannello inferiore, widget condivisi, `notify`, `startguard` e costanti di finestra. Le viste Qt restano qui.
 
