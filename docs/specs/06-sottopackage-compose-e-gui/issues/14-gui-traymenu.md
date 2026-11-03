@@ -4,9 +4,9 @@
 
 **Blocked by:** 08 (gui: estrarre view), 10 (gui: estrarre project).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `traymenu` importa `view` e `project`, non la radice.
-- [ ] `TrayNode` è esportato e `traytree_test` vive in `traymenu`.
-- [ ] Il menu della tray della radice usa il nuovo package e `make test-ui` è verde.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] `traymenu` importa `view` e `project`, non la radice.
+- [x] `TrayNode` è esportato e `traytree_test` vive in `traymenu`.
+- [x] Il menu della tray della radice usa il nuovo package e `make test-ui` è verde.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.

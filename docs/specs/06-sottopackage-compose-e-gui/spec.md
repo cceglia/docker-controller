@@ -83,7 +83,7 @@ sono coperti solo attraverso `Manager` ricevono test di package.
 31. Come manutentore, voglio che le viste Qt restino in `internal/gui`, così da non esportare la superficie dei widget.
 32. Come manutentore, voglio che nessun sottopackage di gui importi la radice, così da evitare cicli.
 33. Come manutentore, voglio che `gui.Run` resti il punto di avvio della UI, così da avere un solo seam dell'app.
-34. Come manutentore, voglio che `main.go` cambi solo l'import del log delle Attività, così da non toccare il wiring.
+34. Come manutentore, voglio che `main.go` cambi solo il costruttore del log delle Attività, così da non toccare il wiring.
 35. Come manutentore, voglio che `notify`, `startguard` e le costanti di finestra restino in radice, così da non creare package da un file.
 36. Come manutentore, voglio che i test non-Qt si spostino con il codice che provano, così da mantenere la copertura.
 37. Come manutentore, voglio che il test della shell con tag `ui` resti in radice, così da non spostare il seam Qt.
@@ -153,7 +153,7 @@ La direzione delle dipendenze è `design`/`view` ← package di feature ← radi
 
 **Avvio e API.** `gui.Run` resta il punto di avvio della UI; cambia solo il tipo del log delle Attività, che passa al package `activity`. `main.go` aggiorna il costruttore del log. `compose.Manager` e le sentinelle mantengono la firma per gui, tray e main.
 
-**Gremlins.** Ogni package di codice di produzione entra in `MUTATE_PACKAGES` con un file di configurazione il cui nome deriva dal path, con `/` sostituito da `-` e `internal/` tolto (`compose-model.yaml`, `compose-docker.yaml`, `gui-view.yaml`, `gui-activity.yaml`, …). `make mutate` esegue tutti i package; `make mutate PKG=…` ne esegue uno. La regola della soglia resta quella del README: valore misurato meno 5 punti. Un package senza mutanti viene annotato nel proprio file e nel README, senza soglia inventata. `docker/fake` e `guitest` restano esclusi da `exclude-files` e non entrano in `MUTATE_PACKAGES`, perché sono codice di supporto ai test.
+**Gremlins.** Ogni package di codice di produzione entra in `MUTATE_PACKAGES` con un file di configurazione il cui nome deriva dal path, con `/` sostituito da `-` e `internal/` tolto (`compose-model.yaml`, `compose-docker.yaml`, `gui-view.yaml`, `gui-activity.yaml`, …). `make mutate` esegue tutti i package; `make mutate PKG=…` ne esegue uno. La regola della soglia resta quella del README: valore misurato meno 5 punti. Un package senza mutanti viene annotato nel proprio file e nel README, senza soglia inventata. `docker/fake` e `guitest` non entrano in `MUTATE_PACKAGES` e `exclude-files` li esclude, perché sono codice di supporto ai test.
 
 **Documentazione.** Il README aggiorna la tabella delle soglie e il percorso di `make test-ui`. Ogni nuovo package ha un commento di package con responsabilità e regola di dipendenza. L'ADR 0006 registra la decisione.
 

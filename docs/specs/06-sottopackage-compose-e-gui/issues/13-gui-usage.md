@@ -4,9 +4,9 @@
 
 **Blocked by:** 02 (gui: creare guitest), 08 (gui: estrarre view).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `usage` importa `view`, non la radice.
-- [ ] `MeterValue` vive in `usage` e `usagebar_test` si sposta con lui.
-- [ ] La barra e il dettaglio della radice usano il nuovo package.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] `usage` importa `view`, non la radice.
+- [x] `MeterValue` vive in `usage` e `usagebar_test` si sposta con lui.
+- [x] La barra e il dettaglio della radice usano il nuovo package.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.

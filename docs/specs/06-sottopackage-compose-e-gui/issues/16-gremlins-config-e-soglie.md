@@ -4,17 +4,17 @@
 
 **Blocked by:** 07 (compose: chiudere la radice), 15 (gui: chiudere la radice).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Esistono quindici file `.gremlins/<path>.yaml` con il blocco condiviso identico.
-- [ ] `make mutate` gira tutti i package; `make mutate PKG=…` ne gira uno.
-- [ ] Le soglie sono misurate e scritte; `docker/fake` e `guitest` restano esclusi.
-- [ ] Un test verifica che `workers`, `timeout-coefficient` ed `exclude-files` siano identici in tutti i file.
-- [ ] Il README riporta le nuove soglie e `./internal/gui/...`.
+- [x] Esistono quindici file `.gremlins/<path>.yaml` con il blocco condiviso identico.
+- [x] `make mutate` gira tutti i package; `make mutate PKG=…` ne gira uno.
+- [x] Le soglie sono misurate e scritte; `docker/fake` e `guitest` restano esclusi.
+- [x] Un test verifica che `workers`, `timeout-coefficient` ed `exclude-files` siano identici in tutti i file.
+- [x] Il README riporta le nuove soglie e `./internal/gui/...`.
 
 ## Misure
 
-Misura del 2026-11-03, dopo lo split. La soglia è il valore misurato meno 5 punti.
+Misure del ticket 16 per compose e gui, del ticket 15 per `internal/tray`. La soglia è il valore misurato meno 5 punti.
 
 | Package | Efficacia | Copertura |
 | --- | ---: | ---: |

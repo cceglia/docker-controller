@@ -4,9 +4,9 @@
 
 **Blocked by:** 02 (gui: creare guitest), 08 (gui: estrarre view).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `forms` importa `view`, non la radice.
-- [ ] I test dei form vivono in `forms`; `qtedit_test` resta in radice.
-- [ ] I dialoghi di aggiunta, modifica, impostazioni e chiusura usano il nuovo package.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] `forms` importa `view`, non la radice.
+- [x] I test dei form vivono in `forms`; `qtedit_test` resta in radice.
+- [x] I dialoghi di aggiunta, modifica, impostazioni e chiusura usano il nuovo package.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.

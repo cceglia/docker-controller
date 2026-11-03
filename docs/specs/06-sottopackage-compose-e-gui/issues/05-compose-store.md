@@ -4,9 +4,9 @@
 
 **Blocked by:** 01 (compose: estrarre model).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `store` contiene la persistenza e non importa la radice.
-- [ ] I test di `store` coprono salvataggio, elenco, impostazioni e rimozione su un database temporaneo.
-- [ ] I test di `Manager` passano senza cambiare il comportamento osservabile.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] `store` contiene la persistenza e non importa la radice.
+- [x] I test di `store` coprono salvataggio, elenco, impostazioni e rimozione su un database temporaneo.
+- [x] I test di `Manager` passano senza cambiare il comportamento osservabile.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.

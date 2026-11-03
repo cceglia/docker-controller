@@ -4,9 +4,9 @@
 
 **Blocked by:** 08 (gui: estrarre view).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `project` importa `view`, non la radice.
-- [ ] `actions_test`, `remove_test`, `detail_test` e `detailstate_test` vivono in `project`.
-- [ ] La lista, il dettaglio e le tacche della radice usano il nuovo package.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] `project` importa `view`, non la radice.
+- [x] `actions_test`, `remove_test`, `detail_test` e `detailstate_test` vivono in `project`.
+- [x] La lista, il dettaglio e le tacche della radice usano il nuovo package.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.

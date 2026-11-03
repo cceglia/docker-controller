@@ -4,9 +4,9 @@
 
 **Blocked by:** 02 (gui: creare guitest), 10 (gui: estrarre project).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `activity` importa `project` e `view` secondo necessità, non la radice.
-- [ ] `gui.Run` e `main.go` usano `activity.Log`; l'app compila.
-- [ ] I test delle Attività e del pannello vivono in `activity` e usano `guitest`.
-- [ ] `go build ./...`, `go test ./...`, `go vet ./...` e `make test-ui` sono verdi.
+- [x] `activity` importa `project` e `view` secondo necessità, non la radice.
+- [x] `gui.Run` e `main.go` usano `activity.Log`; l'app compila.
+- [x] I test delle Attività e del pannello vivono in `activity` e usano `guitest`.
+- [x] `go build ./...`, `go test ./...`, `go vet ./...` e `make test-ui` sono verdi.

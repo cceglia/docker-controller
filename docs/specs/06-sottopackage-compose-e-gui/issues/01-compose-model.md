@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `model` contiene i tipi, gli helper e le sentinelle elencati.
-- [ ] `StatusOf` e `Folder` hanno test di package.
-- [ ] `compose.Manager`, `Config`, `New` e le sentinelle mantengono la firma per i chiamanti esterni.
-- [ ] I test esistenti di compose passano senza cambiamenti di merito.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
-- [ ] Il package ha un commento che dice cosa contiene e la direzione delle dipendenze.
+- [x] `model` contiene i tipi, gli helper e le sentinelle elencati.
+- [x] `StatusOf` e `Folder` hanno test di package.
+- [x] `compose.Manager`, `Config`, `New` e le sentinelle mantengono la firma per i chiamanti esterni.
+- [x] I test esistenti di compose passano senza cambiamenti di merito.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] Il package ha un commento che dice cosa contiene e la direzione delle dipendenze.

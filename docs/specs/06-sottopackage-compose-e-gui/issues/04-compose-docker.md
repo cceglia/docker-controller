@@ -4,9 +4,9 @@
 
 **Blocked by:** 01 (compose: estrarre model).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `docker` contiene la porta, `ExecDocker` e `fake`; la radice non esegue più processi.
-- [ ] `main.go` compila senza cambiare il proprio import.
-- [ ] Il test dell'adattatore si sposta in `docker` e passa.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] `docker` contiene la porta, `ExecDocker` e `fake`; la radice non esegue più processi.
+- [x] `main.go` compila senza cambiare il proprio import.
+- [x] Il test dell'adattatore si sposta in `docker` e passa.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.

@@ -4,9 +4,9 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `design` contiene token, foglio di stile e `ServiceColor`; non importa `internal/gui`.
-- [ ] `designtokens_test` e gli helper di contrasto vivono in `design`.
-- [ ] `qtshell_test` usa i simboli esportati e `make test-ui` è verde.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] `design` contiene token, foglio di stile e `ServiceColor`; non importa `internal/gui`.
+- [x] `designtokens_test` e gli helper di contrasto vivono in `design`.
+- [x] `qtshell_test` usa i simboli esportati e `make test-ui` è verde.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.

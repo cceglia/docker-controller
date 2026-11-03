@@ -4,9 +4,9 @@
 
 **Blocked by:** 03 (gui: estrarre design), 08 (gui: estrarre view).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `logs` importa `design` e `view`, non la radice.
-- [ ] `logstreams_test`, `logview_test` e la parte Log di `user_errors_test` vivono in `logs`.
-- [ ] La pagina Log della radice usa il nuovo package e `make test-ui` è verde.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] `logs` importa `design` e `view`, non la radice.
+- [x] `logstreams_test`, `logview_test` e la parte Log di `user_errors_test` vivono in `logs`.
+- [x] La pagina Log della radice usa il nuovo package e `make test-ui` è verde.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.

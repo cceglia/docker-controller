@@ -4,9 +4,9 @@
 
 **Blocked by:** 04 (compose: estrarre docker), 05 (compose: estrarre store), 06 (compose: estrarre parse).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] La radice non contiene più codice spostato né alias non usati.
-- [ ] Nessun sottopackage importa `internal/compose`.
-- [ ] `go test ./internal/compose/...` è verde.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] La radice non contiene più codice spostato né alias non usati.
+- [x] Nessun sottopackage importa `internal/compose`.
+- [x] `go test ./internal/compose/...` è verde.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.

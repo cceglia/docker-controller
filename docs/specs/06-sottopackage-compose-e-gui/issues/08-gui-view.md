@@ -4,9 +4,9 @@
 
 **Blocked by:** 02 (gui: creare guitest).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `view` non importa `logs`, `project`, `forms`, `activity`, `usage` o `traymenu`.
-- [ ] `ProjectName`, `DisplayNameOf` e `MissingComposeText` vivono in `view`.
-- [ ] `open_test` usa `guitest`; la parte dei Log di `user_errors_test` resta fuori da `view`.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] `view` non importa `logs`, `project`, `forms`, `activity`, `usage` o `traymenu`.
+- [x] `ProjectName`, `DisplayNameOf` e `MissingComposeText` vivono in `view`.
+- [x] `open_test` usa `guitest`; la parte dei Log di `user_errors_test` resta fuori da `view`.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.

@@ -4,9 +4,9 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `guitest` contiene solo helper, non test.
-- [ ] `notify_test` e `qtshell_test` usano gli helper condivisi.
-- [ ] `activitylog_test`, `addproject_test` e `usagestream_test` non definiscono più gli stessi helper.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] `guitest` contiene solo helper, non test.
+- [x] `notify_test` e `qtshell_test` usano gli helper condivisi.
+- [x] `activitylog_test`, `addproject_test` e `usagestream_test` non definiscono più gli stessi helper.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.

@@ -4,9 +4,9 @@
 
 **Blocked by:** 03 (gui: estrarre design), 08 (gui: estrarre view), 09 (gui: estrarre logs), 10 (gui: estrarre project), 11 (gui: estrarre forms), 12 (gui: estrarre activity), 13 (gui: estrarre usage), 14 (gui: estrarre traymenu).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] La radice non contiene più modelli o helper spostati.
-- [ ] Nessun sottopackage importa `internal/gui`.
-- [ ] `qtshell_test` compila con i simboli esportati.
-- [ ] `go build ./...`, `go test ./...`, `go vet ./...` e `make test-ui` sono verdi.
+- [x] La radice non contiene più modelli o helper spostati.
+- [x] Nessun sottopackage importa `internal/gui`.
+- [x] `qtshell_test` compila con i simboli esportati.
+- [x] `go build ./...`, `go test ./...`, `go vet ./...` e `make test-ui` sono verdi.

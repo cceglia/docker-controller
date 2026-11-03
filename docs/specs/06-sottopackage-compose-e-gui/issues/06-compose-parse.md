@@ -4,9 +4,9 @@
 
 **Blocked by:** 01 (compose: estrarre model).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `parse` contiene i parser e non importa la radice.
-- [ ] I test di `parse` coprono i formati reali di `compose ls`, `compose ps`, Log, Utilizzo risorse e Profili.
-- [ ] Nessuna fixture viene duplicata.
-- [ ] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
+- [x] `parse` contiene i parser e non importa la radice.
+- [x] I test di `parse` coprono i formati reali di `compose ls`, `compose ps`, Log, Utilizzo risorse e Profili.
+- [x] Nessuna fixture viene duplicata.
+- [x] `go build ./...`, `go test ./...` e `go vet ./...` sono verdi.
