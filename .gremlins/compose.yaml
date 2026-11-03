@@ -2,7 +2,7 @@
 # `make mutate` passa questo file con --config. Gremlins legge un solo file di
 # configurazione: --config sostituisce il vecchio .gremlins.yaml.
 # Il blocco condiviso (workers, timeout-coefficient, exclude-files) è identico
-# negli altri due file .gremlins/*.yaml. Se lo cambi, cambialo in tutti e tre.
+# in tutti i file .gremlins/*.yaml. Se lo cambi, cambialo in tutti.
 
 silent: false
 
@@ -18,11 +18,12 @@ unleash:
   exclude-files:
     - "internal/db/"
     - "internal/compose/docker/fake/"
+    - "internal/gui/guitest/"
     - "(_gen|_generated)\\.go$"
     - "\\.gen\\.go$"
     - "/generated/"
-  # Efficacia e copertura dei mutanti misurate nel ticket 15: 76,85% e 91,53%.
-  # L'efficacia è la più bassa dei tre package.
+  # Efficacia e copertura dei mutanti misurate nel ticket 16: 79,82% e 90,83%.
+  # Il cancello sta cinque punti sotto il misurato.
   threshold:
-    efficacy: 71.85
-    mutant-coverage: 86.53
+    efficacy: 74.82
+    mutant-coverage: 85.83

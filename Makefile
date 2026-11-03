@@ -8,12 +8,29 @@ APP_BIN := docker-controller
 ICON_SIZES := 256x256 512x512
 
 # Mutation testing: gremlins accepts one package per run, so `make mutate`
-# runs it three times. The version is pinned together with the config files.
+# runs it once per package. The version is pinned together with the config files.
 GREMLINS_VERSION := v0.6.0
-MUTATE_PACKAGES := ./internal/tray ./internal/gui ./internal/compose
-# One config file per package: the three threshold pairs differ, and a single
-# .gremlins.yaml cannot hold them. --config replaces the default file, so each
-# file in .gremlins/ repeats the shared settings (workers, timeout, exclusions).
+# Production packages only: docker/fake and guitest are test support.
+MUTATE_PACKAGES := \
+	./internal/compose \
+	./internal/compose/model \
+	./internal/compose/docker \
+	./internal/compose/store \
+	./internal/compose/parse \
+	./internal/gui \
+	./internal/gui/design \
+	./internal/gui/view \
+	./internal/gui/project \
+	./internal/gui/forms \
+	./internal/gui/activity \
+	./internal/gui/logs \
+	./internal/gui/usage \
+	./internal/gui/traymenu \
+	./internal/tray
+# One config file per package, named after the path with internal/ removed and
+# / replaced by - (internal/compose/model -> .gremlins/compose-model.yaml).
+# Each file in .gremlins/ repeats the shared settings (workers, timeout,
+# exclusions), so a single .gremlins.yaml cannot hold the threshold pairs.
 MUTATE_CONFIG_DIR := .gremlins
 # -count=1 disables the Go test cache for the coverage run. Gremlins sets the
 # timeout of each mutant to the coverage time times the coefficient. A cached
@@ -49,17 +66,21 @@ test:
 
 ## test-ui: UI tests without a display: offscreen smoke test and design tokens
 test-ui:
-	QT_QPA_PLATFORM=offscreen go vet -tags ui ./internal/gui
-	QT_QPA_PLATFORM=offscreen go test -tags ui ./internal/gui
+	QT_QPA_PLATFORM=offscreen go vet -tags ui ./internal/gui/...
+	QT_QPA_PLATFORM=offscreen go test -tags ui ./internal/gui/...
 
 ## tools: developer tools in $(GOBIN), outside `make check`
 tools:
 	go install github.com/go-gremlins/gremlins/cmd/gremlins@$(GREMLINS_VERSION)
 
-## mutate: mutation testing with gremlins on tray, gui and compose, with the thresholds of each package (minutes, outside `make check`)
+## mutate: mutation testing with gremlins on every package, or on PKG=... only, with the threshold of each package (minutes, outside `make check`)
 mutate:
-	@for pkg in $(MUTATE_PACKAGES); do \
-		conf="$(MUTATE_CONFIG_DIR)/$${pkg##*/}.yaml"; \
+	@for pkg in $(if $(PKG),$(PKG),$(MUTATE_PACKAGES)); do \
+		name=$$(printf '%s\n' "$$pkg" | sed -e 's|^\./||' -e 's|^internal/||' -e 's|/|-|g'); \
+		conf="$(MUTATE_CONFIG_DIR)/$$name.yaml"; \
+		if [ ! -f "$$conf" ]; then \
+			echo "CONFIGURAZIONE MANCANTE: $$conf"; exit 1; \
+		fi; \
 		min_efficacy=$$(sed -n 's/^[[:space:]]*efficacy:[[:space:]]*//p' "$$conf"); \
 		min_mcover=$$(sed -n 's/^[[:space:]]*mutant-coverage:[[:space:]]*//p' "$$conf"); \
 		echo "== $$pkg (soglie: efficacia $$min_efficacy%, copertura dei mutanti $$min_mcover%)"; \
