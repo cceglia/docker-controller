@@ -3,7 +3,7 @@
 // behavior. A form keeps what the user typed and hands it to the Manager only
 // when the user confirms it.
 //
-// Dependency direction: forms imports compose, settings and view. The root
-// package gui imports forms, and forms imports no gui package and no Qt binding,
-// so its tests run without a display.
+// Dependency direction: forms imports compose, settings and view, and it never
+// imports the root package gui, which imports forms. It uses no Qt binding, so
+// its tests run without a display.
 package forms

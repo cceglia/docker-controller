@@ -4,6 +4,6 @@
 // entry of the Service palette.
 //
 // Dependency direction: design is a leaf. The root package gui imports it, and
-// design imports no gui package and no Qt binding, so its test runs without a
-// display.
+// design imports no root package `internal/gui` and no Qt binding, so its test
+// runs without a display.
 package design

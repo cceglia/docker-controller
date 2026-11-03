@@ -3,7 +3,7 @@
 // Project off the list, the lines of the detail and the state that decides when
 // to draw the panel again.
 //
-// Dependency direction: project imports compose and view. The root package gui
-// imports project, and project imports no gui package and no Qt binding, so its
+// Dependency direction: project imports compose and view, and it never imports
+// the root package gui, which imports project. It uses no Qt binding, so its
 // tests run without a display.
 package project

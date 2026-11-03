@@ -2,7 +2,7 @@
 // view: the lines kept and filtered, the segments of a line, the palette entry
 // of a Service, the end of a stream and its Italian message.
 //
-// Dependency direction: design and view are leaves. The root package gui
-// imports logs, and logs imports no internal/gui package and no Qt binding, so
-// its tests run without a display.
+// Dependency direction: design and view are leaves. logs imports them, and it
+// never imports the root package gui, which imports logs. It uses no Qt
+// binding, so its tests run without a display.
 package logs

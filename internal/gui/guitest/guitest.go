@@ -1,6 +1,7 @@
 // Package guitest holds the helpers the gui tests share: the builders of the
 // Activity events, the comparison of two string slices and the wait for a
-// signal. It is test support, not production code: no gui package imports it.
+// signal. It is test support, not production code: only test files import it,
+// and it imports compose and never the root package gui.
 package guitest
 
 import (
