@@ -9,8 +9,8 @@ cgo. Dividiamo i due package in sottopackage dentro `internal/`, lasciando in
 radice il punto di composizione: `Manager` per compose, la shell Qt per gui.
 
 `internal/compose` si divide in `model` (tipi di dominio, helper puri e
-sentinelle), `docker` (porta e adattatore della CLI, con `fake` escluso dal
-build di produzione), `store` (persistenza SQLite) e `parse` (parsing
+sentinelle), `docker` (porta e adattatore della CLI, con `fake` fuori dal
+binario di produzione), `store` (persistenza SQLite) e `parse` (parsing
 dell'output della CLI). `Manager` resta l'unica interfaccia del modulo e resta
 in radice, con i metodi che oggi possiede: `Do`, `Logs` e `Usage` non diventano
 componenti separati, perché sono metodi su `*Manager` e spostarli richiederebbe

@@ -34,7 +34,8 @@ Gui si divide in `design`, `view`, `project`, `forms`, `activity`, `logs`,
 Qt restano in `internal/gui`: sono adattatori, e spostarle richiederebbe di
 esportare l'intera superficie dei widget usata dalla shell. I sottopackage
 contengono solo codice senza Qt, già testabile senza display. `view` è il
-package foglia: nessun package di feature lo importa al contrario.
+package foglia: i package di feature lo importano, e lui non importa nessun
+package di feature.
 
 Ogni nuovo package entra in Gremlins con il proprio file di configurazione. Le
 soglie di compose e gui vengono rimisurate dopo lo split, e i package che oggi
@@ -57,7 +58,7 @@ sono coperti solo attraverso `Manager` ricevono test di package.
 ### Package di compose
 
 10. Come manutentore, voglio che i tipi di dominio di compose vivano in `model`, così da sapere dove cercare Progetto, Servizio, Container e Snapshot.
-11. Come manutentore, voglio che la porta verso la CLI Docker e il suo adattatore stiano in `docker`, così da isolare l'unico punto che esegue processi.
+11. Come manutentore, voglio che la porta verso la CLI Docker e il suo adattatore stiano in `docker`, così da isolare l'unico punto di compose che esegue processi.
 12. Come manutentore, voglio che il doppio di test stia sotto `docker/fake`, così da non mescolarlo al codice di produzione.
 13. Come manutentore, voglio che la persistenza stia in `store`, così da leggere le query SQL in un solo posto.
 14. Come manutentore, voglio che il parsing dell'output CLI stia in `parse`, così da provarlo senza un Docker vero.
@@ -118,7 +119,7 @@ sono coperti solo attraverso `Manager` ricevono test di package.
 57. Come manutentore, voglio che `ProjectName`, `DisplayNameOf` e `MissingComposeText` vivano in `view`, così che i package di feature li usino senza importarsi a vicenda.
 58. Come manutentore, voglio che i messaggi degli errori di fine stream stiano in `logs`, così che `view` non conosca `ErrLogOpen`.
 59. Come manutentore, voglio che il foglio di stile e `ServiceColor` stiano in `design`, così che il test dei token provi il foglio senza importare la radice.
-60. Come manutentore, voglio che `serviceHueOf` stia in `logs`, così che il test della vista Log non dipenda dalla radice.
+60. Come manutentore, voglio che `ServiceHueOf` stia in `logs`, così che il test della vista Log non dipenda dalla radice.
 61. Come manutentore, voglio che `MeterValue` stia in `usage`, così che il test della barra si sposti con il calcolo.
 62. Come manutentore, voglio un package `guitest` per gli helper condivisi, così che i test di `activity`, `view`, `forms`, `usage` e radice non duplichino lo stesso codice.
 63. Come manutentore, voglio che `qtedit_test` resti in radice, così da provare `fieldAccessibleName` dove vive.
@@ -144,7 +145,7 @@ La radice riesporta con alias solo la superficie usata fuori da compose (gui, tr
 - `project`: azioni e relative etichette, rimozione dalla lista, formattazione del dettaglio e stato del disegno.
 - `forms`: modelli di aggiunta, modifica, impostazioni e comportamento di chiusura.
 - `activity`: log delle Attività, testi e modello del pannello.
-- `logs`: ciclo di vita degli stream, modello della vista Log, `serviceHueOf` e i messaggi degli errori di fine stream.
+- `logs`: ciclo di vita degli stream, modello della vista Log, `ServiceHueOf` e i messaggi degli errori di fine stream.
 - `usage`: feed, stream, stato dell'Utilizzo risorse e `MeterValue`.
 - `traymenu`: albero del menu della tray.
 - `guitest`: helper condivisi dai test (eventi di Attività, asserzioni su slice, attesa di un segnale); non è codice di produzione.
