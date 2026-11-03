@@ -4,6 +4,6 @@
 // commands that open a folder, a terminal or an address.
 //
 // Dependency direction: view is a leaf. The root package gui and the feature
-// packages import it, and view imports no root package `internal/gui` and no Qt
-// binding, so its tests run without a display.
+// packages that need it import it, and view imports no root package
+// `internal/gui` and no Qt binding, so its tests run without a display.
 package view

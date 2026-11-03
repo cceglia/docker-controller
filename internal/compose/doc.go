@@ -3,7 +3,7 @@
 // them, computes their status and tells subscribers when something changed.
 //
 // The root holds Manager, its Config and New, and the methods of the module:
-// Snapshot, Refresh, Watch, AddProject, RemoveFromList, UpdateSettings, Do
+// Snapshot, Refresh, Watch, Run, AddProject, RemoveFromList, UpdateSettings, Do
 // (Actions, run as Activities), Logs (log streams) and Usage (Utilizzo risorse
 // samples, a flow separate from Watch). Window and tray drive the module
 // through Manager.

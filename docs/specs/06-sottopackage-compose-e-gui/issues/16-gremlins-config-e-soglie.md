@@ -11,3 +11,25 @@
 - [ ] Le soglie sono misurate e scritte; `docker/fake` e `guitest` restano esclusi.
 - [ ] Un test verifica che `workers`, `timeout-coefficient` ed `exclude-files` siano identici in tutti i file.
 - [ ] Il README riporta le nuove soglie e `./internal/gui/...`.
+
+## Misure
+
+Misura del 2026-11-03, dopo lo split. La soglia è il valore misurato meno 5 punti.
+
+| Package | Efficacia | Copertura |
+| --- | ---: | ---: |
+| `internal/compose` | 79,82% | 90,83% |
+| `internal/compose/model` | 100,00% | 25,00% |
+| `internal/compose/docker` | 66,67% | 56,25% |
+| `internal/compose/store` | 96,88% | 100,00% |
+| `internal/compose/parse` | 83,93% | 93,33% |
+| `internal/gui` | 90,30% | 41,36% |
+| `internal/gui/design` | 85,71% | 87,50% |
+| `internal/gui/view` | 87,95% | 94,32% |
+| `internal/gui/project` | 94,29% | 77,78% |
+| `internal/gui/forms` | 83,67% | 77,78% |
+| `internal/gui/activity` | 95,83% | 100,00% |
+| `internal/gui/logs` | 93,18% | 97,78% |
+| `internal/gui/usage` | 86,21% | 93,55% |
+| `internal/gui/traymenu` | 100,00% | 100,00% |
+| `internal/tray` | 89,66% | 93,55% |
