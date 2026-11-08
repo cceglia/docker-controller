@@ -16,7 +16,15 @@ import "fmt"
 // and 20 px for the title of the detail. Secondary text keeps the body size and
 // the colour of the theme: a smaller size would break the minimum of 16 px, and
 // a muted role does not guarantee the contrast a text needs.
-func ApplicationStyleSheet(theme DesignTheme) string {
+//
+// selection is the background of a selected row, as "#rrggbb": the desktop owns
+// that colour, so it arrives from the palette instead of a role. An empty
+// selection keeps the highlight of the palette.
+func ApplicationStyleSheet(theme DesignTheme, selection string) string {
+	selected := "palette(highlight)"
+	if selection != "" {
+		selected = selection
+	}
 	return fmt.Sprintf(`
 QLabel#sidebarTitle {
     font-size: %dpx;
@@ -136,11 +144,11 @@ QPushButton#primaryAction:disabled {
     font-weight: 600;
 }
 QListWidget::item:selected {
-    background: palette(highlight);
+    background: %s;
     color: palette(highlighted-text);
 }
 QListWidget::item:selected:!active {
-    background: palette(highlight);
+    background: %s;
 }
 QWidget#projectRowSelected QLabel {
     color: palette(highlighted-text);
@@ -169,5 +177,6 @@ QWidget#projectRowSelected QLabel {
 		theme.Color(RoleStatusFault),
 		theme.Color(RoleStatusFault),
 		SpaceS,
+		selected, selected,
 	)
 }

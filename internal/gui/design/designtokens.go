@@ -161,6 +161,13 @@ func (t DesignTheme) Color(role string) string {
 	return t.roles[role].color
 }
 
+// IsDark reports whether the palette is the dark one. The selection of the list
+// is the one colour the sheet takes from the palette of the desktop, and a dark
+// desktop paints a selected row with the darker of its two highlights.
+func (t DesignTheme) IsDark() bool {
+	return t.name == DarkTheme.name
+}
+
 // ServiceColor is the colour of one palette entry in the theme, as "#rrggbb".
 // The colours live with the other design tokens, so the token test checks
 // them. An entry outside the palette has no colour.

@@ -115,7 +115,7 @@ func TestServiceColoursComeFromTheRoles(t *testing.T) {
 func TestStyleSheetColoursComeFromTheRoles(t *testing.T) {
 	for _, theme := range themes {
 		t.Run(theme.name, func(t *testing.T) {
-			sheet := ApplicationStyleSheet(theme)
+			sheet := ApplicationStyleSheet(theme, "")
 			found := hexColorPattern.FindAllString(sheet, -1)
 			if len(found) == 0 {
 				t.Fatal("the style sheet declares no colour: the sheet is not built from the tokens")
@@ -131,6 +131,40 @@ func TestStyleSheetColoursComeFromTheRoles(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestStyleSheetTakesTheSelectionOfTheDesktop guards the one colour of the
+// sheet that comes from the palette: a desktop that hands a selection colour
+// gets it on the focused row and on the inactive one, so the band does not
+// change when the window loses focus.
+func TestStyleSheetTakesTheSelectionOfTheDesktop(t *testing.T) {
+	const selection = "#1b4155"
+	for _, theme := range themes {
+		theme := theme
+		t.Run(theme.name, func(t *testing.T) {
+			sheet := ApplicationStyleSheet(theme, selection)
+			for _, rule := range []string{
+				"QListWidget::item:selected {\n    background: " + selection + ";",
+				"QListWidget::item:selected:!active {\n    background: " + selection + ";",
+			} {
+				if !strings.Contains(sheet, rule) {
+					t.Errorf("the sheet has no rule %q", rule)
+				}
+			}
+		})
+	}
+
+	t.Run("an empty selection keeps the highlight of the palette", func(t *testing.T) {
+		sheet := ApplicationStyleSheet(DarkTheme, "")
+		for _, rule := range []string{
+			"QListWidget::item:selected {\n    background: palette(highlight);",
+			"QListWidget::item:selected:!active {\n    background: palette(highlight);",
+		} {
+			if !strings.Contains(sheet, rule) {
+				t.Errorf("the sheet has no rule %q", rule)
+			}
+		}
+	})
 }
 
 func TestTypeScale(t *testing.T) {
@@ -156,7 +190,7 @@ func TestTypeScale(t *testing.T) {
 	for _, theme := range themes {
 		chooser := theme
 		t.Run("sheet/"+chooser.name, func(t *testing.T) {
-			sizes := fontSizePattern.FindAllStringSubmatch(ApplicationStyleSheet(chooser), -1)
+			sizes := fontSizePattern.FindAllStringSubmatch(ApplicationStyleSheet(chooser, ""), -1)
 			if len(sizes) == 0 {
 				t.Fatal("the style sheet declares no font size")
 			}
@@ -184,7 +218,7 @@ func TestStyleSheetPaddingComesFromTheSpacingScale(t *testing.T) {
 	for _, theme := range themes {
 		chooser := theme
 		t.Run(chooser.name, func(t *testing.T) {
-			paddings := paddingPattern.FindAllStringSubmatch(ApplicationStyleSheet(chooser), -1)
+			paddings := paddingPattern.FindAllStringSubmatch(ApplicationStyleSheet(chooser, ""), -1)
 			if len(paddings) == 0 {
 				t.Fatal("the style sheet declares no padding")
 			}
@@ -227,7 +261,7 @@ func TestThemeForLightness(t *testing.T) {
 // must draw them back.
 func TestPrimaryActionShowsItsStates(t *testing.T) {
 	for _, theme := range themes {
-		sheet := ApplicationStyleSheet(theme)
+		sheet := ApplicationStyleSheet(theme, "")
 		for _, state := range []string{
 			"QPushButton#primaryAction:hover",
 			"QPushButton#primaryAction:focus",

@@ -62,9 +62,10 @@ func Run(ctx context.Context, manager *compose.Manager, activities *activity.Log
 	// The window colour of the desktop palette picks the palette of the roles
 	// the sheet carries: a dark window needs lighter colours to keep the
 	// contrast of the labels of state.
-	theme := themeForPalette(qt6.QGuiApplication_Palette())
+	palette := qt6.QGuiApplication_Palette()
+	theme := themeForPalette(palette)
 
-	a.qt.SetStyleSheet(design.ApplicationStyleSheet(theme))
+	a.qt.SetStyleSheet(design.ApplicationStyleSheet(theme, selectionForPalette(theme, palette)))
 
 	a.shell = newShell(a, theme)
 	// The click on a notification shows the window. The signal arrives on a
@@ -94,6 +95,24 @@ func themeForPalette(palette *qt6.QPalette) design.DesignTheme {
 		return design.LightTheme
 	}
 	return design.ThemeForLightness(window.Lightness())
+}
+
+// selectionForPalette is the background of a selected row of the list. A dark
+// desktop keeps two highlights: the brighter one is the accent of an active
+// window, which paints a loud stripe across the list, and the darker one is what
+// a file manager shows on a selected row. The colour still comes from the
+// palette, so another dark colour scheme reaches the list. A light theme, and a
+// palette without the inactive highlight, keep the highlight the sheet asks
+// for.
+func selectionForPalette(theme design.DesignTheme, palette *qt6.QPalette) string {
+	if !theme.IsDark() || palette == nil {
+		return ""
+	}
+	highlight := palette.Color(qt6.QPalette__Inactive, qt6.QPalette__Highlight)
+	if highlight == nil {
+		return ""
+	}
+	return highlight.Name()
 }
 
 // application owns what outlives the window: the Qt application, the Manager,

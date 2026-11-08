@@ -45,7 +45,7 @@ func TestShellOffscreen(t *testing.T) {
 	app := qt6.NewQApplication([]string{"docker-controller-ui-test"})
 	defer app.Delete()
 	qt6.QCoreApplication_SetApplicationName(appID)
-	app.SetStyleSheet(design.ApplicationStyleSheet(design.LightTheme))
+	app.SetStyleSheet(design.ApplicationStyleSheet(design.LightTheme, ""))
 
 	s := newShell(&application{}, design.LightTheme)
 	defer s.window.Delete()
@@ -1984,13 +1984,22 @@ func captureScreens(t *testing.T, dir string, app *qt6.QApplication) {
 	// The dark desktop: the same blocks with the palette of Breeze Dark, so a
 	// role that reads on white and disappears on black shows here.
 	qt6.QApplication_SetPalette(testDarkPalette())
-	app.SetStyleSheet(design.ApplicationStyleSheet(design.DarkTheme))
+	if got := selectionForPalette(design.LightTheme, qt6.QGuiApplication_Palette()); got != "" {
+		t.Errorf("light selection = %q, want the highlight of the sheet", got)
+	}
+	if got := selectionForPalette(design.DarkTheme, qt6.QGuiApplication_Palette()); got != "#1b4155" {
+		t.Errorf("dark selection = %q, want the inactive highlight of the palette", got)
+	}
+	app.SetStyleSheet(design.ApplicationStyleSheet(design.DarkTheme, selectionForPalette(design.DarkTheme, qt6.QGuiApplication_Palette())))
 	dark := newShell(&application{}, design.DarkTheme)
 	defer dark.window.Delete()
 	dark.show()
 	settle()
 	dark.apply(compose.Snapshot{DockerReachable: true, Projects: projects})
 	dark.open(projects[1])
+	// The click that opens a Project also selects its row: the screenshot shows
+	// the band of the selection of the dark palette.
+	dark.list.selectProject(projects[1].Name)
 	settle()
 	dark.panel.setUsage(screenshotUsage(projects[1]))
 	saveGrab(t, dark.window, dir, "11-detail-dark")
@@ -2124,6 +2133,8 @@ func testDarkPalette() *qt6.QPalette {
 	set(qt6.QPalette__BrightText, "#ffffff")
 	set(qt6.QPalette__Highlight, "#3daee9")
 	set(qt6.QPalette__HighlightedText, "#ffffff")
+	// A view without focus takes the darker highlight of the desktop.
+	palette.SetColor(qt6.QPalette__Inactive, qt6.QPalette__Highlight, qt6.NewQColor6("#1b4155"))
 	set(qt6.QPalette__Mid, "#4a4f55")
 	set(qt6.QPalette__Dark, "#191c1e")
 	set(qt6.QPalette__Light, "#5a6068")
