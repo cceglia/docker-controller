@@ -5,6 +5,45 @@ import (
 	"dockercontroller/internal/compose/model"
 )
 
+// The name rule of a Group lives in the model: one function and one set of
+// outcomes. The form model re-exports them for the dialog, so the dialog reads
+// the rule through the form and never repeats it.
+type (
+	// GroupNameMode selects the rule a validation applies.
+	GroupNameMode = model.GroupNameMode
+	// GroupNameStatus is the outcome of a validation.
+	GroupNameStatus = model.GroupNameStatus
+	// GroupNameCheck is the result of ValidateGroupName.
+	GroupNameCheck = model.GroupNameCheck
+)
+
+const (
+	// GroupNameAssign is the rule of the Project form, GroupNameCreate the rule
+	// of a new Group and GroupNameRename the rule of a rename.
+	GroupNameAssign = model.GroupNameAssign
+	GroupNameCreate = model.GroupNameCreate
+	GroupNameRename = model.GroupNameRename
+	// GroupNameValid, GroupNameInvalid and GroupNameDuplicate are the outcomes
+	// of a validation.
+	GroupNameValid     = model.GroupNameValid
+	GroupNameInvalid   = model.GroupNameInvalid
+	GroupNameDuplicate = model.GroupNameDuplicate
+)
+
+// NormalizeGroupName returns the name of a Group as it is saved: without the
+// spaces at its ends.
+func NormalizeGroupName(name string) string {
+	return model.NormalizeGroupName(name)
+}
+
+// ValidateGroupName applies the single rule of the Group names. The name is
+// trimmed first. A blank name is valid only when the form assigns a Group, and
+// a reserved label is never valid. A name another Group has is a duplicate with
+// its spelling, while a rename of the same Group stays valid.
+func ValidateGroupName(name string, existing []string, mode GroupNameMode, from string) GroupNameCheck {
+	return model.ValidateGroupName(name, existing, mode, from)
+}
+
 // GroupChangeKind is what one successful operation of the Groups dialog did.
 type GroupChangeKind int
 

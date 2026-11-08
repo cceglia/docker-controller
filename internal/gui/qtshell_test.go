@@ -78,6 +78,7 @@ func TestShellOffscreen(t *testing.T) {
 	checkList(t, s)
 	checkEditForm(t, s)
 	checkGroupsDialog(t, s)
+	checkGroupsDeletionOrder(t)
 	checkActions(t, s)
 	checkConfirmDialog(t, s)
 	checkCommands(t, s)
@@ -1321,6 +1322,101 @@ func checkGroupsDialog(t *testing.T, s *shell) {
 	// The step of the form leaves the panel as it found it.
 	s.panel.cancelEdit()
 	settle()
+}
+
+// checkGroupsDeletionOrder reproduces the real order of a deletion: the Manager
+// publishes the new snapshot before it returns, so the list that already lost
+// the Group arrives first and the outcome after it. The selection still goes to
+// the Group that took the empty place, otherwise to the last one, otherwise to
+// none.
+//
+// The cases run in one loop on this goroutine: every Qt call stays on the one
+// that created the QApplication, so the step starts no goroutine of its own.
+func checkGroupsDeletionOrder(t *testing.T) {
+	t.Helper()
+
+	cases := []struct {
+		name         string
+		groups       []string
+		removed      int
+		want         string
+		wantRow      int
+		wantCommands bool
+	}{
+		{
+			name:         "the middle Group leaves its place to the next one",
+			groups:       []string{"Casa", "Lavoro", "Vuoto"},
+			removed:      1,
+			want:         "Vuoto",
+			wantRow:      1,
+			wantCommands: true,
+		},
+		{
+			name:         "the last Group leaves the selection to the new last one",
+			groups:       []string{"Casa", "Lavoro", "Vuoto"},
+			removed:      2,
+			want:         "Lavoro",
+			wantRow:      1,
+			wantCommands: true,
+		},
+		{
+			name:         "the only Group leaves no selection",
+			groups:       []string{"Vuoto"},
+			removed:      0,
+			want:         "",
+			wantRow:      -1,
+			wantCommands: false,
+		},
+	}
+
+	for _, tc := range cases {
+		parent := qt6.NewQWidget2()
+		d := newGroupsDialog(parent, tc.groups, nil, groupDialogOperator{})
+		d.open()
+		settle()
+		d.onConfirm = func(_ guiproject.Confirmation, run func()) { run() }
+
+		var pending func(error)
+		d.op.Delete = func(_ string, done func(error)) { pending = done }
+		d.list.SetCurrentRow(tc.removed)
+		settle()
+		d.deleteButton.Click()
+		settle()
+		if pending == nil {
+			t.Fatalf("%s: Elimina starts no deletion", tc.name)
+		}
+		if !d.busy {
+			t.Errorf("%s: the dialog is not busy during the deletion", tc.name)
+		}
+
+		// The snapshot without the Group reaches the Qt thread before the
+		// outcome of the Manager.
+		rest := append(append([]string{}, tc.groups[:tc.removed]...), tc.groups[tc.removed+1:]...)
+		d.setSnapshot(rest, nil)
+		settle()
+		pending(nil)
+		settle()
+
+		if d.busy {
+			t.Errorf("%s: the dialog stays busy after the outcome", tc.name)
+		}
+		if got := d.selectedName(); got != tc.want {
+			t.Errorf("%s: after the deletion the selection is %q, want %q", tc.name, got, tc.want)
+		}
+		if got := d.list.CurrentRow(); got != tc.wantRow {
+			t.Errorf("%s: the list selects the row %d, want %d", tc.name, got, tc.wantRow)
+		}
+		if got := d.renameButton.IsEnabled(); got != tc.wantCommands {
+			t.Errorf("%s: Rinomina is %v after the deletion, want %v", tc.name, got, tc.wantCommands)
+		}
+		if got := d.deleteButton.IsEnabled(); got != tc.wantCommands {
+			t.Errorf("%s: Elimina is %v after the deletion, want %v", tc.name, got, tc.wantCommands)
+		}
+
+		d.dialog.Reject()
+		settle()
+		parent.Delete()
+	}
 }
 
 // listTexts lists the text of every row of a list.

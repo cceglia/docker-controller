@@ -92,6 +92,10 @@ type groupsDialog struct {
 	// before the outcome, so the dialog swaps the list only while the Group
 	// still sits there.
 	moveFrom int
+	// deleteFrom is the row the running deletion started from. A snapshot can
+	// arrive before the outcome and leave the list without the Group, so the
+	// outcome reads the row here when the Group is gone.
+	deleteFrom int
 	// closed is true from the finished event, so an outcome that arrives after
 	// the dialog went away touches no widget.
 	closed bool
@@ -129,7 +133,7 @@ type groupsDialog struct {
 // newGroupsDialog builds the dialog on the last snapshot. The dialog reads the
 // Groups and the Projects; the operations reach the Manager through op.
 func newGroupsDialog(parent *qt6.QWidget, groups []string, projects []compose.Project, op groupDialogOperator) *groupsDialog {
-	d := &groupsDialog{op: op, selection: -1}
+	d := &groupsDialog{op: op, selection: -1, deleteFrom: -1}
 	d.groups = append([]string{}, groups...)
 	d.projects = projects
 
@@ -583,13 +587,13 @@ func (d *groupsDialog) confirmFieldAction() {
 	if d.busy || !d.fieldOpen {
 		return
 	}
-	name := model.NormalizeGroupName(d.entry.Text())
+	name := forms.NormalizeGroupName(d.entry.Text())
 	d.setFieldMessage("")
 	d.showListError("")
 
 	if d.fieldCreate {
-		check := model.ValidateGroupName(name, d.groups, model.GroupNameCreate, "")
-		if check.Status == model.GroupNameInvalid {
+		check := forms.ValidateGroupName(name, d.groups, forms.GroupNameCreate, "")
+		if check.Status == forms.GroupNameInvalid {
 			d.setFieldMessage(invalidGroupMessage())
 			return
 		}
@@ -597,11 +601,11 @@ func (d *groupsDialog) confirmFieldAction() {
 		return
 	}
 
-	check := model.ValidateGroupName(name, d.groups, model.GroupNameRename, d.fieldFrom)
+	check := forms.ValidateGroupName(name, d.groups, forms.GroupNameRename, d.fieldFrom)
 	switch check.Status {
-	case model.GroupNameInvalid:
+	case forms.GroupNameInvalid:
 		d.setFieldMessage(invalidGroupMessage())
-	case model.GroupNameDuplicate:
+	case forms.GroupNameDuplicate:
 		from := d.fieldFrom
 		d.ask(d.unionQuestion(from, check.Existing), func() {
 			d.startRename(from, check.Existing, true)
@@ -730,9 +734,11 @@ func (d *groupsDialog) askDelete() {
 	d.ask(d.deleteQuestion(name), func() { d.startDelete(name) })
 }
 
-// startDelete runs the deletion of the Group the question was about.
+// startDelete runs the deletion of the Group the question was about. The row it
+// holds now is the one the outcome reads if a snapshot arrives first.
 func (d *groupsDialog) startDelete(name string) {
 	d.showListError("")
+	d.deleteFrom = d.indexOf(name)
 	d.busy = true
 	d.refreshCommands()
 	if d.op.Delete == nil {
@@ -744,7 +750,9 @@ func (d *groupsDialog) startDelete(name string) {
 
 // deleteDone applies the outcome of a deletion: an error sits under the list, a
 // Group that left takes its Projects' Group away and the selection moves to the
-// Group that took the empty place.
+// Group that took the empty place. A snapshot can arrive before the outcome and
+// leave the list without the Group, so the row it held at the start is the row
+// the selection comes from.
 func (d *groupsDialog) deleteDone(name string, err error) {
 	if d.closed {
 		return
@@ -756,13 +764,20 @@ func (d *groupsDialog) deleteDone(name string, err error) {
 		return
 	}
 	index := d.indexOf(name)
+	present := index >= 0
 	length := len(d.groups)
+	if !present {
+		// The snapshot already took the Group out, so the list is one step
+		// ahead of the outcome: the row comes from the start of the deletion.
+		index = d.deleteFrom
+		length++
+	}
 	for i := range d.projects {
 		if model.SameGroupName(d.projects[i].Group, name) {
 			d.projects[i].Group = ""
 		}
 	}
-	if index >= 0 {
+	if present {
 		d.groups = append(d.groups[:index], d.groups[index+1:]...)
 	}
 	d.changes = append(d.changes, forms.GroupChange{Kind: forms.GroupDeleted, From: name})

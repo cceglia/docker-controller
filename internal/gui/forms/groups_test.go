@@ -7,6 +7,79 @@ import (
 	"dockercontroller/internal/compose"
 )
 
+func TestValidateGroupName_AppliesTheRuleOfTheModel(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		input    string
+		existing []string
+		mode     GroupNameMode
+		from     string
+		wantName string
+		want     GroupNameStatus
+		spelling string
+	}{
+		{
+			name:     "a new name is valid and trimmed",
+			input:    "  Casa  ",
+			existing: []string{"Lavoro"},
+			mode:     GroupNameCreate,
+			wantName: "Casa",
+			want:     GroupNameValid,
+		},
+		{
+			name:  "an empty creation is invalid",
+			input: "   ",
+			mode:  GroupNameCreate,
+			want:  GroupNameInvalid,
+		},
+		{
+			name:     "a reserved label is invalid",
+			input:    "Senza Gruppo",
+			existing: []string{"Casa"},
+			mode:     GroupNameCreate,
+			wantName: "Senza Gruppo",
+			want:     GroupNameInvalid,
+		},
+		{
+			name:     "another Group with the name is a duplicate with its spelling",
+			input:    "casa",
+			existing: []string{"Casa", "Lavoro"},
+			mode:     GroupNameCreate,
+			wantName: "casa",
+			want:     GroupNameDuplicate,
+			spelling: "Casa",
+		},
+		{
+			name:     "a rename of its own spelling stays valid",
+			input:    "CASA",
+			existing: []string{"Casa", "Lavoro"},
+			mode:     GroupNameRename,
+			from:     "Casa",
+			wantName: "CASA",
+			want:     GroupNameValid,
+		},
+		{
+			name:     "an empty assignment clears the Group",
+			existing: []string{"Casa"},
+			mode:     GroupNameAssign,
+			want:     GroupNameValid,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			check := ValidateGroupName(tc.input, tc.existing, tc.mode, tc.from)
+			if check.Name != tc.wantName {
+				t.Errorf("the name is %q, want %q", check.Name, tc.wantName)
+			}
+			if check.Status != tc.want {
+				t.Errorf("the status is %v, want %v", check.Status, tc.want)
+			}
+			if check.Existing != tc.spelling {
+				t.Errorf("the saved spelling is %q, want %q", check.Existing, tc.spelling)
+			}
+		})
+	}
+}
+
 func TestApplyGroupChanges_FollowsTheTouchedGroup(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
