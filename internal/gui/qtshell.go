@@ -189,7 +189,7 @@ func (s *shell) buildSidebar() {
 	s.list.onOpen = s.open
 	// Before the first snapshot the list is not empty: it is waiting. The line
 	// says so, so a slow Docker never reads as "no Project".
-	s.list.set(nil, "", true)
+	s.list.set(nil, nil, "", true)
 	keepTarget(s.list.widget.QWidget)
 	layout.AddWidget2(s.list.widget.QWidget, 1)
 
@@ -418,7 +418,7 @@ func (s *shell) showList() {
 // show it.
 func (s *shell) open(project compose.Project) {
 	s.selected = project.Name
-	s.panel.setProjects(s.snapshot.Projects)
+	s.panel.setGroups(s.snapshot.Groups)
 	s.panel.set(project, s.snapshot.DockerReachable, s.snapshot.Loading)
 	s.usage.Follow(s.snapshot.DockerReachable)
 	s.bottom.setProject(project)
@@ -436,8 +436,8 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 	s.snapshot = snapshot
 	s.usage.Follow(snapshot.DockerReachable)
 	s.panel.setDocker(snapshot.DockerReachable, snapshot.Loading)
-	s.list.set(snapshot.Projects, s.selected, snapshot.Loading)
-	s.panel.setProjects(snapshot.Projects)
+	s.list.set(snapshot.Projects, snapshot.Groups, s.selected, snapshot.Loading)
+	s.panel.setGroups(snapshot.Groups)
 	if s.selected == "" {
 		s.panel.clear()
 		s.bottom.setProject(compose.Project{})

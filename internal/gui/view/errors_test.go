@@ -83,6 +83,33 @@ func TestKnownMessage_ReportsOnlyTheKnownErrors(t *testing.T) {
 	}
 }
 
+func TestKnownMessage_TranslatesTheGroupErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"unknown", fmt.Errorf("%w: %q", compose.ErrUnknownGroup, "Casa"), "Gruppo sconosciuto."},
+		{"duplicate", fmt.Errorf("%w: %q", compose.ErrDuplicateGroup, "Casa"), "Esiste già un Gruppo con questo nome."},
+		{"invalid", fmt.Errorf("%w: %q", compose.ErrInvalidGroupName, ""), "Nome del Gruppo non valido: non può essere vuoto, né «Nessun Gruppo», né «Senza Gruppo»."},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := KnownMessage(tc.err)
+			if !ok || got != tc.want {
+				t.Errorf("KnownMessage(%v) = %q, %t, want %q", tc.err, got, ok, tc.want)
+			}
+		})
+	}
+
+	// The message of a bad Group name must not read as the one of a bad
+	// Project name: they are two different fields of two different forms.
+	groupMsg, _ := KnownMessage(compose.ErrInvalidGroupName)
+	projectMsg, _ := KnownMessage(compose.ErrInvalidName)
+	if groupMsg == projectMsg {
+		t.Errorf("the Group and the Project invalid names share the message %q", groupMsg)
+	}
+}
+
 func TestWithMessage_KeepsTheChain(t *testing.T) {
 	cause := errors.New("boom")
 	got := WithMessage(cause, "Messaggio.")

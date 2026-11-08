@@ -90,16 +90,17 @@ func (p *projectList) choose(item *qt6.QListWidgetItem) {
 }
 
 // set replaces the rows with the Projects of the snapshot and keeps the open
-// Project selected. An empty list with no load in flight says that no Project is
-// saved; a list that is still loading stays blank.
-func (p *projectList) set(projects []compose.Project, selected string, loading bool) {
+// Project selected. The Groups of the snapshot give the order of the sections,
+// so the list reads them here. An empty list with no load in flight says that no
+// Project is saved; a list that is still loading stays blank.
+func (p *projectList) set(projects []compose.Project, groups []string, selected string, loading bool) {
 	p.widget.Clear()
 	p.rows = nil
 	p.kinds = nil
 	p.strips = nil
 
 	shown := 0
-	for _, section := range view.Sections(projects) {
+	for _, section := range view.Sections(projects, groups) {
 		if len(section.Projects) == 0 {
 			continue
 		}

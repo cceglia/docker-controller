@@ -5,7 +5,12 @@
 // carries the notifications.
 package tray
 
-import "dockercontroller/internal/compose"
+import (
+	"sort"
+
+	"dockercontroller/internal/compose"
+	"dockercontroller/internal/compose/model"
+)
 
 // Command is what a menu entry that is not an Action does.
 type Command int
@@ -48,7 +53,10 @@ func IconFor(s compose.Snapshot) Icon {
 
 // BuildMenu describes the whole tray menu for a snapshot: Groups as submenus
 // of Projects, ungrouped Projects at the top level, then "Mostra finestra" and
-// "Esci". Up, Stop, Restart and Down are offered on a Project; Start, Stop,
+// "Esci". The Groups follow the order of the snapshot, an empty Group shows no
+// submenu, and a Group the snapshot does not list goes after the known ones, in
+// alphabetical order, and before the ungrouped Projects. Up, Stop, Restart and
+// Down are offered on a Project; Start, Stop,
 // Restart and Down on a Service. Down asks for confirmation (Item.Confirm) and
 // never removes volumes: Down con volumi, Pull and Build are not in the tray.
 // Every Action is disabled
@@ -69,10 +77,22 @@ func BuildMenu(s compose.Snapshot) []Item {
 			byGroup[p.Group] = append(byGroup[p.Group], item)
 		}
 	}
+	known := make(map[string]bool, len(s.Groups))
 	for _, g := range s.Groups {
+		known[g] = true
 		if children := byGroup[g]; len(children) > 0 {
 			menu = append(menu, Item{Label: g, Enabled: true, Children: children})
 		}
+	}
+	var unknown []string
+	for name := range byGroup {
+		if !known[name] {
+			unknown = append(unknown, name)
+		}
+	}
+	sort.Slice(unknown, func(i, j int) bool { return model.LessGroupName(unknown[i], unknown[j]) })
+	for _, name := range unknown {
+		menu = append(menu, Item{Label: name, Enabled: true, Children: byGroup[name]})
 	}
 	menu = append(menu, ungrouped...)
 

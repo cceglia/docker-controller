@@ -139,7 +139,7 @@ func (m *Manager) settleLoading(ctx context.Context) {
 	}
 	next, err := m.unreachable(ctx)
 	if err != nil {
-		next = Snapshot{Projects: []Project{}}
+		next = Snapshot{Projects: []Project{}, Groups: []string{}}
 	}
 	m.publish(next)
 }
@@ -181,6 +181,10 @@ func (m *Manager) build(ctx context.Context) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
+	groups, err := m.store.ListGroups(ctx)
+	if err != nil {
+		return Snapshot{}, err
+	}
 	for i := range projects {
 		o := seen[projects[i].Name]
 		projects[i].Running, projects[i].Total = o.running, o.total
@@ -192,7 +196,7 @@ func (m *Manager) build(ctx context.Context) (Snapshot, error) {
 		projects[i].ComposeMissing = composeMissing(projects[i].ComposeFiles)
 		projects[i].Profiles = m.availableProfiles(ctx, projects[i])
 	}
-	return Snapshot{DockerReachable: true, Projects: projects}, nil
+	return Snapshot{DockerReachable: true, Projects: projects, Groups: groups}, nil
 }
 
 // composeMissing reports whether any of the compose files is gone. A file that
@@ -213,9 +217,13 @@ func (m *Manager) unreachable(ctx context.Context) (Snapshot, error) {
 	prev := m.base
 	m.mu.Unlock()
 	if len(prev.Projects) > 0 {
-		return Snapshot{DockerReachable: false, Projects: prev.Projects}, nil
+		return Snapshot{DockerReachable: false, Projects: prev.Projects, Groups: prev.Groups}, nil
 	}
 	projects, err := m.store.List(ctx)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	groups, err := m.store.ListGroups(ctx)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -225,7 +233,7 @@ func (m *Manager) unreachable(ctx context.Context) (Snapshot, error) {
 		projects[i].ComposeMissing = composeMissing(projects[i].ComposeFiles)
 		projects[i].Profiles = orEmpty(m.profiles[projects[i].Name].names)
 	}
-	return Snapshot{DockerReachable: false, Projects: projects}, nil
+	return Snapshot{DockerReachable: false, Projects: projects, Groups: groups}, nil
 }
 
 // publish stores a new base snapshot and notifies watchers if the result
@@ -242,7 +250,9 @@ func (m *Manager) publish(next Snapshot) {
 func (m *Manager) recompose() {
 	next := Snapshot{Loading: m.base.Loading, DockerReachable: m.base.DockerReachable, Projects: make([]Project, len(m.base.Projects))}
 	copy(next.Projects, m.base.Projects)
-	next.Groups = groupsOf(next.Projects)
+	// Groups are saved on their own, so they come from the base snapshot as
+	// they are: the order is the user's, and a Group no Project uses stays.
+	next.Groups = append([]string{}, m.base.Groups...)
 	for i := range next.Projects {
 		if a, ok := m.running[next.Projects[i].Name]; ok {
 			next.Projects[i].Activity = &a

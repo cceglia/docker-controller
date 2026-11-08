@@ -45,16 +45,6 @@ func TestNewProjectEdit_StartsEmptyWithoutASavedValue(t *testing.T) {
 	}
 }
 
-func TestNewProjectEdit_ResetsTheNewGroupField(t *testing.T) {
-	got := NewProjectEdit(compose.Project{Name: "shop", Group: "Casa"})
-	if got.NewGroup {
-		t.Error("NewGroup = true, want the saved Group chosen")
-	}
-	if got.NewGroupName != "" {
-		t.Errorf("NewGroupName = %q, want an empty field", got.NewGroupName)
-	}
-}
-
 func TestProjectEdit_SetProfile_KeepsTheOtherProfiles(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -121,34 +111,11 @@ func TestProjectEdit_GroupValue_ReadsTheGroupToSend(t *testing.T) {
 		{"the chosen Group", ProjectEdit{Group: "Casa"}, "Casa"},
 		{"surrounding spaces go", ProjectEdit{Group: "  Casa  "}, "Casa"},
 		{"no Group", ProjectEdit{}, ""},
-		{"the new Group typed", ProjectEdit{NewGroup: true, Group: "Casa", NewGroupName: "  Nuovo "}, "Nuovo"},
-		{"the new Group field left empty", ProjectEdit{NewGroup: true, Group: "Casa"}, ""},
-		{"the new Group field with spaces only", ProjectEdit{NewGroup: true, NewGroupName: "   "}, ""},
+		{"spaces only is no Group", ProjectEdit{Group: "   "}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := tc.edit.GroupValue(); got != tc.want {
 				t.Errorf("GroupValue = %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestProjectEdit_SaveEnabled_AsksForTheNewGroupName(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		edit ProjectEdit
-		want bool
-	}{
-		{"a chosen Group may be saved", ProjectEdit{Group: "Casa"}, true},
-		{"no Group may be saved", ProjectEdit{}, true},
-		{"the new Group named may be saved", ProjectEdit{NewGroup: true, NewGroupName: "Nuovo"}, true},
-		{"the new Group named with spaces around", ProjectEdit{NewGroup: true, NewGroupName: " Nuovo "}, true},
-		{"the new Group field left empty may not be saved", ProjectEdit{NewGroup: true}, false},
-		{"the new Group field with spaces only may not be saved", ProjectEdit{NewGroup: true, NewGroupName: "   "}, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.edit.SaveEnabled(); got != tc.want {
-				t.Errorf("SaveEnabled = %t, want %t", got, tc.want)
 			}
 		})
 	}
@@ -191,8 +158,8 @@ func TestProjectEdit_Settings_TrimsTheNamesAndSendsTheCompleteSet(t *testing.T) 
 			profiles:    []string{},
 		},
 		{
-			name:        "the new Group typed is sent",
-			edit:        ProjectEdit{DisplayName: "Negozio", Group: "Casa", NewGroup: true, NewGroupName: "  Nuovo "},
+			name:        "a new name outside the list is sent as typed",
+			edit:        ProjectEdit{DisplayName: "Negozio", Group: "  Nuovo "},
 			displayName: "Negozio",
 			group:       "Nuovo",
 			profiles:    []string{},
@@ -239,199 +206,82 @@ func TestProjectEdit_Settings_KeepsAProfileTheComposeFilesNoLongerDefine(t *test
 	}
 }
 
-func TestGroupChoices_OffersNoGroupThenTheGroupsInUse(t *testing.T) {
+func TestGroupChoices_OffersNoGroupThenTheSavedGroupsInTheirOrder(t *testing.T) {
 	for _, tc := range []struct {
-		name     string
-		current  string
-		projects []compose.Project
-		want     []string
+		name    string
+		current string
+		groups  []string
+		want    []string
 	}{
 		{
 			name: "no Group at all",
 			want: []string{""},
 		},
 		{
-			name:     "the Groups in use, sorted",
-			projects: []compose.Project{{Group: "Zeta"}, {Group: "Alfa"}, {Group: "Beta"}},
-			want:     []string{"", "Alfa", "Beta", "Zeta"},
+			name:   "the saved Groups in the chosen order",
+			groups: []string{"Zeta", "Alfa", "Beta"},
+			want:   []string{"", "Zeta", "Alfa", "Beta"},
 		},
 		{
-			name:     "sorted without regard to case",
-			projects: []compose.Project{{Group: "beta"}, {Group: "Alfa"}},
-			want:     []string{"", "Alfa", "beta"},
+			name:   "an empty saved Group offers nothing",
+			groups: []string{"", "Casa"},
+			want:   []string{"", "Casa"},
 		},
 		{
-			name:     "a Group in use appears once",
-			projects: []compose.Project{{Group: "Casa"}, {Group: "Casa"}, {Group: "Lavoro"}},
-			want:     []string{"", "Casa", "Lavoro"},
+			name:   "the spaces around a Group go",
+			groups: []string{" Casa ", "Casa"},
+			want:   []string{"", "Casa"},
 		},
 		{
-			name:     "a Project without Group offers nothing",
-			projects: []compose.Project{{Group: ""}, {Group: "Casa"}},
-			want:     []string{"", "Casa"},
+			name:    "the current Group outside the list joins at the end",
+			current: "Vecchio",
+			groups:  []string{"Casa", "Lavoro"},
+			want:    []string{"", "Casa", "Lavoro", "Vecchio"},
 		},
 		{
-			name:     "the spaces around a Group go",
-			projects: []compose.Project{{Group: " Casa "}, {Group: "Casa"}},
-			want:     []string{"", "Casa"},
+			name:    "the current Group of the list is not listed twice",
+			current: "Casa",
+			groups:  []string{"Casa", "Lavoro"},
+			want:    []string{"", "Casa", "Lavoro"},
 		},
 		{
-			name:     "the current Group joins the ones in use",
-			current:  "Vecchio",
-			projects: []compose.Project{{Group: "Casa"}},
-			want:     []string{"", "Casa", "Vecchio"},
-		},
-		{
-			name:     "the current Group is not listed twice",
-			current:  "Casa",
-			projects: []compose.Project{{Group: "Casa"}, {Group: "Lavoro"}},
-			want:     []string{"", "Casa", "Lavoro"},
+			name:    "the current Group differing only in case is the saved one",
+			current: "CASA",
+			groups:  []string{"Casa", "Lavoro"},
+			want:    []string{"", "Casa", "Lavoro"},
 		},
 		{
 			name:    "a blank current Group adds nothing",
 			current: "   ",
-			want:    []string{""},
+			groups:  []string{"Casa"},
+			want:    []string{"", "Casa"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := GroupChoices(tc.current, tc.projects); !reflect.DeepEqual(got, tc.want) {
+			if got := GroupChoices(tc.current, tc.groups); !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("GroupChoices = %v, want %v", got, tc.want)
 			}
 		})
 	}
 }
 
-func TestGroupIndex_FindsTheOptionOfAGroup(t *testing.T) {
-	choices := []string{"", "Casa", "Lavoro"}
+func TestGroupSuggestions_DropsTheEmptyOption(t *testing.T) {
 	for _, tc := range []struct {
-		name  string
-		group string
-		want  int
+		name    string
+		choices []string
+		want    []string
 	}{
-		{"no Group", "", 0},
-		{"a Group of the list", "Lavoro", 2},
-		{"the spaces around the Group go", " Lavoro ", 2},
-		{"a Group outside the list falls back to no Group", "Vecchio", 0},
+		{"no Group to propose", []string{""}, []string{}},
+		{"no choice at all", nil, []string{}},
+		{"the Groups of the choices keep their order", []string{"", "Casa", "Lavoro"}, []string{"Casa", "Lavoro"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := GroupIndex(choices, tc.group); got != tc.want {
-				t.Errorf("GroupIndex(%q) = %d, want %d", tc.group, got, tc.want)
+			got := GroupSuggestions(tc.choices)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("GroupSuggestions(%v) = %v, want %v", tc.choices, got, tc.want)
 			}
-		})
-	}
-}
-
-func TestGroupAt_ReadsTheOptionOfAGroup(t *testing.T) {
-	choices := []string{"", "Casa", "Lavoro"}
-	for _, tc := range []struct {
-		name  string
-		index int
-		want  string
-	}{
-		{"no Group", 0, ""},
-		{"a Group of the list", 2, "Lavoro"},
-		{"an option past the list falls back to no Group", 7, ""},
-		{"a negative option falls back to no Group", -1, ""},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := groupAt(choices, tc.index); got != tc.want {
-				t.Errorf("groupAt(%d) = %q, want %q", tc.index, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestGroupOption_ReadsTheOptionOfTheForm(t *testing.T) {
-	choices := []string{"", "Casa", "Lavoro"}
-	for _, tc := range []struct {
-		name string
-		edit ProjectEdit
-		want int
-	}{
-		{"no Group", ProjectEdit{}, 0},
-		{"the chosen Group", ProjectEdit{Group: "Lavoro"}, 2},
-		{"a Group outside the list reads as no Group", ProjectEdit{Group: "Vecchio"}, 0},
-		{"a new Group asks for the last option", ProjectEdit{Group: "Lavoro", NewGroup: true}, 3},
-		{"a new Group asks for the last option without a Group", ProjectEdit{NewGroup: true}, 3},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := GroupOption(choices, tc.edit); got != tc.want {
-				t.Errorf("GroupOption = %d, want %d", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestProjectEdit_SetGroupOption_PicksTheOptionAndTheNewGroupField(t *testing.T) {
-	choices := []string{"", "Casa", "Lavoro"}
-	for _, tc := range []struct {
-		name         string
-		edit         ProjectEdit
-		index        int
-		group        string
-		newGroup     bool
-		newGroupName string
-	}{
-		{
-			name:         "no Group",
-			edit:         ProjectEdit{Group: "Lavoro", NewGroup: true, NewGroupName: "Nuovo"},
-			index:        0,
-			group:        "",
-			newGroup:     false,
-			newGroupName: "Nuovo",
-		},
-		{
-			name:         "a Group of the list",
-			edit:         ProjectEdit{Group: "Casa"},
-			index:        2,
-			group:        "Lavoro",
-			newGroup:     false,
-			newGroupName: "",
-		},
-		{
-			name:         "the last option asks for a new Group",
-			edit:         ProjectEdit{Group: "Casa"},
-			index:        3,
-			group:        "Casa",
-			newGroup:     true,
-			newGroupName: "",
-		},
-		{
-			name:         "the last option keeps the name already typed",
-			edit:         ProjectEdit{Group: "Casa", NewGroup: true, NewGroupName: "Nuovo"},
-			index:        3,
-			group:        "Casa",
-			newGroup:     true,
-			newGroupName: "Nuovo",
-		},
-		{
-			name:         "an option past the field falls back to no Group",
-			edit:         ProjectEdit{Group: "Casa", NewGroup: true, NewGroupName: "Nuovo"},
-			index:        9,
-			group:        "",
-			newGroup:     false,
-			newGroupName: "Nuovo",
-		},
-		{
-			name:         "a negative option falls back to no Group",
-			edit:         ProjectEdit{Group: "Casa"},
-			index:        -1,
-			group:        "",
-			newGroup:     false,
-			newGroupName: "",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			edit := tc.edit
-			edit.SetGroupOption(choices, tc.index)
-			if edit.Group != tc.group {
-				t.Errorf("Group = %q, want %q", edit.Group, tc.group)
-			}
-			if edit.NewGroup != tc.newGroup {
-				t.Errorf("NewGroup = %t, want %t", edit.NewGroup, tc.newGroup)
-			}
-			if edit.NewGroupName != tc.newGroupName {
-				t.Errorf("NewGroupName = %q, want %q", edit.NewGroupName, tc.newGroupName)
+			if got == nil {
+				t.Error("GroupSuggestions returned nil, want an empty list")
 			}
 		})
 	}
@@ -453,31 +303,6 @@ func TestProfileChoices_OffersTheProfilesOfTheProject(t *testing.T) {
 			got := ProfileChoices(compose.Project{Profiles: tc.profiles})
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("ProfileChoices = %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
-// TestGroupSuggestions_DropsTheEmptyOption checks the options of the editable
-// box of the Group: every Group of the choices, never the empty one, which the
-// box shows as its hint instead.
-func TestGroupSuggestions_DropsTheEmptyOption(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		choices []string
-		want    []string
-	}{
-		{"no Group to propose", []string{""}, []string{}},
-		{"no choice at all", nil, []string{}},
-		{"the Groups of the choices keep their order", []string{"", "Casa", "Lavoro"}, []string{"Casa", "Lavoro"}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got := GroupSuggestions(tc.choices)
-			if !reflect.DeepEqual(got, tc.want) {
-				t.Errorf("GroupSuggestions(%v) = %v, want %v", tc.choices, got, tc.want)
-			}
-			if got == nil {
-				t.Error("GroupSuggestions returned nil, want an empty list")
 			}
 		})
 	}

@@ -14,9 +14,10 @@ type Settings = model.Settings
 
 // UpdateSettings changes the settings of a saved Project and publishes the new
 // snapshot. It never touches Docker, so it also works while Docker is
-// unreachable. Values are trimmed. It is refused with ErrUnknownProject.
+// unreachable. Values are trimmed. It is refused with ErrUnknownProject, and a
+// reserved Group name with ErrInvalidGroupName.
 func (m *Manager) UpdateSettings(ctx context.Context, name string, s Settings) error {
-	s = Settings{DisplayName: trimmed(s.DisplayName), Group: trimmed(s.Group), Profiles: cleanProfiles(s.Profiles)}
+	s = Settings{DisplayName: trimmed(s.DisplayName), Group: cleanGroup(s.Group), Profiles: cleanProfiles(s.Profiles)}
 
 	m.refreshMu.Lock()
 	defer m.refreshMu.Unlock()
@@ -27,6 +28,14 @@ func (m *Manager) UpdateSettings(ctx context.Context, name string, s Settings) e
 	}
 	if !found {
 		return fmt.Errorf("%w: %q", ErrUnknownProject, name)
+	}
+
+	// The Groups are read back so a Group typed in the form arrives with its
+	// place and a name that differs only in capitalisation shows the saved
+	// spelling. A Group the form left empty does not create anything.
+	groups, err := m.store.ListGroups(ctx)
+	if err != nil {
+		return err
 	}
 
 	m.mu.Lock()
@@ -41,14 +50,39 @@ func (m *Manager) UpdateSettings(ctx context.Context, name string, s Settings) e
 			next.Projects[i].DisplayName = *s.DisplayName
 		}
 		if s.Group != nil {
-			next.Projects[i].Group = *s.Group
+			next.Projects[i].Group = savedGroupName(*s.Group, groups)
 		}
 		if s.Profiles != nil {
 			next.Projects[i].ActiveProfiles = s.Profiles
 		}
 	}
+	next.Groups = groups
 	m.publish(next)
 	return nil
+}
+
+// savedGroupName returns the spelling of the Group whose name is asked for. A
+// name that matches no saved Group stays as it is, and an empty name is no
+// Group.
+func savedGroupName(name string, groups []string) string {
+	if name == "" {
+		return ""
+	}
+	for _, saved := range groups {
+		if model.SameGroupName(saved, name) {
+			return saved
+		}
+	}
+	return name
+}
+
+// cleanGroup trims the Group name; nil stays nil (unchanged).
+func cleanGroup(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	t := model.NormalizeGroupName(*s)
+	return &t
 }
 
 // cleanProfiles trims the names, drops blanks and duplicates and sorts them;
@@ -75,18 +109,4 @@ func trimmed(s *string) *string {
 	}
 	t := strings.TrimSpace(*s)
 	return &t
-}
-
-// groupsOf lists the Groups in use, each once, sorted; never nil.
-func groupsOf(projects []Project) []string {
-	seen := map[string]bool{}
-	out := []string{}
-	for _, p := range projects {
-		if p.Group != "" && !seen[p.Group] {
-			seen[p.Group] = true
-			out = append(out, p.Group)
-		}
-	}
-	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i]) < strings.ToLower(out[j]) })
-	return out
 }

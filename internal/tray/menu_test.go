@@ -229,6 +229,75 @@ func TestBuildMenu_DownOfAProjectAndOfAServiceAsksForConfirmation(t *testing.T) 
 	}
 }
 
+func TestBuildMenu_KeepsTheChosenOrderAndSkipsTheEmptyGroups(t *testing.T) {
+	s := compose.Snapshot{
+		DockerReachable: true,
+		Groups:          []string{"Lavoro", "Casa", "Vuoto"},
+		Projects: []compose.Project{
+			project("w1", "", "Lavoro", compose.StatusActive),
+			project("h1", "", "Casa", compose.StatusStopped),
+		},
+	}
+
+	m := BuildMenu(s)
+	// Lavoro comes before Casa because that is the order of the snapshot, and
+	// the empty Vuoto produces no submenu.
+	if find(m, "Lavoro") == nil || find(m, "Casa") == nil {
+		t.Fatalf("missing a Group: %v", labels(m))
+	}
+	if find(m, "Vuoto") != nil {
+		t.Errorf("the empty Group has a submenu: %v", labels(m))
+	}
+	lavoro, casa := index(m, "Lavoro"), index(m, "Casa")
+	if lavoro > casa {
+		t.Errorf("Lavoro at %d after Casa at %d, want the chosen order", lavoro, casa)
+	}
+}
+
+func TestBuildMenu_PutsTheUnknownGroupsAfterTheKnownOnesAndBeforeTheUngrouped(t *testing.T) {
+	s := compose.Snapshot{
+		DockerReachable: true,
+		Groups:          []string{"Lavoro"},
+		Projects: []compose.Project{
+			project("solo", "", "", compose.StatusActive),
+			project("known", "", "Lavoro", compose.StatusActive),
+			project("z", "", "Zeta", compose.StatusActive),
+			project("a", "", "Alfa", compose.StatusActive),
+		},
+	}
+
+	m := BuildMenu(s)
+	var got []string
+	for _, it := range m {
+		if it.Label == "" || it.Separator {
+			continue
+		}
+		got = append(got, it.Label)
+	}
+	want := []string{"Lavoro", "Alfa", "Zeta", "● solo", "Mostra finestra", "Esci"}
+	if len(got) != len(want) {
+		t.Fatalf("menu = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("menu = %v, want %v", got, want)
+		}
+	}
+	if find(m, "Alfa") == nil || find(m, "Zeta") == nil {
+		t.Errorf("an unknown Group lost its submenu: %v", labels(m))
+	}
+}
+
+// index is the place of a top-level entry, -1 when it is absent.
+func index(items []Item, label string) int {
+	for i := range items {
+		if items[i].Label == label {
+			return i
+		}
+	}
+	return -1
+}
+
 func TestIconFor(t *testing.T) {
 	if IconFor(snapshot(true)) != IconNormal {
 		t.Error("reachable Docker should use the normal icon")

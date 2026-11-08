@@ -1,6 +1,8 @@
 package gui
 
 import (
+	"errors"
+
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
@@ -28,7 +30,7 @@ const (
 	// displayNameHint says what an empty Display name does, groupHint what the
 	// Group does and profilesHint what the Profiles drive.
 	displayNameHint = "Un Nome visualizzato vuoto mostra il nome compose."
-	groupHint       = "Raggruppa il Progetto nella lista. Vuoto per nessun Gruppo."
+	groupHint       = "Raggruppa il Progetto nella lista. Vuoto per nessun Gruppo. Un nome non in elenco crea un Gruppo."
 	profilesHint    = "Vengono usati da Up, Stop, Restart, Pull e Build. " +
 		"Cambiarli non avvia né ferma nulla. Down agisce su tutti i Profili."
 	// noProfilesText explains a form with no Profile to choose.
@@ -42,8 +44,12 @@ const (
 type editForm struct {
 	edit forms.ProjectEdit
 	// message is the Italian reason of a refused save, "" while there is none.
-	// It sits under the Display name field, the first field of the form.
+	// It sits under the Display name field, the first field of the form, unless
+	// the refusal concerns the Group field, which takes groupMessage.
 	message string
+	// groupMessage is the Italian reason of a Group name the Manager refused,
+	// shown under the Group field, "" while there is none.
+	groupMessage string
 	// saving is true while the shell reaches the Manager: a second click on
 	// Salva starts nothing.
 	saving bool
@@ -82,6 +88,8 @@ func (p *detailPanel) saveEdit() {
 		return
 	}
 	p.edit.saving = true
+	p.edit.message = ""
+	p.edit.groupMessage = ""
 	if p.edit.save != nil {
 		p.edit.save.SetEnabled(false)
 	}
@@ -103,7 +111,13 @@ func (p *detailPanel) saveDone(err error) {
 	}
 	p.edit.saving = false
 	if err != nil {
-		p.edit.message = view.UserError(err).Error()
+		// A refusal of the Group name belongs under the Group field; every
+		// other reason sits under the first field.
+		if errors.Is(err, compose.ErrInvalidGroupName) {
+			p.edit.groupMessage = view.UserError(err).Error()
+		} else {
+			p.edit.message = view.UserError(err).Error()
+		}
 		p.render()
 		p.focusEdit()
 		return
@@ -131,10 +145,10 @@ func (p *detailPanel) focusEdit() {
 	}
 }
 
-// setProjects keeps the Projects of the snapshot. The Group field proposes the
-// Groups the Projects in use carry, so it reads them here.
-func (p *detailPanel) setProjects(projects []compose.Project) {
-	p.projects = projects
+// setGroups keeps the saved Groups of the snapshot. The Group field proposes
+// them in the order the user chose.
+func (p *detailPanel) setGroups(groups []string) {
+	p.groups = groups
 }
 
 // fieldAccessibleName is the accessible name of a field of the form: its
@@ -171,7 +185,7 @@ func editField(caption string, field *qt6.QWidget, message, hint string) *qt6.QW
 }
 
 // editBlock builds the form of the settings in place of the data of the
-// Project: the Display name, the Group with the Groups in use to choose from,
+// Project: the Display name, the Group with the saved Groups to choose from,
 // the active Profiles, and the two commands. Every change goes to the pending
 // form, so a render builds it again from the same values.
 func (p *detailPanel) editBlock() *qt6.QWidget {
@@ -207,24 +221,24 @@ func (p *detailPanel) editBlock() *qt6.QWidget {
 	form.name = name
 	box.AddWidget(editField(displayNameLabelText, name.QWidget, form.message, displayNameHint))
 
-	// Gruppo: a box the user types in, which proposes the Groups already in use.
-	// An empty box is no Group, and the hint of the box says so.
+	// Gruppo: a box the user types in, which proposes the saved Groups in the
+	// order of the snapshot. An empty box is no Group, and the hint of the box
+	// says so.
 	group := qt6.NewQComboBox2()
 	setObjectName(group.QWidget, "editGroup")
 	group.SetEditable(true)
 	group.SetInsertPolicy(qt6.QComboBox__NoInsert)
 	group.SetPlaceholderText(forms.NoGroupText)
-	group.AddItems(forms.GroupSuggestions(forms.GroupChoices(form.edit.Group, p.projects)))
+	group.AddItems(forms.GroupSuggestions(forms.GroupChoices(form.edit.Group, p.groups)))
 	group.SetCurrentText(form.edit.Group)
-	group.SetAccessibleName(groupLabelText)
+	group.SetAccessibleName(fieldAccessibleName(groupLabelText, form.groupMessage))
 	group.SetAccessibleDescription(groupHint)
 	keepTarget(group.QWidget)
 	group.OnCurrentTextChanged(func(text string) {
 		form.edit.Group = text
-		form.edit.NewGroup = false
 	})
 	form.group = group
-	box.AddWidget(editField(groupLabelText, group.QWidget, "", groupHint))
+	box.AddWidget(editField(groupLabelText, group.QWidget, form.groupMessage, groupHint))
 
 	// The two fields join the tab chain in the reading order, before the
 	// Profiles and the commands.

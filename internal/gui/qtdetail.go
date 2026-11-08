@@ -77,9 +77,9 @@ type detailPanel struct {
 	// onSave hands the values of the form to the shell, which reaches the
 	// Manager off the Qt thread. A nil function closes the form at once.
 	onSave func(string, compose.Settings)
-	// projects are the Projects of the last snapshot: the Group field proposes
-	// the Groups they use.
-	projects []compose.Project
+	// groups are the saved Groups of the last snapshot, in the user's order: the
+	// Group field proposes them.
+	groups []string
 	// edit is the form of the settings on screen, nil while the detail shows the
 	// data of the Project. A snapshot that arrives while it is open waits, so the
 	// form keeps what the user typed.

@@ -5,14 +5,12 @@ import (
 	"strings"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/compose/model"
 )
 
-// NoGroupText is the option of the Group field that clears the Group.
-const NoGroupText = "Nessun Gruppo"
-
-// NewGroupText is the last option of the Group field: it asks for the name of a
-// new Group, like the old view did.
-const NewGroupText = "Nuovo Gruppo…"
+// NoGroupText is the hint of the empty Group field. The model holds the single
+// definition, so form, list and migration agree.
+const NoGroupText = model.NoGroupText
 
 // ProjectEdit is the pending form of a Project: the values the user types and
 // changes while the detail stays open. Nothing reaches the Manager until the
@@ -23,12 +21,10 @@ type ProjectEdit struct {
 	// Project is the compose name of the Project the form belongs to.
 	Project     string
 	DisplayName string
-	Group       string
-	// NewGroup says the Group field asks for a new Group instead of one of the
-	// choices. NewGroupName is the name typed there, which a new form resets.
-	NewGroup     bool
-	NewGroupName string
-	Profiles     []string
+	// Group is the Group the form sends; an empty value clears it. A name
+	// outside the saved Groups creates the Group when the form is saved.
+	Group    string
+	Profiles []string
 }
 
 // NewProjectEdit opens the form on the saved values of a Project.
@@ -76,19 +72,10 @@ func HasProfile(profiles []string, name string) bool {
 	return false
 }
 
-// GroupValue is the Group the form sends: the new Group typed when the Group
-// field asks for one, else the chosen Group. Both come out trimmed.
+// GroupValue is the Group the form sends, trimmed. An empty value clears the
+// Group of the Project.
 func (e ProjectEdit) GroupValue() string {
-	if e.NewGroup {
-		return strings.TrimSpace(e.NewGroupName)
-	}
-	return strings.TrimSpace(e.Group)
-}
-
-// SaveEnabled says whether the form may be confirmed. A form that asks for a
-// new Group needs its name, so the old view disabled Salva the same way.
-func (e ProjectEdit) SaveEnabled() bool {
-	return !e.NewGroup || strings.TrimSpace(e.NewGroupName) != ""
+	return model.NormalizeGroupName(e.Group)
 }
 
 // Settings is the update the form asks for: the trimmed Display name, the
@@ -119,95 +106,32 @@ func cleanEditProfiles(in []string) []string {
 	return out
 }
 
-// GroupChoices lists the options of the Group field: no Group first, then every
-// Group the Projects in the snapshot use, sorted without duplicates. The
-// current Group of the form joins them when nothing else uses it, so the field
-// never loses a value the user saved before.
-func GroupChoices(current string, projects []compose.Project) []string {
+// GroupChoices lists the options of the Group field: no Group first, then the
+// saved Groups in the order of the snapshot. A saved Group appears once. The
+// current Group of the form joins them at the end, in alphabetical order after
+// the known ones, when it matches no saved Group, so the field never loses a
+// value the user saved before. An empty choice is no Group.
+func GroupChoices(current string, groups []string) []string {
+	out := []string{""}
 	seen := map[string]bool{"": true}
-	var names []string
-	for _, p := range projects {
-		group := strings.TrimSpace(p.Group)
-		if group == "" || seen[group] {
+	for _, g := range groups {
+		g = model.NormalizeGroupName(g)
+		if g == "" || seen[g] {
 			continue
 		}
-		seen[group] = true
-		names = append(names, group)
+		seen[g] = true
+		out = append(out, g)
 	}
-	if group := strings.TrimSpace(current); group != "" && !seen[group] {
-		seen[group] = true
-		names = append(names, group)
+	current = model.NormalizeGroupName(current)
+	if current == "" {
+		return out
 	}
-	sort.Slice(names, func(i, j int) bool {
-		left, right := strings.ToLower(names[i]), strings.ToLower(names[j])
-		if left != right {
-			return left < right
-		}
-		return names[i] < names[j]
-	})
-	return append([]string{""}, names...)
-}
-
-// GroupIndex is the option of a Group in the list of choices. A Group the list
-// does not hold reads as no Group.
-func GroupIndex(choices []string, group string) int {
-	group = strings.TrimSpace(group)
-	for i, choice := range choices {
-		if choice == group {
-			return i
+	for _, g := range out {
+		if model.SameGroupName(g, current) {
+			return out
 		}
 	}
-	return 0
-}
-
-// groupAt is the Group of one option of the list. An option outside the list
-// reads as no Group, so a stale selection never names a Group of its own.
-func groupAt(choices []string, index int) string {
-	if index < 0 || index >= len(choices) {
-		return ""
-	}
-	return choices[index]
-}
-
-// GroupOption is the option the Group field shows: the option of the chosen
-// Group, or the last option when the form asks for a new Group. The last option
-// is the one for a new Group, one past the choices of the list.
-func GroupOption(choices []string, e ProjectEdit) int {
-	if e.NewGroup {
-		return len(choices)
-	}
-	return GroupIndex(choices, e.Group)
-}
-
-// SetGroupOption picks an option of the Group field. The last option turns the
-// new Group field on and keeps the name already typed. Any other option turns
-// it off and makes its Group the chosen one. An option outside the field reads
-// as no Group, like groupAt does.
-func (e *ProjectEdit) SetGroupOption(choices []string, index int) {
-	if index == len(choices) {
-		e.NewGroup = true
-		return
-	}
-	e.NewGroup = false
-	e.Group = groupAt(choices, index)
-}
-
-// groupLabels is the text of each option of the Group field: no Group reads as
-// a sentence, every Group keeps its name, and the last option asks for a new
-// Group.
-func groupLabels(choices []string) []string {
-	labels := make([]string, 0, len(choices)+1)
-	for _, choice := range choices {
-		if choice == "" {
-			labels = append(labels, NoGroupText)
-			continue
-		}
-		labels = append(labels, choice)
-	}
-	if len(labels) == 0 {
-		labels = append(labels, NoGroupText)
-	}
-	return append(labels, NewGroupText)
+	return append(out, current)
 }
 
 // GroupSuggestions lists the options of the editable box of the Group: the

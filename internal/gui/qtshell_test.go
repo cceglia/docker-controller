@@ -74,6 +74,7 @@ func TestShellOffscreen(t *testing.T) {
 
 	checkMinimumTargets(t, s.window)
 	checkDetailPanel(t, s)
+	checkList(t, s)
 	checkEditForm(t, s)
 	checkActions(t, s)
 	checkConfirmDialog(t, s)
@@ -346,6 +347,58 @@ func actionKind(views []guiproject.ActionView, kind compose.ActionKind) (guiproj
 	return guiproject.ActionView{}, false
 }
 
+// checkList drives the Projects list: the headings follow the order of the
+// snapshot, an empty Group produces no heading, an unknown Group goes after the
+// known ones and before "Senza Gruppo", and a list with no Group at all stays
+// flat. It is a step of the smoke test, so the process still has one
+// QApplication.
+func checkList(t *testing.T, s *shell) {
+	t.Helper()
+
+	projects := []compose.Project{
+		{Name: "solo"},
+		{Name: "work", Group: "Lavoro"},
+		{Name: "home", Group: "Casa"},
+		{Name: "zeta", Group: "Zeta"},
+	}
+	// Lavoro before Casa is the chosen order; Zeta is not in the snapshot.
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: projects, Groups: []string{"Lavoro", "Casa", "Vuoto"}})
+	settle()
+
+	got := listRows(s.list.widget)
+	want := []string{"Lavoro", "work", "Casa", "home", "Zeta", "zeta", "Senza Gruppo", "solo"}
+	if !slices.Equal(got, want) {
+		t.Errorf("the list shows %v, want %v", got, want)
+	}
+
+	// A saved Group with no Project produces no heading, and without a Project
+	// that carries a Group the list stays flat and unnamed.
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{{Name: "a"}, {Name: "b"}}, Groups: []string{"Lavoro", "Casa"}})
+	settle()
+	got = listRows(s.list.widget)
+	if want := []string{"a", "b"}; !slices.Equal(got, want) {
+		t.Errorf("the flat list shows %v, want %v", got, want)
+	}
+}
+
+// listRows lists the text of every row of the list, headings included.
+func listRows(list *qt6.QListWidget) []string {
+	var rows []string
+	for i := 0; ; i++ {
+		item := list.Item(i)
+		if item == nil {
+			return rows
+		}
+		widget := list.ItemWidget(item)
+		for _, label := range widgetsNamed(widget, "listHeading") {
+			rows = append(rows, qt6.UnsafeNewQLabel(label.UnsafePointer()).Text())
+		}
+		for _, label := range widgetsNamed(widget, "projectName") {
+			rows = append(rows, qt6.UnsafeNewQLabel(label.UnsafePointer()).Text())
+		}
+	}
+}
+
 // checkEditForm drives the form of the settings: the command of the data opens
 // it with the saved values, the Group field proposes the Groups in use, a
 // snapshot that arrives while it is open keeps the text the user typed, a
@@ -361,7 +414,7 @@ func checkEditForm(t *testing.T, s *shell) {
 	other.Name = "vakt"
 	other.DisplayName = ""
 	other.Group = "Lavoro"
-	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{shop, other}})
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: []compose.Project{shop, other}, Groups: []string{"Lavoro"}})
 	s.open(shop)
 	settle()
 
@@ -392,17 +445,20 @@ func checkEditForm(t *testing.T, s *shell) {
 	if got := s.panel.edit.group.CurrentText(); got != shop.Group {
 		t.Errorf("the Group field holds %q, want the saved %q", got, shop.Group)
 	}
-	// The box proposes the Groups in use, without the empty option: an empty box
-	// is no Group, and the hint of the box says so.
+	// The box proposes the saved Groups in their order, without the empty
+	// option: an empty box is no Group, and the hint of the box says so.
 	group := s.panel.edit.group
-	if got, want := itemsOf(group), forms.GroupSuggestions(forms.GroupChoices(shop.Group, []compose.Project{shop, other})); !slices.Equal(got, want) {
+	if got, want := itemsOf(group), forms.GroupSuggestions(forms.GroupChoices(shop.Group, []string{"Lavoro"})); !slices.Equal(got, want) {
 		t.Errorf("the Group field proposes %v, want %v", got, want)
 	}
 	if !slices.Contains(itemsOf(group), other.Group) {
-		t.Errorf("the Group field does not propose the Group in use %q", other.Group)
+		t.Errorf("the Group field does not propose the saved Group %q", other.Group)
 	}
 	if got := group.PlaceholderText(); got != forms.NoGroupText {
 		t.Errorf("an empty Group box says %q, want %q", got, forms.NoGroupText)
+	}
+	if got := group.AccessibleDescription(); !strings.Contains(got, "crea un Gruppo") {
+		t.Errorf("the Group hint reads %q, want it to say a new name creates a Group", got)
 	}
 	if !s.panel.edit.checks["debug"].IsChecked() {
 		t.Error("the form leaves the active Profile debug off")
@@ -479,6 +535,29 @@ func checkEditForm(t *testing.T, s *shell) {
 	}
 	if got := s.panel.edit.name.AccessibleName(); !strings.Contains(got, message) {
 		t.Errorf("the field is named %q, want it to repeat %q", got, message)
+	}
+
+	// A reserved Group name is refused under the Group field, not under the
+	// Display name, and the Group field repeats the reason in its accessible
+	// name.
+	s.panel.edit.group.SetCurrentText(forms.NoGroupText)
+	settle()
+	s.panel.onSave = func(string, compose.Settings) { s.panel.saveDone(compose.ErrInvalidGroupName) }
+	s.panel.edit.save.Click()
+	settle()
+	form = blockNamed(s.panel, editTitle)
+	if form == nil {
+		t.Fatal("a refused Group name closes the form")
+	}
+	message = view.UserError(compose.ErrInvalidGroupName).Error()
+	if got := errorUnder(form); got != message {
+		t.Errorf("the refusal reads %q under the Group field, want %q", got, message)
+	}
+	if got := s.panel.edit.group.AccessibleName(); !strings.Contains(got, message) {
+		t.Errorf("the Group field is named %q, want it to repeat %q", got, message)
+	}
+	if got := s.panel.edit.name.AccessibleName(); strings.Contains(got, message) {
+		t.Errorf("the Display name field is named %q, want no Group error", got)
 	}
 
 	// A save that works closes the form and gives the focus back to the command

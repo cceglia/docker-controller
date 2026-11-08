@@ -103,7 +103,16 @@ func (s *Store) UpdateSettings(ctx context.Context, name string, st model.Settin
 		}
 	}
 	if st.Group != nil {
-		if _, err := tx.ExecContext(ctx, `UPDATE projects SET group_name = NULLIF(?, '') WHERE name = ?`, *st.Group, name); err != nil {
+		var groupID any
+		group := model.NormalizeGroupName(*st.Group)
+		if group != "" {
+			id, err := ensureGroup(ctx, tx, group)
+			if err != nil {
+				return false, fmt.Errorf("compose: update group of %s: %w", name, err)
+			}
+			groupID = id
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE projects SET group_id = ? WHERE name = ?`, groupID, name); err != nil {
 			return false, fmt.Errorf("compose: update group of %s: %w", name, err)
 		}
 	}
@@ -126,7 +135,8 @@ func (s *Store) UpdateSettings(ctx context.Context, name string, st model.Settin
 // List returns every saved Project, sorted by name, without status.
 func (s *Store) List(ctx context.Context) ([]model.Project, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT name, folder, COALESCE(display_name, ''), COALESCE(group_name, '') FROM projects`)
+		`SELECT p.name, p.folder, COALESCE(p.display_name, ''), COALESCE(g.name, '')
+		 FROM projects p LEFT JOIN groups g ON g.id = p.group_id`)
 	if err != nil {
 		return nil, fmt.Errorf("compose: list projects: %w", err)
 	}

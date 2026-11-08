@@ -286,3 +286,126 @@ func TestRemove_UnknownProjectChangesNothing(t *testing.T) {
 		t.Errorf("List = %+v, want the saved project", projects)
 	}
 }
+
+func TestCreateGroup_AppendsTheGroupAndKeepsTheOrder(t *testing.T) {
+	s := open(t)
+	for _, name := range []string{"Zeta", "Alfa"} {
+		if err := s.CreateGroup(t.Context(), name); err != nil {
+			t.Fatalf("CreateGroup(%q): %v", name, err)
+		}
+	}
+
+	if got, want := groups(t, s), []string{"Zeta", "Alfa"}; !slices.Equal(got, want) {
+		t.Errorf("ListGroups = %v, want %v", got, want)
+	}
+}
+
+func TestCreateGroup_RefusesADuplicateWithTheExistingSpelling(t *testing.T) {
+	s := open(t)
+	if err := s.CreateGroup(t.Context(), "Città"); err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+
+	err := s.CreateGroup(t.Context(), "CITTÀ")
+	var duplicate *model.DuplicateGroupError
+	if !errors.As(err, &duplicate) {
+		t.Fatalf("CreateGroup duplicate error = %v, want DuplicateGroupError", err)
+	}
+	if duplicate.Existing != "Città" {
+		t.Errorf("Existing = %q, want %q", duplicate.Existing, "Città")
+	}
+	if !errors.Is(err, model.ErrDuplicateGroup) {
+		t.Error("the duplicate error must wrap ErrDuplicateGroup")
+	}
+	if got, want := groups(t, s), []string{"Città"}; !slices.Equal(got, want) {
+		t.Errorf("ListGroups = %v, want %v", got, want)
+	}
+}
+
+func TestCreateGroup_RefusesAReservedName(t *testing.T) {
+	s := open(t)
+	for _, name := range []string{"Nessun Gruppo", "Senza Gruppo", "  "} {
+		if err := s.CreateGroup(t.Context(), name); !errors.Is(err, model.ErrInvalidGroupName) {
+			t.Errorf("CreateGroup(%q) error = %v, want ErrInvalidGroupName", name, err)
+		}
+	}
+	if got := groups(t, s); len(got) != 0 {
+		t.Errorf("ListGroups = %v, want none", got)
+	}
+}
+
+func TestUpdateSettings_ACaseVariantAssignsTheSavedGroup(t *testing.T) {
+	s := open(t)
+	for _, name := range []string{"app", "other"} {
+		if err := s.Add(t.Context(), model.Discovered{Name: name, ComposeFiles: []string{"/srv/" + name + "/compose.yaml"}}); err != nil {
+			t.Fatalf("Add %s: %v", name, err)
+		}
+	}
+	first, second := "Città", "CITTÀ"
+	if _, err := s.UpdateSettings(t.Context(), "app", model.Settings{Group: &first}); err != nil {
+		t.Fatalf("UpdateSettings: %v", err)
+	}
+	if _, err := s.UpdateSettings(t.Context(), "other", model.Settings{Group: &second}); err != nil {
+		t.Fatalf("UpdateSettings: %v", err)
+	}
+
+	projects := list(t, s)
+	for _, p := range projects {
+		if p.Group != "Città" {
+			t.Errorf("%s Group = %q, want the saved spelling Città", p.Name, p.Group)
+		}
+	}
+	if got, want := groups(t, s), []string{"Città"}; !slices.Equal(got, want) {
+		t.Errorf("ListGroups = %v, want %v", got, want)
+	}
+}
+
+func TestUpdateSettings_EmptyGroupClearsItAndKeepsTheGroupSaved(t *testing.T) {
+	s := open(t)
+	if err := s.Add(t.Context(), model.Discovered{Name: "app", ComposeFiles: []string{"/srv/app/compose.yaml"}}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	group := "Casa"
+	if _, err := s.UpdateSettings(t.Context(), "app", model.Settings{Group: &group}); err != nil {
+		t.Fatalf("UpdateSettings: %v", err)
+	}
+	blank := "   "
+	if _, err := s.UpdateSettings(t.Context(), "app", model.Settings{Group: &blank}); err != nil {
+		t.Fatalf("UpdateSettings: %v", err)
+	}
+
+	if p := list(t, s)[0]; p.Group != "" {
+		t.Errorf("Group = %q, want empty", p.Group)
+	}
+	if got, want := groups(t, s), []string{"Casa"}; !slices.Equal(got, want) {
+		t.Errorf("ListGroups = %v, want the Group kept, %v", got, want)
+	}
+}
+
+func TestUpdateSettings_RefusesAReservedGroupName(t *testing.T) {
+	s := open(t)
+	if err := s.Add(t.Context(), model.Discovered{Name: "app", ComposeFiles: []string{"/srv/app/compose.yaml"}}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	reserved := "Nessun Gruppo"
+	found, err := s.UpdateSettings(t.Context(), "app", model.Settings{Group: &reserved})
+	if !errors.Is(err, model.ErrInvalidGroupName) {
+		t.Fatalf("UpdateSettings error = %v, want ErrInvalidGroupName", err)
+	}
+	if found {
+		t.Error("UpdateSettings found = true, want false")
+	}
+	if p := list(t, s)[0]; p.Group != "" {
+		t.Errorf("Group = %q, want the field unchanged", p.Group)
+	}
+}
+
+// groups reads the saved Groups, failing the test on error.
+func groups(t *testing.T, s *store.Store) []string {
+	t.Helper()
+	names, err := s.ListGroups(t.Context())
+	if err != nil {
+		t.Fatalf("ListGroups: %v", err)
+	}
+	return names
+}

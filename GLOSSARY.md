@@ -16,10 +16,6 @@ _Avoid_: config, yml
 Un nome facoltativo scelto dall'utente, mostrato al posto del nome compose del Progetto.
 _Avoid_: etichetta, alias
 
-**Gruppo**:
-Una categoria facoltativa scelta dall'utente (es. "Lavoro"); ogni Progetto appartiene al massimo a un Gruppo, usato per raggruppare la lista e il tray.
-_Avoid_: etichetta, tag, categoria
-
 **Progetto scoperto**:
 Un Progetto che Docker conosce in questo momento perché ha almeno un Container.
 
@@ -32,6 +28,27 @@ _Avoid_: elimina, cancella
 
 **File compose mancante**:
 Condizione di un Progetto salvato i cui File compose non esistono più su disco.
+
+## Gruppi
+
+**Gruppo**:
+Una categoria nominata dall'utente (es. "Lavoro") che raccoglie Progetti nella lista e nel tray. Ogni Progetto appartiene al massimo a un Gruppo; un Gruppo esiste anche senza Progetti, e due Gruppi non possono avere lo stesso nome, nemmeno con maiuscole diverse o spazi iniziali e finali.
+_Avoid_: etichetta, tag, categoria
+
+**Nessun Gruppo**:
+Il segnaposto del campo Gruppo quando il Progetto non ha Gruppo. Il nome è riservato e non è un Gruppo.
+
+**Senza Gruppo**:
+La condizione dei Progetti che non appartengono a un Gruppo: quando la lista ha sezioni, formano una sezione in fondo, e nel tray stanno in fondo al primo livello. Non è un Gruppo, il suo nome è riservato e non si gestisce.
+_Avoid_: gruppo vuoto, gruppo predefinito
+
+**Rinomina di un Gruppo**:
+Cambia il nome di un Gruppo per tutti i suoi Progetti. Rinominarlo sul nome di un Gruppo esistente unisce i due Gruppi: sopravvive quello che aveva già il nome di arrivo.
+_Avoid_: modifica del Gruppo, spostamento
+
+**Eliminazione di un Gruppo**:
+Toglie il Gruppo e lascia i suoi Progetti senza Gruppo, senza toccare i Progetti né Docker.
+_Avoid_: rimozione dalla lista, cancellazione
 
 ## Stato di un Progetto
 

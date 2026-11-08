@@ -84,8 +84,8 @@ type Snapshot struct {
 	// DockerReachable is false when the Docker daemon does not answer.
 	DockerReachable bool      `json:"dockerReachable"`
 	Projects        []Project `json:"projects"`
-	// Groups lists the Groups in use, each once, sorted; empty (not nil) when
-	// no Project has a Group.
+	// Groups lists every saved Group in the user's order, empty Groups
+	// included; empty (not nil) when no Group is saved.
 	Groups []string `json:"groups"`
 }
 
