@@ -1,0 +1,34 @@
+# 02: Il dialogo Gruppi: crea, rinomina, elimina
+
+**What to build:** Dal form del Progetto il comando "Gruppi…" apre un dialogo dedicato alla gestione dei Gruppi. Il dialogo mostra i Gruppi nell'ordine scelto, ognuno con il numero di Progetti che contiene, e offre Nuovo, Rinomina, Elimina e Chiudi. Nuovo e Rinomina aprono in riga un campo con i comandi Conferma e Annulla. Nuovo crea un Gruppo anche senza Progetti e lo mette in fondo. Rinomina cambia il nome a tutti i Progetti del Gruppo e, sul nome di un Gruppo esistente, chiede conferma e unisce i due: sopravvive il Gruppo che aveva già il nome di arrivo, con il suo nome e il suo posto relativo. Elimina chiede conferma dicendo quanti Progetti passeranno a "Senza Gruppo" e non tocca i Progetti né Docker. I comandi non disponibili sono spenti, un nome rifiutato mostra il messaggio sotto il campo e nella descrizione accessibile del campo, e ogni modifica si vede subito nel dialogo, nel campo Gruppo del form, nella lista e nel tray. Chiudere con "Chiudi" o Escape restituisce il focus al comando "Gruppi…".
+
+**Blocked by:** 01
+
+**Status:** resolved
+
+- [x] "Gruppi…" apre un dialogo modale dal form del Progetto; "Chiudi" ed Escape lo chiudono e il focus torna al comando "Gruppi…"
+- [x] L'elenco mostra i Gruppi nell'ordine scelto, ognuno con il numero di Progetti o "nessun Progetto"
+- [x] Nuovo crea un Gruppo, anche senza Progetti, con il nome ripulito dagli spazi iniziali e finali, e lo mette in fondo all'elenco
+- [x] Nella creazione, un nome vuoto, un nome riservato ("Nessun Gruppo" o "Senza Gruppo") e un nome già usato, anche con maiuscole diverse, sono rifiutati con il messaggio sotto il campo e nella descrizione accessibile; il messaggio del duplicato usa la grafia del Gruppo esistente; il dialogo resta aperto
+- [x] Nuovo e Rinomina aprono un campo in riga con i comandi Conferma e Annulla
+- [x] Rinomina parte dal nome del Gruppo scelto, il nuovo nome, ripulito dagli spazi iniziali e finali, arriva a tutti i suoi Progetti e il posto relativo non cambia
+- [x] Nella rinomina, un nome vuoto o riservato è rifiutato con il messaggio sotto il campo e nella descrizione accessibile, e il dialogo resta aperto
+- [x] Nella rinomina un nome già usato non è un errore: chiede conferma, dice quanti Progetti si spostano e unisce i due; sopravvive il Gruppo che aveva già il nome di arrivo, con il suo nome e il suo posto relativo
+- [x] Una rinomina che cambia solo le maiuscole dello stesso Gruppo non chiede conferma e non unisce nulla
+- [x] Elimina chiede conferma con il numero di Progetti e li lascia senza Gruppo, senza toccare Docker
+- [x] Rinominare o eliminare un Gruppo non salvato restituisce l'errore Gruppo sconosciuto, mostra il messaggio italiano nella riga sotto l'elenco e lascia il dialogo aperto
+- [x] Ogni errore del Manager che non riguarda un nome compare nella riga sotto l'elenco; un duplicato senza nome nell'errore usa il messaggio generico
+- [x] Dopo un'unione la selezione va al Gruppo sopravvissuto; dopo una rinomina semplice resta sul Gruppo rinominato; dopo Nuovo va al Gruppo nuovo. Dopo un'eliminazione va al Gruppo che prende la posizione vuota, altrimenti all'ultimo, altrimenti a nessuno
+- [x] Rinomina ed Elimina sono spenti senza selezione; Nuovo resta attivo quando il campo del nome è chiuso; il dialogo conserva la selezione quando arriva uno snapshot
+- [x] Mentre il campo del nome è aperto, gli altri comandi del dialogo sono spenti e l'elenco ignora i clic; il Gruppo da rinominare è quello scelto all'apertura del campo. Conferma chiude il campo solo quando l'operazione riesce, Annulla lo chiude sempre, un rifiuto lo lascia aperto con il messaggio sotto il campo, e uno snapshot conserva il testo digitato
+- [x] Durante un'operazione i comandi sono spenti, un secondo clic non avvia una seconda operazione, Escape e Chiudi sono ignorati; al ritorno i comandi si riaccendono e l'esito si applica prima della selezione dallo snapshot
+- [x] Alla chiusura il form si ridisegna con l'elenco aggiornato e applica in ordine i record che il dialogo restituisce: il tipo (creazione, rinomina, unione o eliminazione), il Gruppo di partenza e il Gruppo di arrivo. Per una creazione la partenza è vuota e l'arrivo è il nome salvato del Gruppo nuovo, per un'unione l'arrivo è il Gruppo sopravvissuto, per un'eliminazione l'arrivo è vuoto. Il campo confronta il valore dopo la ripulitura e senza distinzione di maiuscole: se mostra il Gruppo toccato, dopo una rinomina o un'unione passa al Gruppo sopravvissuto, dopo un'eliminazione si svuota, e se il dialogo ha creato quel nome mostra la grafia salvata; se mostra un altro Gruppo, o un nome non salvato, resta com'è. Nome visualizzato e Profili restano quelli digitati
+- [x] Il dialogo si usa anche con la tastiera. L'ordine di tabulazione è elenco, Nuovo, Rinomina, Elimina, Chiudi; con il campo aperto è campo, Conferma, Annulla. I due comandi di spostamento entrano in quest'ordine nel ticket 03. Invio conferma il campo aperto, Escape annulla il campo aperto e lascia il dialogo aperto; senza campo aperto, Escape chiude il dialogo
+- [x] Elenco, campo e comandi hanno nomi accessibili, e i bersagli non scendono sotto i 24 px
+- [x] Le operazioni funzionano anche con Docker irraggiungibile
+- [x] Test: operazioni del Manager con creazione in fondo, rinomina su tutti i Progetti, unione con nome e posto del Gruppo di arrivo, eliminazione che lascia i Progetti senza Gruppo, Gruppo sconosciuto, nome duplicato e nome non valido (vuoto o riservato), salvataggio del form che rifiuta un nome riservato; i tre messaggi italiani letti con `view.KnownMessage` e confrontati con il testo esatto, dove il duplicato resta il messaggio generico e il messaggio del nome non valido differisce da quello di `ErrInvalidName`; il messaggio del duplicato composto dal dialogo con la grafia salvata letto con `errors.As` su `model.DuplicateGroupError`; validazione del nome nelle funzioni pure; passo offscreen con creazione, rinomina ed eliminazione, record di unione ed eliminazione distinti, campo del form dopo una creazione, una rinomina, un'unione e un'eliminazione, intestazioni della lista e ordine del tray dopo le operazioni, selezione dopo una rinomina semplice, dopo Nuovo, dopo un'unione e dopo un'eliminazione, Conferma, Annulla, descrizione accessibile, comandi spenti, doppio clic, Escape e Chiudi ignorati durante un'operazione, ordine di tabulazione, testo che sopravvive a uno snapshot, focus a "Gruppi…", bersagli di 24 px, giro di tastiera, Docker irraggiungibile e un callback che blocca un'operazione
+- [x] `make check` e `make test-ui` verdi
+
+## Comments
+
+Implementato in `3bffd3a`. La review finale ha chiesto due correzioni: la selezione persa dopo un'eliminazione e il seam di validazione mancante nel modello del form. Corrette in `1be92b6`, review successiva approvata. `make check` e `make test-ui` verdi.
