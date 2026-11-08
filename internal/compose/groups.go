@@ -91,6 +91,25 @@ func (m *Manager) DeleteGroup(ctx context.Context, name string) error {
 	return nil
 }
 
+// MoveGroup moves a saved Group by delta places and publishes the new snapshot
+// at once. It never talks to Docker, so the order can be chosen while Docker is
+// unreachable. A move past either end changes nothing and is not an error; an
+// unknown Group is refused with model.ErrUnknownGroup.
+func (m *Manager) MoveGroup(ctx context.Context, name string, delta int) error {
+	m.refreshMu.Lock()
+	defer m.refreshMu.Unlock()
+
+	if err := m.store.MoveGroup(ctx, name, delta); err != nil {
+		return err
+	}
+	next, err := m.snapshotWithGroups(ctx)
+	if err != nil {
+		return err
+	}
+	m.publish(next)
+	return nil
+}
+
 // snapshotWithGroups copies the base snapshot and replaces the Group list with
 // the saved one. The caller changes the Projects it touched before publishing.
 // The copy keeps the snapshot already handed to the watchers untouched.

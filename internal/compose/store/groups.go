@@ -157,11 +157,9 @@ func (s *Store) DeleteGroup(ctx context.Context, name string) error {
 
 // MoveGroup moves a saved Group by delta places, swapping it with its neighbour.
 // A move past either end changes nothing: the command is a no-op there, not an
-// error.
+// error. A zero move changes nothing too, but an unknown Group is always
+// refused.
 func (s *Store) MoveGroup(ctx context.Context, name string, delta int) error {
-	if delta == 0 {
-		return nil
-	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("compose: move Group %q: %w", name, err)
@@ -175,6 +173,9 @@ func (s *Store) MoveGroup(ctx context.Context, name string, delta int) error {
 	group, ok := groupNamed(rows, name)
 	if !ok {
 		return fmt.Errorf("%w: %q", model.ErrUnknownGroup, name)
+	}
+	if delta == 0 {
+		return nil
 	}
 	neighbour, ok := groupAt(rows, group.position+delta)
 	if !ok {

@@ -80,6 +80,23 @@ func GroupRows(groups []string, projects []compose.Project) []GroupRow {
 	return rows
 }
 
+// MoveGroup returns the list with the Group at index swapped with the neighbour
+// delta places away, and the row of the moved Group. A move past either end
+// changes nothing: the list keeps its order and the row stays. The input list
+// is not changed, so a caller can keep the snapshot it received.
+func MoveGroup(groups []string, index, delta int) ([]string, int) {
+	moved := append([]string(nil), groups...)
+	if index < 0 || index >= len(moved) {
+		return moved, index
+	}
+	target := index + delta
+	if target < 0 || target >= len(moved) {
+		return moved, index
+	}
+	moved[index], moved[target] = moved[target], moved[index]
+	return moved, target
+}
+
 // SelectionAfterDeletion returns the row to select after the Group at index
 // removed leaves a list that held length Groups: the Group that takes the empty
 // place, otherwise the last one, otherwise none (-1).

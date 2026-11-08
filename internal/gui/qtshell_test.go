@@ -729,9 +729,13 @@ func checkGroupsDialog(t *testing.T, s *shell) {
 		t.Errorf("the list shows %v, want %v", got, wantRows)
 	}
 
-	// Without a selection Rinomina and Elimina are off, Nuovo and Chiudi stay on.
+	// Without a selection Rinomina, Elimina and the two moves are off, Nuovo
+	// and Chiudi stay on.
 	if d.renameButton.IsEnabled() || d.deleteButton.IsEnabled() {
 		t.Error("Rinomina or Elimina is on without a selection")
+	}
+	if d.moveUpButton.IsEnabled() || d.moveDownButton.IsEnabled() {
+		t.Error("Sposta su or Sposta giù is on without a selection")
 	}
 	if !d.newButton.IsEnabled() || !d.closeButton.IsEnabled() {
 		t.Error("Nuovo or Chiudi is off without a selection")
@@ -741,11 +745,29 @@ func checkGroupsDialog(t *testing.T, s *shell) {
 	if !d.renameButton.IsEnabled() || !d.deleteButton.IsEnabled() {
 		t.Error("Rinomina or Elimina stays off with a selection")
 	}
+	if !d.moveUpButton.IsEnabled() || !d.moveDownButton.IsEnabled() {
+		t.Error("Sposta su or Sposta giù stays off with a Group in the middle")
+	}
+
+	// At the first Group Sposta su is off and Sposta giù stays on; at the last
+	// Group the other way round.
+	d.list.SetCurrentRow(0)
+	settle()
+	if d.moveUpButton.IsEnabled() || !d.moveDownButton.IsEnabled() {
+		t.Error("at the first Group Sposta su is not off, or Sposta giù is")
+	}
+	d.list.SetCurrentRow(2)
+	settle()
+	if !d.moveUpButton.IsEnabled() || d.moveDownButton.IsEnabled() {
+		t.Error("at the last Group Sposta giù is not off, or Sposta su is")
+	}
+	d.list.SetCurrentRow(1)
+	settle()
 
 	// The tab order follows the reading order, and a snapshot keeps the
 	// selection.
 	if got, want := controlLabels(d.controls), []string{
-		groupsTitle, newGroupText, renameGroupText, deleteGroupText, closeGroupsText,
+		groupsTitle, newGroupText, renameGroupText, deleteGroupText, moveUpText, moveDownText, closeGroupsText,
 	}; !slices.Equal(got, want) {
 		t.Errorf("the tab order of the dialog is %v, want %v", got, want)
 	}
@@ -753,6 +775,120 @@ func checkGroupsDialog(t *testing.T, s *shell) {
 	settle()
 	if got := d.selectedName(); got != "Lavoro" {
 		t.Errorf("the snapshot moved the selection to %q, want Lavoro", got)
+	}
+
+	// Sposta su moves the chosen Group and keeps it selected. A move changes no
+	// name, so it adds no record for the form.
+	var moves []moveCall
+	d.op.Move = func(name string, delta int, done func(error)) {
+		moves = append(moves, moveCall{name: name, delta: delta})
+		d.moveDone(name, delta, nil)
+	}
+	d.moveUpButton.Click()
+	settle()
+	if got := listTexts(d.list); !slices.Equal(got, []string{
+		"Lavoro (1 Progetto)", "Casa (1 Progetto)", "Vuoto (nessun Progetto)",
+	}) {
+		t.Errorf("the list shows %v after Sposta su", got)
+	}
+	if got := d.selectedName(); got != "Lavoro" {
+		t.Errorf("after Sposta su the selection is %q, want the moved Group Lavoro", got)
+	}
+	if len(d.changes) != 0 {
+		t.Errorf("the move added the record %+v, want no record", d.changes)
+	}
+	if d.moveUpButton.IsEnabled() || !d.moveDownButton.IsEnabled() {
+		t.Error("after the move to the first place Sposta su is not off, or Sposta giù is")
+	}
+
+	// Alt+Down moves the Group back without the mouse, and Alt+Up moves it up
+	// again; Sposta giù restores the order.
+	pressDialogKeyWith(d, qt6.Key_Down, qt6.AltModifier)
+	settle()
+	if got := listTexts(d.list); !slices.Equal(got, wantRows) {
+		t.Errorf("Alt+Down leaves the list as %v, want %v", got, wantRows)
+	}
+	if got := len(moves); got != 2 {
+		t.Fatalf("the keyboard started %d moves, want 2", got)
+	}
+	if moves[1].name != "Lavoro" || moves[1].delta != 1 {
+		t.Errorf("Alt+Down moves %+v, want Lavoro by 1", moves[1])
+	}
+	pressDialogKeyWith(d, qt6.Key_Up, qt6.AltModifier)
+	settle()
+	if got := listTexts(d.list); !slices.Equal(got, []string{
+		"Lavoro (1 Progetto)", "Casa (1 Progetto)", "Vuoto (nessun Progetto)",
+	}) {
+		t.Errorf("Alt+Up leaves the list as %v", got)
+	}
+	d.moveDownButton.Click()
+	settle()
+	if got := listTexts(d.list); !slices.Equal(got, wantRows) {
+		t.Errorf("Sposta giù leaves the list as %v, want %v", got, wantRows)
+	}
+
+	// A move in progress turns every command off and starts nothing else; the
+	// outcome brings the commands back.
+	var blockedMove func(error)
+	moveCalls := 0
+	d.op.Move = func(name string, delta int, done func(error)) {
+		moveCalls++
+		blockedMove = func(err error) { d.moveDone(name, delta, err) }
+	}
+	d.moveUpButton.Click()
+	settle()
+	if !d.busy {
+		t.Fatal("the dialog is not busy during a move")
+	}
+	for _, button := range []*qt6.QPushButton{d.newButton, d.renameButton, d.deleteButton, d.moveUpButton, d.moveDownButton, d.closeButton} {
+		if button.IsEnabled() {
+			t.Errorf("the command %q is on during the move", button.Text())
+		}
+	}
+	if d.list.IsEnabled() {
+		t.Error("the list accepts clicks during the move")
+	}
+	d.moveUpButton.Click()
+	pressDialogKeyWith(d, qt6.Key_Down, qt6.AltModifier)
+	settle()
+	if moveCalls != 1 {
+		t.Errorf("a second command started %d moves, want 1", moveCalls)
+	}
+	blockedMove(nil)
+	settle()
+	if d.busy {
+		t.Error("the dialog stays busy after the move")
+	}
+	if got := d.selectedName(); got != "Lavoro" {
+		t.Errorf("after the blocked move the selection is %q, want Lavoro", got)
+	}
+	d.op.Move = func(name string, delta int, done func(error)) { d.moveDone(name, delta, nil) }
+	d.moveDownButton.Click()
+	settle()
+	if got := listTexts(d.list); !slices.Equal(got, wantRows) {
+		t.Errorf("the list after the blocked move is %v, want %v", got, wantRows)
+	}
+
+	// A move of an unsaved Group reports the Italian error under the list, keeps
+	// the dialog open and changes no order.
+	d.op.Move = func(string, int, func(error)) { d.moveDone("Fantasma", -1, compose.ErrUnknownGroup) }
+	d.moveUpButton.Click()
+	settle()
+	if got, want := d.errorLine.Text(), "Gruppo sconosciuto."; got != want {
+		t.Errorf("the unknown Group reads %q under the list, want %q", got, want)
+	}
+	if d.closed {
+		t.Error("the unknown Group closes the dialog")
+	}
+	if d.busy {
+		t.Error("the unknown Group leaves the dialog busy")
+	}
+	if got := listTexts(d.list); !slices.Equal(got, wantRows) {
+		t.Errorf("the refused move leaves the list as %v, want %v", got, wantRows)
+	}
+	d.op.Move = func(name string, delta int, done func(error)) {
+		moves = append(moves, moveCall{name: name, delta: delta})
+		d.moveDone(name, delta, nil)
 	}
 
 	// Nuovo opens the inline field with Conferma and Annulla and shuts every
@@ -766,8 +902,16 @@ func checkGroupsDialog(t *testing.T, s *shell) {
 		t.Errorf("the new name starts as %q, want empty", got)
 	}
 	if d.list.IsEnabled() || d.newButton.IsEnabled() || d.renameButton.IsEnabled() ||
-		d.deleteButton.IsEnabled() || d.closeButton.IsEnabled() {
+		d.deleteButton.IsEnabled() || d.closeButton.IsEnabled() ||
+		d.moveUpButton.IsEnabled() || d.moveDownButton.IsEnabled() {
 		t.Error("a command or the list stays on while the field is open")
+	}
+	before := len(moves)
+	pressDialogKeyWith(d, qt6.Key_Up, qt6.AltModifier)
+	pressDialogKeyWith(d, qt6.Key_Down, qt6.AltModifier)
+	settle()
+	if got := len(moves); got != before {
+		t.Errorf("the keys started %d moves while the field is open, want none", got-before)
 	}
 	if got, want := controlLabels(d.fieldControls), []string{
 		groupNameLabelText, confirmGroupText, cancelFieldText,
@@ -1040,7 +1184,7 @@ func checkGroupsDialog(t *testing.T, s *shell) {
 	if !d.busy {
 		t.Fatal("the dialog is not busy during the operation")
 	}
-	for _, button := range []*qt6.QPushButton{d.newButton, d.renameButton, d.deleteButton, d.closeButton} {
+	for _, button := range []*qt6.QPushButton{d.newButton, d.renameButton, d.deleteButton, d.moveUpButton, d.moveDownButton, d.closeButton} {
 		if button.IsEnabled() {
 			t.Errorf("the command %q is on during the operation", button.Text())
 		}
@@ -1052,6 +1196,13 @@ func checkGroupsDialog(t *testing.T, s *shell) {
 	settle()
 	if calls != 1 {
 		t.Errorf("a second click started %d operations, want 1", calls)
+	}
+	before = len(moves)
+	pressDialogKeyWith(d, qt6.Key_Up, qt6.AltModifier)
+	pressDialogKeyWith(d, qt6.Key_Down, qt6.AltModifier)
+	settle()
+	if got := len(moves); got != before {
+		t.Errorf("the keys started %d moves during the operation, want none", got-before)
 	}
 	pressDialogKey(d, qt6.Key_Escape)
 	settle()
@@ -1111,6 +1262,62 @@ func checkGroupsDialog(t *testing.T, s *shell) {
 		t.Error("Escape does not give the focus back to the command of the Groups")
 	}
 
+	// A move changes the order of the form's Group field, of the list headings
+	// and of the tray, and the selection stays on the moved Group.
+	shopAfter.Group, otherAfter.Group = "Casa", "Lavoro"
+	s.apply(compose.Snapshot{
+		DockerReachable: true,
+		Projects:        []compose.Project{shopAfter, otherAfter},
+		Groups:          []string{"Casa", "Lavoro"},
+	})
+	settle()
+	commands = widgetsNamed(blockNamed(s.panel, editTitle), "editGroups")
+	qt6.UnsafeNewQPushButton(commands[0].UnsafePointer()).Click()
+	settle()
+	d = s.groups
+	if d == nil {
+		t.Fatal("the command opens no dialog of the Groups for the move")
+	}
+	d.op.Move = func(name string, delta int, done func(error)) { d.moveDone(name, delta, nil) }
+	d.list.SetCurrentRow(1)
+	settle()
+	d.moveUpButton.Click()
+	settle()
+	if got := d.selectedName(); got != "Lavoro" {
+		t.Errorf("after the move the selection is %q, want the moved Group Lavoro", got)
+	}
+	if got := listTexts(d.list); !slices.Equal(got, []string{
+		"Lavoro (1 Progetto)", "Casa (1 Progetto)",
+	}) {
+		t.Errorf("the list shows %v after the move", got)
+	}
+	d.closeButton.Click()
+	settle()
+	if got, want := itemsOf(s.panel.edit.group), []string{"Lavoro", "Casa"}; !slices.Equal(got, want) {
+		t.Errorf("the Group field proposes %v after the move, want %v", got, want)
+	}
+	// The snapshot the Manager publishes after the move brings the same order
+	// to the list and to the tray.
+	s.apply(compose.Snapshot{
+		DockerReachable: true,
+		Projects:        []compose.Project{shopAfter, otherAfter},
+		Groups:          []string{"Lavoro", "Casa"},
+	})
+	settle()
+	if rows := listRows(s.list.widget); len(rows) == 0 || rows[0] != "Lavoro" {
+		t.Errorf("the list headings after the move are %v, want Lavoro first", rows)
+	}
+	var menu []string
+	for _, item := range tray.BuildMenu(s.snapshot) {
+		if item.Label == "" || item.Separator {
+			continue
+		}
+		menu = append(menu, item.Label)
+	}
+	if want := []string{"Lavoro", "Casa", "Mostra finestra", "Esci"}; !slices.Equal(menu, want) {
+		t.Errorf("the tray menu is %v after the move, want %v", menu, want)
+	}
+
 	// The step of the form leaves the panel as it found it.
 	s.panel.cancelEdit()
 	settle()
@@ -1136,13 +1343,24 @@ func controlLabels(controls []panelControl) []string {
 	return out
 }
 
+// moveCall is one move the dialog asked its operator to run.
+type moveCall struct {
+	name  string
+	delta int
+}
+
 // pressDialogKey sends a key press to a dialog, as the keyboard would.
 func pressDialogKey(d *groupsDialog, key qt6.Key) {
+	pressDialogKeyWith(d, key, qt6.NoModifier)
+}
+
+// pressDialogKeyWith sends a key press with modifiers to a dialog.
+func pressDialogKeyWith(d *groupsDialog, key qt6.Key, modifiers qt6.KeyboardModifier) {
 	handle := d.dialog.WindowHandle()
 	if handle == nil {
 		return
 	}
-	event := qt6.NewQKeyEvent(qt6.QEvent__KeyPress, int(key), qt6.NoModifier)
+	event := qt6.NewQKeyEvent(qt6.QEvent__KeyPress, int(key), modifiers)
 	qt6.QCoreApplication_SendEvent(handle.QObject, event.QInputEvent.QEvent)
 	event.Delete()
 }

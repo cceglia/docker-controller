@@ -149,6 +149,36 @@ func TestGroupRows_CountsTheProjectsOfEveryGroupInTheChosenOrder(t *testing.T) {
 	}
 }
 
+func TestMoveGroup_SwapsWithTheNeighbourAndKeepsTheRow(t *testing.T) {
+	groups := []string{"Alfa", "Beta", "Gamma"}
+	for _, tc := range []struct {
+		name    string
+		index   int
+		delta   int
+		want    []string
+		wantRow int
+	}{
+		{"Sposta su in the middle", 1, -1, []string{"Beta", "Alfa", "Gamma"}, 0},
+		{"Sposta giù in the middle", 1, 1, []string{"Alfa", "Gamma", "Beta"}, 2},
+		{"Sposta su on the first Group changes nothing", 0, -1, groups, 0},
+		{"Sposta giù on the last Group changes nothing", 2, 1, groups, 2},
+		{"no selection changes nothing", -1, -1, groups, -1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, row := MoveGroup(groups, tc.index, tc.delta)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("MoveGroup(%v, %d, %d) = %v, want %v", groups, tc.index, tc.delta, got, tc.want)
+			}
+			if row != tc.wantRow {
+				t.Errorf("the moved Group is at row %d, want %d", row, tc.wantRow)
+			}
+			if want := []string{"Alfa", "Beta", "Gamma"}; !reflect.DeepEqual(groups, want) {
+				t.Errorf("MoveGroup changed its input to %v, want %v", groups, want)
+			}
+		})
+	}
+}
+
 func TestSelectionAfterDeletion_PicksTheGroupThatTakesThePlace(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

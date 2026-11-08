@@ -20,11 +20,14 @@ const (
 	groupsTitle = "Gruppi"
 	// groupsCommandText opens the dialog from the form of a Project.
 	groupsCommandText = "Gruppi…"
-	// newGroupText, renameGroupText, deleteGroupText and closeGroupsText are
-	// the commands of the dialog, in the reading order.
+	// newGroupText, renameGroupText, deleteGroupText, moveUpText,
+	// moveDownText and closeGroupsText are the commands of the dialog, in the
+	// reading order.
 	newGroupText    = "Nuovo"
 	renameGroupText = "Rinomina"
 	deleteGroupText = "Elimina"
+	moveUpText      = "Sposta su"
+	moveDownText    = "Sposta giù"
 	closeGroupsText = "Chiudi"
 	// groupNameLabelText names the inline field, and confirmGroupText and
 	// cancelFieldText are its two commands.
@@ -48,13 +51,14 @@ const (
 	groupsMaxWidth = 640
 )
 
-// groupDialogOperator reaches the Manager for the three operations of the
-// dialog. Each call runs the operation and reports the refusal through done;
-// the shell supplies the functions and runs the work off the Qt thread.
+// groupDialogOperator reaches the Manager for the operations of the dialog.
+// Each call runs the operation and reports the refusal through done; the shell
+// supplies the functions and runs the work off the Qt thread.
 type groupDialogOperator struct {
 	Create func(name string, done func(error))
 	Rename func(from, to string, done func(error))
 	Delete func(name string, done func(error))
+	Move   func(name string, delta int, done func(error))
 }
 
 // groupsDialog is the modal dialog of the Groups: the list with the number of
@@ -84,6 +88,10 @@ type groupsDialog struct {
 	// busy is true while the Manager works: a second click starts nothing and
 	// the dialog stays open.
 	busy bool
+	// moveFrom is the row the running move started from. A snapshot can arrive
+	// before the outcome, so the dialog swaps the list only while the Group
+	// still sits there.
+	moveFrom int
 	// closed is true from the finished event, so an outcome that arrives after
 	// the dialog went away touches no widget.
 	closed bool
@@ -91,17 +99,19 @@ type groupsDialog struct {
 	// dialog sets does not read as a click.
 	updating bool
 
-	list         *qt6.QListWidget
-	errorLine    *qt6.QLabel
-	entryRow     *qt6.QWidget
-	entry        *qt6.QLineEdit
-	fieldMessage *qt6.QLabel
-	confirmField *qt6.QPushButton
-	cancelField  *qt6.QPushButton
-	newButton    *qt6.QPushButton
-	renameButton *qt6.QPushButton
-	deleteButton *qt6.QPushButton
-	closeButton  *qt6.QPushButton
+	list           *qt6.QListWidget
+	errorLine      *qt6.QLabel
+	entryRow       *qt6.QWidget
+	entry          *qt6.QLineEdit
+	fieldMessage   *qt6.QLabel
+	confirmField   *qt6.QPushButton
+	cancelField    *qt6.QPushButton
+	newButton      *qt6.QPushButton
+	renameButton   *qt6.QPushButton
+	deleteButton   *qt6.QPushButton
+	moveUpButton   *qt6.QPushButton
+	moveDownButton *qt6.QPushButton
+	closeButton    *qt6.QPushButton
 
 	// controls are the widgets of the dialog in the reading order, and
 	// fieldControls the ones of the open field. The tab order follows them.
@@ -142,6 +152,15 @@ func newGroupsDialog(parent *qt6.QWidget, groups []string, projects []compose.Pr
 	d.list.SetSelectionMode(qt6.QAbstractItemView__SingleSelection)
 	d.list.SetUniformItemSizes(true)
 	d.list.OnCurrentRowChanged(d.rowChanged)
+	// Alt+Up and Alt+Down move the chosen Group wherever the focus is. The list
+	// takes the arrow keys before the dialog does, so it handles them here too.
+	d.list.OnKeyPressEvent(func(super func(event *qt6.QKeyEvent), event *qt6.QKeyEvent) {
+		if d.moveKey(event) {
+			event.Accept()
+			return
+		}
+		super(event)
+	})
 	layout.AddWidget2(d.list.QWidget, 1)
 
 	d.errorLine = detailLabel("", "fieldError")
@@ -170,7 +189,8 @@ func newGroupsDialog(parent *qt6.QWidget, groups []string, projects []compose.Pr
 		super(event)
 	})
 	// Escape cancels the open field and otherwise closes the dialog. Return
-	// confirms the open field. The two keys work wherever the focus is.
+	// confirms the open field. Alt+Up and Alt+Down move the chosen Group. The
+	// keys work wherever the focus is.
 	d.dialog.OnKeyPressEvent(func(super func(event *qt6.QKeyEvent), event *qt6.QKeyEvent) {
 		switch qt6.Key(event.Key()) {
 		case qt6.Key_Escape:
@@ -179,6 +199,12 @@ func newGroupsDialog(parent *qt6.QWidget, groups []string, projects []compose.Pr
 		case qt6.Key_Return, qt6.Key_Enter:
 			if d.fieldOpen {
 				d.confirmFieldAction()
+				event.Accept()
+				return
+			}
+			super(event)
+		case qt6.Key_Up, qt6.Key_Down:
+			if d.moveKey(event) {
 				event.Accept()
 				return
 			}
@@ -240,8 +266,9 @@ func (d *groupsDialog) fieldRow() *qt6.QWidget {
 	return d.entryRow
 }
 
-// commands builds the four commands of the dialog. Nuovo and Rinomina open the
-// inline field; Rinomina and Elimina stay off without a selection.
+// commands builds the commands of the dialog. Nuovo and Rinomina open the
+// inline field; Rinomina, Elimina and the two moves stay off without a
+// selection, and the moves also stop at the two ends.
 func (d *groupsDialog) commands() *qt6.QHBoxLayout {
 	row := qt6.NewQHBoxLayout2()
 	row.SetSpacing(design.SpaceS)
@@ -258,6 +285,14 @@ func (d *groupsDialog) commands() *qt6.QHBoxLayout {
 	d.deleteButton.OnClicked(d.askDelete)
 	row.AddWidget(d.deleteButton.QWidget)
 
+	d.moveUpButton = detailButton(moveUpText, "groupsMoveUp", "Sposta il Gruppo scelto di un posto verso l'alto. Alt+Su.", false)
+	d.moveUpButton.OnClicked(func() { d.moveBy(-1) })
+	row.AddWidget(d.moveUpButton.QWidget)
+
+	d.moveDownButton = detailButton(moveDownText, "groupsMoveDown", "Sposta il Gruppo scelto di un posto verso il basso. Alt+Giù.", false)
+	d.moveDownButton.OnClicked(func() { d.moveBy(1) })
+	row.AddWidget(d.moveDownButton.QWidget)
+
 	row.AddStretch()
 
 	d.closeButton = detailButton(closeGroupsText, "groupsClose", "Chiude la gestione dei Gruppi.", true)
@@ -269,13 +304,15 @@ func (d *groupsDialog) commands() *qt6.QHBoxLayout {
 		{widget: d.newButton.QWidget, label: newGroupText},
 		{widget: d.renameButton.QWidget, label: renameGroupText},
 		{widget: d.deleteButton.QWidget, label: deleteGroupText},
+		{widget: d.moveUpButton.QWidget, label: moveUpText},
+		{widget: d.moveDownButton.QWidget, label: moveDownText},
 		{widget: d.closeButton.QWidget, label: closeGroupsText},
 	}
 	return row
 }
 
 // linkTabOrder puts the two states of the dialog in the reading order: the
-// list and the four commands, or the field and its two commands.
+// list and the commands, or the field and its two commands.
 func (d *groupsDialog) linkTabOrder() {
 	for i := 1; i < len(d.controls); i++ {
 		qt6.QWidget_SetTabOrder(d.controls[i-1].widget, d.controls[i].widget)
@@ -395,7 +432,8 @@ func groupCountText(count int) string {
 
 // refreshCommands turns the commands on and off from the state of the dialog:
 // nothing while an operation runs, the list and Nuovo while the field is
-// closed, and the field with its commands while it is open.
+// closed, and the field with its commands while it is open. A move is on only
+// when the chosen Group has a neighbour in that direction.
 func (d *groupsDialog) refreshCommands() {
 	field := d.fieldOpen
 	busy := d.busy
@@ -404,10 +442,85 @@ func (d *groupsDialog) refreshCommands() {
 	hasSelection := d.selectedName() != ""
 	d.renameButton.SetEnabled(!field && !busy && hasSelection)
 	d.deleteButton.SetEnabled(!field && !busy && hasSelection)
+	d.moveUpButton.SetEnabled(!field && !busy && d.canMove(-1))
+	d.moveDownButton.SetEnabled(!field && !busy && d.canMove(1))
 	d.closeButton.SetEnabled(!field && !busy)
 	d.entry.SetEnabled(!busy)
 	d.confirmField.SetEnabled(!busy)
 	d.cancelField.SetEnabled(!busy)
+}
+
+// canMove reports whether the chosen Group has a neighbour delta places away.
+func (d *groupsDialog) canMove(delta int) bool {
+	if d.selection < 0 || d.selection >= len(d.groups) {
+		return false
+	}
+	target := d.selection + delta
+	return target >= 0 && target < len(d.groups)
+}
+
+// moveBy moves the chosen Group by delta places. The commands are off at the
+// two ends and without a selection, and so is the key: the move stops there.
+func (d *groupsDialog) moveBy(delta int) {
+	if d.busy || d.fieldOpen {
+		return
+	}
+	name := d.selectedName()
+	if name == "" || !d.canMove(delta) {
+		return
+	}
+	d.showListError("")
+	d.moveFrom = d.selection
+	d.busy = true
+	d.refreshCommands()
+	if d.op.Move == nil {
+		d.moveDone(name, delta, nil)
+		return
+	}
+	d.op.Move(name, delta, func(err error) { d.moveDone(name, delta, err) })
+}
+
+// moveKey runs Alt+Up or Alt+Down on the chosen Group and reports whether the
+// key was a move. While the field is open or an operation runs the moves are
+// off, so the key changes nothing.
+func (d *groupsDialog) moveKey(event *qt6.QKeyEvent) bool {
+	if event.Modifiers()&qt6.AltModifier == 0 {
+		return false
+	}
+	switch qt6.Key(event.Key()) {
+	case qt6.Key_Up:
+		d.moveBy(-1)
+		return true
+	case qt6.Key_Down:
+		d.moveBy(1)
+		return true
+	}
+	return false
+}
+
+// moveDone applies the outcome of a move: an error sits under the list and
+// changes no order, a move that worked puts the Group in its new place and
+// keeps it selected. A snapshot can arrive before the outcome, so the dialog
+// swaps the list itself only while the Group still sits where the move began.
+func (d *groupsDialog) moveDone(name string, delta int, err error) {
+	if d.closed {
+		return
+	}
+	d.busy = false
+	if err != nil {
+		d.showListError(view.GroupErrorMessage(err))
+		d.refreshCommands()
+		return
+	}
+	index := d.indexOf(name)
+	if index == d.moveFrom {
+		d.groups, index = forms.MoveGroup(d.groups, index, delta)
+	}
+	if index >= 0 {
+		d.selection = index
+	}
+	d.rebuildList()
+	d.list.SetFocus()
 }
 
 // openCreate opens the field for a new Group.

@@ -292,6 +292,7 @@ func (s *shell) openGroups() {
 		Create: s.createGroup,
 		Rename: s.renameGroup,
 		Delete: s.deleteGroup,
+		Move:   s.moveGroup,
 	})
 	groups.onClose = func(changes []forms.GroupChange) {
 		if s.groups != groups {
@@ -341,6 +342,21 @@ func (s *shell) deleteGroup(name string, done func(error)) {
 	}
 	go func() {
 		err := manager.DeleteGroup(s.app.ctx, name)
+		mainthread.Start(func() { done(err) })
+	}()
+}
+
+// moveGroup moves a Group off the Qt thread. The database write must not
+// freeze the dialog, and the snapshot the Manager publishes brings the new
+// order to the list and the tray.
+func (s *shell) moveGroup(name string, delta int, done func(error)) {
+	manager := s.app.manager
+	if manager == nil {
+		done(nil)
+		return
+	}
+	go func() {
+		err := manager.MoveGroup(s.app.ctx, name, delta)
 		mainthread.Start(func() { done(err) })
 	}()
 }
