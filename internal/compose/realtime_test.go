@@ -3,6 +3,7 @@ package compose_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,12 @@ func startRun(t *testing.T, port docker.Docker, refreshEvery, retryEvery time.Du
 	if err != nil {
 		t.Fatal(err)
 	}
+	return startRunOn(t, m)
+}
+
+// startRunOn runs a Manager the test already prepared, until the test ends.
+func startRunOn(t *testing.T, m *compose.Manager) (*compose.Manager, <-chan compose.Snapshot) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := m.Watch(ctx)
 	done := make(chan struct{})
@@ -123,6 +130,57 @@ func TestRun_ContainerEventRefreshesOnlyTheAffectedProject(t *testing.T) {
 	}
 	if n := count(f, psArgs("sunlinkdocker")); n != psBefore {
 		t.Errorf("an unrelated project was refreshed (%d ps calls, was %d)", n, psBefore)
+	}
+}
+
+func TestRun_ContainerEventKeepsTheSavedGroups(t *testing.T) {
+	f := realDocker(t)
+	f.Follow(eventsArgs...)
+	release := f.Hold(eventsArgs...)
+	f.RespondStream([]byte(containerEvent(t, "start", "stellantisvpn")), nil, nil, eventsArgs...)
+
+	m := newManager(t, f, tempDB(t))
+	ctx := context.Background()
+	if err := m.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// Two Groups in an order that is not the alphabetical one, plus one no
+	// Project uses: the event must keep all of them, in this order.
+	for _, g := range []struct{ project, group string }{
+		{"sunlinkdocker", "Zeta"},
+		{"stellantisvpn", "Alfa"},
+		{"personalvpn", "Vuoto"},
+	} {
+		if err := m.UpdateSettings(ctx, g.project, compose.Settings{Group: ptr(g.group)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := m.UpdateSettings(ctx, "personalvpn", compose.Settings{Group: ptr("")}); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"Zeta", "Alfa", "Vuoto"}
+
+	// personalvpn changes too, so the first refresh notifies and the event is
+	// the only change after it.
+	f.Respond(fixture(t, "ps-stellantisvpn.json"), psArgs("personalvpn")...)
+	_, ch := startRunOn(t, m)
+	until(t, ch, "initial refresh", func(s compose.Snapshot) bool {
+		return find(t, s, "personalvpn").Status == compose.StatusStopped
+	})
+	lsBefore := count(f, lsArgs)
+
+	// The container comes up from a terminal; then its event arrives.
+	f.Respond(fixture(t, "ps-personalvpn.json"), psArgs("stellantisvpn")...)
+	release()
+
+	s := until(t, ch, "stellantisvpn running", func(s compose.Snapshot) bool {
+		return find(t, s, "stellantisvpn").Status == compose.StatusActive
+	})
+	if !reflect.DeepEqual(s.Groups, want) {
+		t.Errorf("Groups after a container event = %v, want %v", s.Groups, want)
+	}
+	if n := count(f, lsArgs); n != lsBefore {
+		t.Errorf("the event ran %d full refreshes, want none", n-lsBefore)
 	}
 }
 

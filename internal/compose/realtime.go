@@ -161,7 +161,9 @@ func (m *Manager) refreshProject(ctx context.Context, name string) error {
 	projects[idx].Status = model.StatusOf(running, len(cs))
 	projects[idx].Services = parse.GroupByService(cs)
 	projects[idx].ComposeMissing = composeMissing(projects[idx].ComposeFiles)
-	m.publish(Snapshot{DockerReachable: true, Projects: projects})
+	// The Groups are saved on their own: they do not derive from the Projects,
+	// so they come from the base snapshot, not from the refreshed Projects.
+	m.publish(Snapshot{DockerReachable: true, Projects: projects, Groups: append([]string{}, base.Groups...)})
 	return nil
 }
 
