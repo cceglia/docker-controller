@@ -7,6 +7,7 @@ import (
 	"dockercontroller/internal/compose"
 	"dockercontroller/internal/gui/activity"
 	"dockercontroller/internal/gui/design"
+	"dockercontroller/internal/gui/forms"
 	"dockercontroller/internal/gui/usage"
 	"dockercontroller/internal/gui/view"
 	"dockercontroller/internal/tray"
@@ -58,6 +59,8 @@ type shell struct {
 	notice *toast
 	// addForm is the form of a new Project on screen, nil when it is closed.
 	addForm *addDialog
+	// groups is the dialog of the Groups on screen, nil when it is closed.
+	groups *groupsDialog
 
 	// selected is the compose name of the open Project, "" when none is open.
 	selected string
@@ -225,6 +228,7 @@ func (s *shell) buildDetail() {
 	s.panel = newDetailPanel(s.theme)
 	s.panel.onAction = s.do
 	s.panel.onSave = s.save
+	s.panel.onGroups = s.openGroups
 	s.panel.onFolder = s.openFolder
 	s.panel.onTerminal = s.openTerminal
 	s.panel.onPort = s.openPort
@@ -271,6 +275,73 @@ func (s *shell) save(name string, settings compose.Settings) {
 	go func() {
 		err := manager.UpdateSettings(s.app.ctx, name, settings)
 		mainthread.Start(func() { s.panel.saveDone(err) })
+	}()
+}
+
+// openGroups opens the modal dialog of the Groups over the form of the Project.
+// One dialog at a time: a second command raises the one on screen. The dialog
+// hands the records of its operations to the form, which applies them when it
+// closes.
+func (s *shell) openGroups() {
+	if s.groups != nil {
+		s.groups.dialog.Raise()
+		s.groups.dialog.ActivateWindow()
+		return
+	}
+	groups := newGroupsDialog(s.panel.parent(), s.snapshot.Groups, s.snapshot.Projects, groupDialogOperator{
+		Create: s.createGroup,
+		Rename: s.renameGroup,
+		Delete: s.deleteGroup,
+	})
+	groups.onClose = func(changes []forms.GroupChange) {
+		if s.groups != groups {
+			return
+		}
+		s.groups = nil
+		s.panel.groupsDone(changes, groups.groupNames())
+	}
+	s.groups = groups
+	groups.open()
+}
+
+// createGroup saves a Group off the Qt thread: the database write must not
+// freeze the dialog. The result comes back on the Qt thread, where a refusal
+// keeps the field open and the snapshot reaches the list and the form.
+func (s *shell) createGroup(name string, done func(error)) {
+	manager := s.app.manager
+	if manager == nil {
+		done(nil)
+		return
+	}
+	go func() {
+		err := manager.CreateGroup(s.app.ctx, name)
+		mainthread.Start(func() { done(err) })
+	}()
+}
+
+// renameGroup renames a Group, or unites two, off the Qt thread.
+func (s *shell) renameGroup(from, to string, done func(error)) {
+	manager := s.app.manager
+	if manager == nil {
+		done(nil)
+		return
+	}
+	go func() {
+		err := manager.RenameGroup(s.app.ctx, from, to)
+		mainthread.Start(func() { done(err) })
+	}()
+}
+
+// deleteGroup removes a Group off the Qt thread.
+func (s *shell) deleteGroup(name string, done func(error)) {
+	manager := s.app.manager
+	if manager == nil {
+		done(nil)
+		return
+	}
+	go func() {
+		err := manager.DeleteGroup(s.app.ctx, name)
+		mainthread.Start(func() { done(err) })
 	}()
 }
 
@@ -438,6 +509,9 @@ func (s *shell) apply(snapshot compose.Snapshot) {
 	s.panel.setDocker(snapshot.DockerReachable, snapshot.Loading)
 	s.list.set(snapshot.Projects, snapshot.Groups, s.selected, snapshot.Loading)
 	s.panel.setGroups(snapshot.Groups)
+	if s.groups != nil {
+		s.groups.setSnapshot(snapshot.Groups, snapshot.Projects)
+	}
 	if s.selected == "" {
 		s.panel.clear()
 		s.bottom.setProject(compose.Project{})

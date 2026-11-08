@@ -151,6 +151,28 @@ func (p *detailPanel) setGroups(groups []string) {
 	p.groups = groups
 }
 
+// openGroups asks the shell to open the dialog of the Groups over the form. The
+// dialog owns the operations and hands the records back at the close.
+func (p *detailPanel) openGroups() {
+	if p.edit == nil || p.onGroups == nil {
+		return
+	}
+	p.onGroups()
+}
+
+// groupsDone applies the records of the dialog of the Groups to the form and
+// draws it again with the list the dialog left, so the Group field shows the
+// outcome at once. Display name and Profiles keep what the user typed.
+func (p *detailPanel) groupsDone(changes []forms.GroupChange, groups []string) {
+	p.groups = append([]string{}, groups...)
+	if p.edit == nil {
+		return
+	}
+	p.edit.edit.Group = forms.ApplyGroupChanges(p.edit.edit.Group, changes)
+	p.render()
+	p.focusControl(groupsCommandText)
+}
+
 // fieldAccessibleName is the accessible name of a field of the form: its
 // caption, then the message that says what is wrong with it, so a screen reader
 // repeats the error with the field.
@@ -165,6 +187,13 @@ func fieldAccessibleName(caption, message string) string {
 // and, under it, the message of a refused save and the hint. The labels wrap, so
 // a narrow panel keeps the whole text and the field its height.
 func editField(caption string, field *qt6.QWidget, message, hint string) *qt6.QWidget {
+	return editFieldBuddy(caption, field, field, message, hint)
+}
+
+// editFieldBuddy is editField with the widget the caption focuses when the user
+// presses its mnemonic: a field inside a row with a command keeps that focus on
+// the field itself.
+func editFieldBuddy(caption string, field, buddy *qt6.QWidget, message, hint string) *qt6.QWidget {
 	widget := qt6.NewQWidget2()
 
 	box := qt6.NewQVBoxLayout(widget)
@@ -172,7 +201,7 @@ func editField(caption string, field *qt6.QWidget, message, hint string) *qt6.QW
 	box.SetSpacing(design.SpaceXS)
 
 	label := detailLabel(caption, "fieldLabel")
-	label.SetBuddy(field)
+	label.SetBuddy(buddy)
 	box.AddWidget(label.QWidget)
 	box.AddWidget(field)
 	if message != "" {
@@ -223,7 +252,7 @@ func (p *detailPanel) editBlock() *qt6.QWidget {
 
 	// Gruppo: a box the user types in, which proposes the saved Groups in the
 	// order of the snapshot. An empty box is no Group, and the hint of the box
-	// says so.
+	// says so. Next to the box the command opens the dialog of the Groups.
 	group := qt6.NewQComboBox2()
 	setObjectName(group.QWidget, "editGroup")
 	group.SetEditable(true)
@@ -238,13 +267,24 @@ func (p *detailPanel) editBlock() *qt6.QWidget {
 		form.edit.Group = text
 	})
 	form.group = group
-	box.AddWidget(editField(groupLabelText, group.QWidget, form.groupMessage, groupHint))
+
+	groupRow := qt6.NewQWidget2()
+	groupLine := qt6.NewQHBoxLayout(groupRow)
+	groupLine.SetContentsMargins(0, 0, 0, 0)
+	groupLine.SetSpacing(design.SpaceS)
+	groupLine.AddWidget2(group.QWidget, 1)
+	groups := detailButton(groupsCommandText, "editGroups", "Gestisci i Gruppi: crea, rinomina o elimina un Gruppo.", true)
+	groups.OnClicked(p.openGroups)
+	groupLine.AddWidget(groups.QWidget)
+	box.AddWidget(editFieldBuddy(groupLabelText, groupRow, group.QWidget, form.groupMessage, groupHint))
 
 	// The two fields join the tab chain in the reading order, before the
-	// Profiles and the commands.
+	// Profiles and the commands. The command of the Groups follows the Group
+	// field it works on.
 	p.controls = append(p.controls,
 		panelControl{widget: name.QWidget, label: displayNameLabelText},
 		panelControl{widget: group.QWidget, label: groupLabelText},
+		panelControl{widget: groups.QWidget, label: groupsCommandText},
 	)
 
 	// Profili attivi: one check per Profile the compose files define. A Project

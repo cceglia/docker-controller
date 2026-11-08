@@ -99,3 +99,18 @@ func WithMessage(err error, msg string) error {
 	}
 	return &localizedError{msg: msg, cause: err}
 }
+
+// GroupErrorMessage returns the Italian message of a refused Group operation. A
+// duplicate that carries the saved name says which Group already exists; a
+// duplicate without the name falls back to the generic message of KnownMessage.
+// Every other error keeps the message of the single table.
+func GroupErrorMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	var duplicate *compose.DuplicateGroupError
+	if errors.As(err, &duplicate) && duplicate.Existing != "" {
+		return "Esiste già il Gruppo «" + duplicate.Existing + "»."
+	}
+	return UserError(err).Error()
+}

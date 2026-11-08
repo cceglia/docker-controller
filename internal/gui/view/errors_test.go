@@ -110,6 +110,28 @@ func TestKnownMessage_TranslatesTheGroupErrors(t *testing.T) {
 	}
 }
 
+func TestGroupErrorMessage_NamesTheExistingGroup(t *testing.T) {
+	// A duplicate carries the saved spelling, so the message says which Group
+	// already exists and the user can correct the typed name.
+	err := fmt.Errorf("create Group: %w", &compose.DuplicateGroupError{Existing: "Lavoro"})
+	if got, want := GroupErrorMessage(err), "Esiste già il Gruppo «Lavoro»."; got != want {
+		t.Errorf("GroupErrorMessage = %q, want %q", got, want)
+	}
+
+	// A duplicate without the name falls back to the generic message of the
+	// table, and an error that concerns another matter keeps its own message.
+	generic, _ := KnownMessage(compose.ErrDuplicateGroup)
+	if got := GroupErrorMessage(&compose.DuplicateGroupError{}); got != generic {
+		t.Errorf("a duplicate without a name = %q, want the generic %q", got, generic)
+	}
+	if got, want := GroupErrorMessage(compose.ErrUnknownGroup), "Gruppo sconosciuto."; got != want {
+		t.Errorf("an unknown Group = %q, want %q", got, want)
+	}
+	if got := GroupErrorMessage(nil); got != "" {
+		t.Errorf("nil = %q, want no message", got)
+	}
+}
+
 func TestWithMessage_KeepsTheChain(t *testing.T) {
 	cause := errors.New("boom")
 	got := WithMessage(cause, "Messaggio.")

@@ -77,6 +77,9 @@ type detailPanel struct {
 	// onSave hands the values of the form to the shell, which reaches the
 	// Manager off the Qt thread. A nil function closes the form at once.
 	onSave func(string, compose.Settings)
+	// onGroups asks the shell to open the dialog of the Groups over the form. A
+	// nil function opens nothing.
+	onGroups func()
 	// groups are the saved Groups of the last snapshot, in the user's order: the
 	// Group field proposes them.
 	groups []string

@@ -16,6 +16,7 @@ import (
 	"github.com/mappu/miqt/qt6"
 
 	"dockercontroller/internal/compose"
+	"dockercontroller/internal/compose/model"
 	"dockercontroller/internal/gui/activity"
 	"dockercontroller/internal/gui/design"
 	"dockercontroller/internal/gui/forms"
@@ -76,6 +77,7 @@ func TestShellOffscreen(t *testing.T) {
 	checkDetailPanel(t, s)
 	checkList(t, s)
 	checkEditForm(t, s)
+	checkGroupsDialog(t, s)
 	checkActions(t, s)
 	checkConfirmDialog(t, s)
 	checkCommands(t, s)
@@ -470,7 +472,7 @@ func checkEditForm(t *testing.T, s *shell) {
 	// The form is one step of the keyboard: the tab order follows the reading
 	// order, and the focus starts on its first field.
 	if got, want := formOrder(s.panel, shop), []string{
-		displayNameLabelText, groupLabelText, "debug", "metrics", cancelText, saveText,
+		displayNameLabelText, groupLabelText, groupsCommandText, "debug", "metrics", cancelText, saveText,
 	}; !slices.Equal(got, want) {
 		t.Errorf("the tab order of the form is %v, want %v", got, want)
 	}
@@ -659,6 +661,519 @@ func checkEditForm(t *testing.T, s *shell) {
 	checkMinimumTargets(t, s.window)
 }
 
+// checkGroupsDialog drives the dialog of the Groups from the form of a Project:
+// creation, rename, union and deletion through its widgets, the counts of the
+// list, the disabled commands, the inline name field, the snapshot that keeps
+// what the user typed, the focus, the keyboard and the records the form applies
+// at the close. It is a step of the smoke test.
+func checkGroupsDialog(t *testing.T, s *shell) {
+	t.Helper()
+
+	shop := fakeProject()
+	shop.Profiles = []string{"debug", "metrics"}
+	other := shop
+	other.Name = "vakt"
+	other.DisplayName = ""
+	other.Group = "Lavoro"
+	projects := []compose.Project{shop, other}
+	groups := []string{"Casa", "Lavoro", "Vuoto"}
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: projects, Groups: groups})
+	s.open(shop)
+	settle()
+	s.panel.startEdit()
+	settle()
+
+	form := blockNamed(s.panel, editTitle)
+	if form == nil {
+		t.Fatal("the form of the Project does not open")
+	}
+	commands := widgetsNamed(form, "editGroups")
+	if len(commands) != 1 {
+		t.Fatalf("the Group field carries %d commands to open the Groups, want 1", len(commands))
+	}
+	groupsCommand := qt6.UnsafeNewQPushButton(commands[0].UnsafePointer())
+	if got := groupsCommand.Text(); got != groupsCommandText {
+		t.Errorf("the command reads %q, want %q", got, groupsCommandText)
+	}
+	if !groupsCommand.IsEnabled() {
+		t.Error("the command of the Groups is insensitive on the form")
+	}
+
+	groupsCommand.Click()
+	settle()
+	d := s.groups
+	if d == nil {
+		t.Fatal("the command opens no dialog of the Groups")
+	}
+	if !d.dialog.IsModal() {
+		t.Error("the dialog of the Groups is not modal")
+	}
+	if got := d.dialog.WindowTitle(); got != groupsTitle {
+		t.Errorf("the dialog is titled %q, want %q", got, groupsTitle)
+	}
+	if got := d.list.AccessibleName(); got != groupsTitle {
+		t.Errorf("the list is named %q, want %q", got, groupsTitle)
+	}
+	if got := d.entry.AccessibleName(); got != groupNameLabelText {
+		t.Errorf("the field is named %q, want %q", got, groupNameLabelText)
+	}
+
+	// The list follows the order of the snapshot and counts the Projects of each
+	// Group, saying when there is none.
+	wantRows := []string{
+		"Casa (1 Progetto)",
+		"Lavoro (1 Progetto)",
+		"Vuoto (nessun Progetto)",
+	}
+	if got := listTexts(d.list); !slices.Equal(got, wantRows) {
+		t.Errorf("the list shows %v, want %v", got, wantRows)
+	}
+
+	// Without a selection Rinomina and Elimina are off, Nuovo and Chiudi stay on.
+	if d.renameButton.IsEnabled() || d.deleteButton.IsEnabled() {
+		t.Error("Rinomina or Elimina is on without a selection")
+	}
+	if !d.newButton.IsEnabled() || !d.closeButton.IsEnabled() {
+		t.Error("Nuovo or Chiudi is off without a selection")
+	}
+	d.list.SetCurrentRow(1)
+	settle()
+	if !d.renameButton.IsEnabled() || !d.deleteButton.IsEnabled() {
+		t.Error("Rinomina or Elimina stays off with a selection")
+	}
+
+	// The tab order follows the reading order, and a snapshot keeps the
+	// selection.
+	if got, want := controlLabels(d.controls), []string{
+		groupsTitle, newGroupText, renameGroupText, deleteGroupText, closeGroupsText,
+	}; !slices.Equal(got, want) {
+		t.Errorf("the tab order of the dialog is %v, want %v", got, want)
+	}
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: projects, Groups: groups})
+	settle()
+	if got := d.selectedName(); got != "Lavoro" {
+		t.Errorf("the snapshot moved the selection to %q, want Lavoro", got)
+	}
+
+	// Nuovo opens the inline field with Conferma and Annulla and shuts every
+	// other command, the list included.
+	d.newButton.Click()
+	settle()
+	if !d.fieldOpen {
+		t.Fatal("Nuovo opens no field")
+	}
+	if got := d.entry.Text(); got != "" {
+		t.Errorf("the new name starts as %q, want empty", got)
+	}
+	if d.list.IsEnabled() || d.newButton.IsEnabled() || d.renameButton.IsEnabled() ||
+		d.deleteButton.IsEnabled() || d.closeButton.IsEnabled() {
+		t.Error("a command or the list stays on while the field is open")
+	}
+	if got, want := controlLabels(d.fieldControls), []string{
+		groupNameLabelText, confirmGroupText, cancelFieldText,
+	}; !slices.Equal(got, want) {
+		t.Errorf("the tab order of the field is %v, want %v", got, want)
+	}
+	if got := d.dialog.FocusWidget(); got == nil || got.UnsafePointer() != d.entry.QWidget.UnsafePointer() {
+		t.Error("the open field does not take the focus")
+	}
+
+	// A snapshot keeps the typed text.
+	d.entry.SetText("lavoro")
+	s.apply(compose.Snapshot{DockerReachable: true, Projects: projects, Groups: groups})
+	settle()
+	if got := d.entry.Text(); got != "lavoro" {
+		t.Errorf("a snapshot changed the typed name to %q", got)
+	}
+
+	// A reserved name is refused under the field and in its accessible
+	// description, and the field stays open.
+	invalid, _ := view.KnownMessage(compose.ErrInvalidGroupName)
+	d.entry.SetText(forms.NoGroupText)
+	d.confirmField.Click()
+	settle()
+	if !d.fieldOpen {
+		t.Error("a refused name closes the field")
+	}
+	if got := d.fieldMessage.Text(); got != invalid {
+		t.Errorf("the refusal reads %q under the field, want %q", got, invalid)
+	}
+	if got := d.entry.AccessibleDescription(); !strings.Contains(got, invalid) {
+		t.Errorf("the field says %q, want it to repeat %q", got, invalid)
+	}
+
+	// A duplicate is judged by the Manager and the message names the saved
+	// Group; a duplicate without the name falls back to the generic message.
+	d.op.Create = func(string, func(error)) {
+		d.creationDone("lavoro", &model.DuplicateGroupError{Existing: "Lavoro"})
+	}
+	d.entry.SetText("lavoro")
+	d.confirmField.Click()
+	settle()
+	if got, want := d.fieldMessage.Text(), "Esiste già il Gruppo «Lavoro»."; got != want {
+		t.Errorf("the duplicate reads %q, want %q", got, want)
+	}
+	d.op.Create = func(string, func(error)) {
+		d.creationDone("lavoro", &model.DuplicateGroupError{})
+	}
+	d.confirmField.Click()
+	settle()
+	generic, _ := view.KnownMessage(compose.ErrDuplicateGroup)
+	if got := d.fieldMessage.Text(); got != generic {
+		t.Errorf("a duplicate without a name reads %q, want the generic %q", got, generic)
+	}
+
+	// A creation that works closes the field, selects the new Group at the end
+	// and goes on the records of the form.
+	d.op.Create = func(string, func(error)) { d.creationDone("Nuovo", nil) }
+	d.entry.SetText("  Nuovo  ")
+	d.confirmField.Click()
+	settle()
+	if d.fieldOpen {
+		t.Error("Conferma leaves the field open after a creation")
+	}
+	if got := d.selectedName(); got != "Nuovo" {
+		t.Errorf("after the creation the selection is %q, want Nuovo", got)
+	}
+	if got := listTexts(d.list); !slices.Equal(got, append(wantRows, "Nuovo (nessun Progetto)")) {
+		t.Errorf("the list shows %v after the creation, want the new Group at the end", got)
+	}
+	if got := d.changes[len(d.changes)-1]; got.Kind != forms.GroupCreated || got.From != "" || got.To != "Nuovo" {
+		t.Errorf("the creation record is %+v, want an empty departure and Nuovo", got)
+	}
+
+	// Annulla always closes the field; Escape cancels it and keeps the dialog.
+	d.list.SetCurrentRow(0)
+	settle()
+	d.renameButton.Click()
+	settle()
+	if got := d.entry.Text(); got != "Casa" {
+		t.Errorf("Rinomina starts from %q, want the selected Group Casa", got)
+	}
+	d.entry.SetText("Scartato")
+	d.cancelField.Click()
+	settle()
+	if d.fieldOpen {
+		t.Error("Annulla leaves the field open")
+	}
+	if !d.list.IsEnabled() || !d.newButton.IsEnabled() {
+		t.Error("Annulla leaves the commands off")
+	}
+	d.renameButton.Click()
+	settle()
+	pressDialogKey(d, qt6.Key_Escape)
+	settle()
+	if d.fieldOpen {
+		t.Error("Escape does not cancel the open field")
+	}
+	if d.closed {
+		t.Error("Escape with the field open closes the dialog")
+	}
+
+	// A plain rename keeps the Group in its place and the selection on it.
+	d.op.Rename = func(string, string, func(error)) { d.renameDone("Casa", "Ufficio", false, nil) }
+	d.renameButton.Click()
+	settle()
+	d.entry.SetText("Ufficio")
+	d.confirmField.Click()
+	settle()
+	if got := d.selectedName(); got != "Ufficio" {
+		t.Errorf("after the rename the selection is %q, want Ufficio", got)
+	}
+	if got := listTexts(d.list); !slices.Equal(got, []string{
+		"Ufficio (1 Progetto)", "Lavoro (1 Progetto)", "Vuoto (nessun Progetto)", "Nuovo (nessun Progetto)",
+	}) {
+		t.Errorf("the list shows %v after the rename", got)
+	}
+	if got := d.changes[len(d.changes)-1]; got.Kind != forms.GroupRenamed || got.From != "Casa" || got.To != "Ufficio" {
+		t.Errorf("the rename record is %+v, want Casa to Ufficio", got)
+	}
+
+	// A rename onto a saved Group asks for a union with the count of the
+	// Projects that move, and the selection goes to the survivor.
+	var question guiproject.Confirmation
+	asked := false
+	d.onConfirm = func(q guiproject.Confirmation, run func()) { asked = true; question = q; run() }
+	d.op.Rename = func(string, string, func(error)) { d.renameDone("Ufficio", "Lavoro", true, nil) }
+	d.renameButton.Click()
+	settle()
+	d.entry.SetText("Lavoro")
+	d.confirmField.Click()
+	settle()
+	if !asked {
+		t.Error("the union asks no confirmation")
+	}
+	if !strings.Contains(question.Message, "1 Progetto") {
+		t.Errorf("the union says %q, want the count of the Projects", question.Message)
+	}
+	if got := d.selectedName(); got != "Lavoro" {
+		t.Errorf("after the union the selection is %q, want the survivor Lavoro", got)
+	}
+	if got := listTexts(d.list); !slices.Equal(got, []string{
+		"Lavoro (2 Progetti)", "Vuoto (nessun Progetto)", "Nuovo (nessun Progetto)",
+	}) {
+		t.Errorf("the list shows %v after the union", got)
+	}
+	if got := d.changes[len(d.changes)-1]; got.Kind != forms.GroupUnited || got.From != "Ufficio" || got.To != "Lavoro" {
+		t.Errorf("the union record is %+v, want Ufficio to Lavoro", got)
+	}
+
+	// An error that does not concern the field shows under the list and keeps
+	// the field open.
+	d.op.Rename = func(string, string, func(error)) { d.renameDone("Vorrei", "X", false, compose.ErrUnknownGroup) }
+	d.list.SetCurrentRow(1)
+	settle()
+	d.renameButton.Click()
+	settle()
+	d.entry.SetText("X")
+	d.confirmField.Click()
+	settle()
+	if got, want := d.errorLine.Text(), "Gruppo sconosciuto."; got != want {
+		t.Errorf("the unknown Group reads %q under the list, want %q", got, want)
+	}
+	if !d.fieldOpen {
+		t.Error("a refused rename closes the field")
+	}
+	d.cancelField.Click()
+	settle()
+
+	// Chiudi gives the form its field back with the new Group, and the focus
+	// returns to the command that opened the dialog.
+	d.closeButton.Click()
+	settle()
+	if !d.closed {
+		t.Fatal("Chiudi leaves the dialog open")
+	}
+	if s.groups != nil {
+		t.Error("the shell keeps the closed dialog")
+	}
+	if blockNamed(s.panel, editTitle) == nil {
+		t.Fatal("closing the dialog closes the form")
+	}
+	if got := s.panel.edit.group.CurrentText(); got != "Lavoro" {
+		t.Errorf("the Group field shows %q after the close, want the survivor Lavoro", got)
+	}
+	if got := s.panel.edit.name.Text(); got != shop.DisplayName {
+		t.Errorf("the closing dialog changed the Display name to %q", got)
+	}
+	if got, want := itemsOf(s.panel.edit.group), forms.GroupSuggestions([]string{"", "Lavoro", "Vuoto", "Nuovo"}); !slices.Equal(got, want) {
+		t.Errorf("the Group field proposes %v after the close, want %v", got, want)
+	}
+	if !s.panel.edit.edit.ProfileOn("debug") {
+		t.Error("the closing dialog turned the Profile the user checked off")
+	}
+	form = blockNamed(s.panel, editTitle)
+	commands = widgetsNamed(form, "editGroups")
+	if len(commands) != 1 {
+		t.Fatal("the form carries no command of the Groups after the close")
+	}
+	if got := s.window.FocusWidget(); got == nil || got.UnsafePointer() != commands[0].UnsafePointer() {
+		t.Error("the close does not give the focus back to the command of the Groups")
+	}
+
+	// The snapshot that follows the operations brings the same list to the
+	// window, as the Manager publishes it.
+	shopAfter, otherAfter := shop, other
+	shopAfter.Group, otherAfter.Group = "Lavoro", "Lavoro"
+	s.apply(compose.Snapshot{
+		DockerReachable: true,
+		Projects:        []compose.Project{shopAfter, otherAfter},
+		Groups:          []string{"Lavoro", "Vuoto", "Nuovo"},
+	})
+	settle()
+
+	// The list of the Projects follows the same order, and a Group without
+	// Projects leaves no heading.
+	rows := listRows(s.list.widget)
+	if len(rows) == 0 || rows[0] != "Lavoro" {
+		t.Errorf("the list headings after the operations are %v, want Lavoro first", rows)
+	}
+	for _, empty := range []string{"Vuoto", "Nuovo"} {
+		if slices.Contains(rows, empty) {
+			t.Errorf("the list shows the heading %q of a Group without Projects: %v", empty, rows)
+		}
+	}
+
+	// Deletion: the question says how many Projects go to Senza Gruppo, the
+	// selection takes the empty place, and the field of the form empties.
+	qt6.UnsafeNewQPushButton(commands[0].UnsafePointer()).Click()
+	settle()
+	d = s.groups
+	if d == nil {
+		t.Fatal("the command opens no dialog the second time")
+	}
+	if got, want := listTexts(d.list), []string{
+		"Lavoro (2 Progetti)", "Vuoto (nessun Progetto)", "Nuovo (nessun Progetto)",
+	}; !slices.Equal(got, want) {
+		t.Errorf("the second dialog shows %v, want %v", got, want)
+	}
+	d.onConfirm = func(q guiproject.Confirmation, run func()) { question = q; run() }
+	d.op.Delete = func(string, func(error)) { d.deleteDone("Lavoro", nil) }
+	d.list.SetCurrentRow(0)
+	settle()
+	d.deleteButton.Click()
+	settle()
+	if !strings.Contains(question.Message, "2 Progetti") {
+		t.Errorf("the deletion says %q, want the count of the Projects", question.Message)
+	}
+	if got := d.selectedName(); got != "Vuoto" {
+		t.Errorf("after the deletion the selection is %q, want the Group that took the place", got)
+	}
+	if got := listTexts(d.list); !slices.Equal(got, []string{
+		"Vuoto (nessun Progetto)", "Nuovo (nessun Progetto)",
+	}) {
+		t.Errorf("the list shows %v after the deletion", got)
+	}
+	if got := d.changes[len(d.changes)-1]; got.Kind != forms.GroupDeleted || got.From != "Lavoro" || got.To != "" {
+		t.Errorf("the deletion record is %+v, want Lavoro with an empty arrival", got)
+	}
+
+	// During an operation every command is off and a second click starts
+	// nothing. Escape and Chiudi are ignored until the outcome arrives.
+	var blocked func(error)
+	calls := 0
+	d.op.Delete = func(string, func(error)) { calls++; blocked = func(err error) { d.deleteDone("Vuoto", err) } }
+	d.list.SetCurrentRow(0)
+	settle()
+	d.deleteButton.Click()
+	settle()
+	if !d.busy {
+		t.Fatal("the dialog is not busy during the operation")
+	}
+	for _, button := range []*qt6.QPushButton{d.newButton, d.renameButton, d.deleteButton, d.closeButton} {
+		if button.IsEnabled() {
+			t.Errorf("the command %q is on during the operation", button.Text())
+		}
+	}
+	if d.list.IsEnabled() {
+		t.Error("the list accepts clicks during the operation")
+	}
+	d.deleteButton.Click()
+	settle()
+	if calls != 1 {
+		t.Errorf("a second click started %d operations, want 1", calls)
+	}
+	pressDialogKey(d, qt6.Key_Escape)
+	settle()
+	if d.closed {
+		t.Error("Escape closes the dialog during an operation")
+	}
+	d.closeButton.Click()
+	settle()
+	if d.closed {
+		t.Error("Chiudi closes the dialog during an operation")
+	}
+	blocked(nil)
+	settle()
+	if d.busy {
+		t.Error("the dialog stays busy after the outcome")
+	}
+	if !d.newButton.IsEnabled() || !d.closeButton.IsEnabled() {
+		t.Error("the commands stay off after the outcome")
+	}
+
+	// The dialog meets the target of 24 px on every control.
+	checkGroupDialogTargets(t, d.dialog)
+
+	d.closeButton.Click()
+	settle()
+	if got := s.panel.edit.group.CurrentText(); got != "" {
+		t.Errorf("the Group field shows %q after the deletion, want empty", got)
+	}
+	shopAfter.Group, otherAfter.Group = "", ""
+	s.apply(compose.Snapshot{
+		DockerReachable: true,
+		Projects:        []compose.Project{shopAfter, otherAfter},
+		Groups:          []string{"Vuoto", "Nuovo"},
+	})
+	settle()
+
+	// Escape without an open field closes the dialog, and the focus returns to
+	// the command of the Groups.
+	commands = widgetsNamed(blockNamed(s.panel, editTitle), "editGroups")
+	d = nil
+	qt6.UnsafeNewQPushButton(commands[0].UnsafePointer()).Click()
+	settle()
+	d = s.groups
+	if d == nil {
+		t.Fatal("the command opens no dialog the third time")
+	}
+	pressDialogKey(d, qt6.Key_Escape)
+	settle()
+	if !d.closed {
+		t.Error("Escape without an open field leaves the dialog open")
+	}
+	if s.groups != nil {
+		t.Error("the shell keeps the dialog Escape closed")
+	}
+	commands = widgetsNamed(blockNamed(s.panel, editTitle), "editGroups")
+	if got := s.window.FocusWidget(); got == nil || got.UnsafePointer() != commands[0].UnsafePointer() {
+		t.Error("Escape does not give the focus back to the command of the Groups")
+	}
+
+	// The step of the form leaves the panel as it found it.
+	s.panel.cancelEdit()
+	settle()
+}
+
+// listTexts lists the text of every row of a list.
+func listTexts(list *qt6.QListWidget) []string {
+	out := make([]string, 0, list.Count())
+	for i := 0; i < list.Count(); i++ {
+		if item := list.Item(i); item != nil {
+			out = append(out, item.Text())
+		}
+	}
+	return out
+}
+
+// controlLabels lists the labels of a list of controls, in order.
+func controlLabels(controls []panelControl) []string {
+	out := make([]string, 0, len(controls))
+	for _, control := range controls {
+		out = append(out, control.label)
+	}
+	return out
+}
+
+// pressDialogKey sends a key press to a dialog, as the keyboard would.
+func pressDialogKey(d *groupsDialog, key qt6.Key) {
+	handle := d.dialog.WindowHandle()
+	if handle == nil {
+		return
+	}
+	event := qt6.NewQKeyEvent(qt6.QEvent__KeyPress, int(key), qt6.NoModifier)
+	qt6.QCoreApplication_SendEvent(handle.QObject, event.QInputEvent.QEvent)
+	event.Delete()
+}
+
+// checkGroupDialogTargets checks the 24 px target on every control of a dialog.
+func checkGroupDialogTargets(t *testing.T, dialog *qt6.QDialog) {
+	t.Helper()
+
+	checked := 0
+	for _, widget := range qt6.QApplication_AllWidgets() {
+		if widget.Window().UnsafePointer() != dialog.QWidget.UnsafePointer() {
+			continue
+		}
+		if widget.FocusPolicy() == qt6.NoFocus {
+			continue
+		}
+		widget.EnsurePolished()
+		hint, minimum := widget.SizeHint(), widget.MinimumSizeHint()
+		width := max(hint.Width(), minimum.Width())
+		height := max(hint.Height(), minimum.Height())
+		if width < design.TargetMin || height < design.TargetMin {
+			t.Errorf("control %q: target %dx%d, want at least %dx%d",
+				widget.ObjectName(), width, height, design.TargetMin, design.TargetMin)
+		}
+		checked++
+	}
+	if checked == 0 {
+		t.Fatal("no interactive control found in the dialog: the wiring is broken")
+	}
+}
+
 // pressKey sends a key press to the window, as the keyboard would.
 func pressKey(s *shell, key qt6.Key) {
 	handle := s.window.WindowHandle()
@@ -700,6 +1215,7 @@ func formOrder(p *detailPanel, project compose.Project) []string {
 	fields := map[string]bool{
 		displayNameLabelText: true,
 		groupLabelText:       true,
+		groupsCommandText:    true,
 		cancelText:           true,
 		saveText:             true,
 	}
